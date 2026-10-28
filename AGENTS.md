@@ -15,6 +15,8 @@ pnpm typecheck
 
 Use `pnpm hmr` for live server and browser updates; `pnpm dev` only watches and restarts the server. `pnpm start` runs in production mode without a separate build step.
 
+`dev` and `start` run on Bun (`Bun.serve`); `hmr` stays on Node because `remix/node-hmr` spawns the entry with Node loader hooks. `server.ts` supports both runtimes.
+
 ## Building Features
 
 Refer to ./.agents/skills/remix/SKILL.md for the Remix mental model and how to find guides and API READMEs through `node_modules/remix/INDEX.md`.
