@@ -1,12 +1,12 @@
 // Delete this file and put your own home page in app/actions/controller.tsx
-import type { Handle, RemixNode } from 'remix/component'
-import { css } from 'remix/component'
+import type { Handle, RemixNode } from 'remix/component';
+import { css } from 'remix/component';
 
-import { Document } from './document.tsx'
-import { PromptButton } from './public/prompt-button.tsx'
+import { Document } from './document.tsx';
+import { PromptButton } from './public/prompt-button.tsx';
 
 const FONT_STACK =
-  "'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+  "'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
 
 export function HomePage() {
   return () => (
@@ -60,7 +60,7 @@ export function HomePage() {
         </div>
       </main>
     </Document>
-  )
+  );
 }
 
 function HomeHead() {
@@ -73,7 +73,7 @@ function HomeHead() {
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap"
       />
     </>
-  )
+  );
 }
 
 function Masthead() {
@@ -105,7 +105,7 @@ function Masthead() {
       </p>
       <RemixWordmarkHero />
     </section>
-  )
+  );
 }
 
 function Columns() {
@@ -127,7 +127,7 @@ function Columns() {
       <GetStartedCard />
       <CodingWithAiCard />
     </section>
-  )
+  );
 }
 
 function GetStartedCard() {
@@ -157,7 +157,7 @@ function GetStartedCard() {
         </li>
       </ul>
     </div>
-  )
+  );
 }
 
 function CodingWithAiCard() {
@@ -199,12 +199,12 @@ function CodingWithAiCard() {
         <PromptButton text="Add compression middleware" />
       </div>
     </div>
-  )
+  );
 }
 
 function CardLink(handle: Handle<{ href: string; icon: RemixNode; label: string }>) {
   return () => {
-    let { href, icon, label } = handle.props
+    let { href, icon, label } = handle.props;
 
     return (
       <a
@@ -229,13 +229,13 @@ function CardLink(handle: Handle<{ href: string; icon: RemixNode; label: string 
         <IconSlot>{icon}</IconSlot>
         <span mix={css({ fontSize: '14px', lineHeight: 1.5, whiteSpace: 'nowrap' })}>{label}</span>
       </a>
-    )
-  }
+    );
+  };
 }
 
 function IconSlot(handle: Handle<{ children: RemixNode; rotated?: boolean }>) {
   return () => {
-    let { children, rotated = false } = handle.props
+    let { children, rotated = false } = handle.props;
 
     return (
       <span
@@ -256,8 +256,8 @@ function IconSlot(handle: Handle<{ children: RemixNode; rotated?: boolean }>) {
       >
         {children}
       </span>
-    )
-  }
+    );
+  };
 }
 
 function Footer() {
@@ -337,7 +337,7 @@ function Footer() {
         <p>&copy;2026 SHOPIFY, INC.</p>
       </div>
     </footer>
-  )
+  );
 }
 
 const cardStyle = css({
@@ -348,7 +348,7 @@ const cardStyle = css({
   flexDirection: 'column',
   alignItems: 'center',
   gap: '32px',
-})
+});
 
 const cardHeaderStyle = css({
   margin: 0,
@@ -362,7 +362,7 @@ const cardHeaderStyle = css({
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
   color: 'var(--text-primary)',
-})
+});
 
 // ----- SVG icons -----
 // Inline so the page is fully self-contained with no external icon assets.
@@ -377,7 +377,7 @@ function AtomIcon() {
         stroke-linecap="round"
       />
     </svg>
-  )
+  );
 }
 
 function DiscordFaceIcon() {
@@ -389,7 +389,7 @@ function DiscordFaceIcon() {
         stroke-width="1.5"
       />
     </svg>
-  )
+  );
 }
 
 function GitHubIcon() {
@@ -402,7 +402,7 @@ function GitHubIcon() {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }
 
 function XIcon() {
@@ -413,7 +413,7 @@ function XIcon() {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }
 
 function YouTubeIcon() {
@@ -424,7 +424,7 @@ function YouTubeIcon() {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }
 
 function DiscordIcon() {
@@ -436,7 +436,7 @@ function DiscordIcon() {
         stroke-width="1.5"
       />
     </svg>
-  )
+  );
 }
 
 function FooterWordmark() {
@@ -463,7 +463,7 @@ function FooterWordmark() {
         <path d="M70.4294 0.124146L69.319 4.33313H48.6296L48.2175 5.9054H48.2233L48.2224 5.90833H68.8796L67.7692 10.1427H47.0856L47.0603 10.2726C46.8284 11.0727 47.8351 11.7177 49.3063 11.7179H67.3308L66.194 15.9269H43.1608C38.3069 15.9267 34.95 13.7581 35.6726 11.0988L37.2995 4.97864C37.3359 4.84353 37.384 4.71053 37.4392 4.57825L37.4372 4.57922L38.6042 0.124146H70.4294Z" />
       </svg>
     </span>
-  )
+  );
 }
 
 function RemixWordmarkHero() {
@@ -530,5 +530,5 @@ function RemixWordmarkHero() {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }

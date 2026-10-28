@@ -10,7 +10,11 @@ bun run dev
 bun run start
 bun run test
 bun run typecheck
+bun fmt
+bun lint
 ```
+
+`typecheck` runs `bun check`; formatting is native `bun fmt`; `bun lint` runs oxlint (shorthand for `bun run lint`).
 
 `bun run dev` watches and restarts the server (refresh the browser to see changes); `bun run start` runs in production mode without a separate build step.
 

@@ -1,29 +1,29 @@
-import { clientEntry, css, on, type Handle } from 'remix/component'
+import { clientEntry, css, on, type Handle } from 'remix/component';
 
-const FADE_MS = 180
-const HOLD_MS = 1200
+const FADE_MS = 180;
+const HOLD_MS = 1200;
 
-type CopyState = 'idle' | 'copied' | 'failed' | 'resetting'
+type CopyState = 'idle' | 'copied' | 'failed' | 'resetting';
 
 interface PromptButtonProps {
-  text: string
+  text: string;
 }
 
 // This component hydrates independently; the rest of the page stays static HTML.
 export const PromptButton = clientEntry(
   import.meta.url,
   function PromptButton(handle: Handle<PromptButtonProps>) {
-    let state: CopyState = 'idle'
+    let state: CopyState = 'idle';
 
     return () => {
-      let promptLabel = `\u201C${handle.props.text}\u201D`
+      let promptLabel = `\u201C${handle.props.text}\u201D`;
       let label =
         state === 'copied' || state === 'resetting'
           ? 'Copied to clipboard'
           : state === 'failed'
             ? 'Copy failed'
-            : promptLabel
-      let active = state === 'copied' || state === 'failed' || state === 'resetting'
+            : promptLabel;
+      let active = state === 'copied' || state === 'failed' || state === 'resetting';
 
       return (
         <button
@@ -32,34 +32,34 @@ export const PromptButton = clientEntry(
             buttonStyle,
             on('click', async (_event, signal) => {
               try {
-                await navigator.clipboard.writeText(handle.props.text)
-                if (signal.aborted) return
+                await navigator.clipboard.writeText(handle.props.text);
+                if (signal.aborted) return;
               } catch {
-                state = 'failed'
-                await handle.update()
-                await wait(HOLD_MS)
-                if (signal.aborted) return
-                state = 'resetting'
-                await handle.update()
-                await wait(FADE_MS)
-                if (signal.aborted) return
-                state = 'idle'
-                handle.update()
-                return
+                state = 'failed';
+                await handle.update();
+                await wait(HOLD_MS);
+                if (signal.aborted) return;
+                state = 'resetting';
+                await handle.update();
+                await wait(FADE_MS);
+                if (signal.aborted) return;
+                state = 'idle';
+                handle.update();
+                return;
               }
 
-              state = 'copied'
-              await handle.update()
-              await wait(HOLD_MS)
-              if (signal.aborted) return
+              state = 'copied';
+              await handle.update();
+              await wait(HOLD_MS);
+              if (signal.aborted) return;
 
-              state = 'resetting'
-              await handle.update()
-              await wait(FADE_MS)
-              if (signal.aborted) return
+              state = 'resetting';
+              await handle.update();
+              await wait(FADE_MS);
+              if (signal.aborted) return;
 
-              state = 'idle'
-              await handle.update()
+              state = 'idle';
+              await handle.update();
             }),
           ]}
           style={
@@ -90,10 +90,10 @@ export const PromptButton = clientEntry(
             </span>
           </span>
         </button>
-      )
-    }
+      );
+    };
   },
-)
+);
 
 export function CopyIcon() {
   return () => (
@@ -105,11 +105,11 @@ export function CopyIcon() {
         stroke-linecap="round"
       />
     </svg>
-  )
+  );
 }
 
 function wait(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 const buttonStyle = css({
@@ -132,7 +132,7 @@ const buttonStyle = css({
     color: 'var(--brand-blue)',
     outline: 'none',
   },
-})
+});
 
 const labelSlotStyle = css({
   alignItems: 'center',
@@ -143,14 +143,14 @@ const labelSlotStyle = css({
   minWidth: 0,
   position: 'relative',
   transition: 'opacity 180ms ease',
-})
+});
 
 const statusLabelStyle = css({
   alignItems: 'center',
   display: 'flex',
   inset: 0,
   position: 'absolute',
-})
+});
 
 const iconSlotStyle = css({
   flex: '0 0 24px',
@@ -164,4 +164,4 @@ const iconSlotStyle = css({
     display: 'block',
     transform: 'rotate(180deg)',
   },
-})
+});
