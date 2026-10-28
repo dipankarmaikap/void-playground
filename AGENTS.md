@@ -5,15 +5,15 @@ This app was scaffolded with `remix new`. Use these conventions when continuing 
 ## Commands
 
 ```sh
-npm i
-npm run dev
-npm run hmr
-npm run start
-npm test
-npm run typecheck
+pnpm i
+pnpm dev
+pnpm hmr
+pnpm start
+pnpm test
+pnpm typecheck
 ```
 
-Use `npm run hmr` for live server and browser updates; `npm run dev` only watches and restarts the server. `npm run start` runs in production mode without a separate build step.
+Use `pnpm hmr` for live server and browser updates; `pnpm dev` only watches and restarts the server. `pnpm start` runs in production mode without a separate build step.
 
 ## Building Features
 
@@ -27,6 +27,10 @@ Superpowers owns `docs/superpowers/`:
 - `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md` — the implementation plan, written by the writing-plans skill, executed by subagent-driven-development or executing-plans
 
 One feature is one spec plus one plan; specs and plans are committed before implementation starts.
+
+## Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <summary>`, e.g. `feat(auth): add session cookie`. Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Summary in lowercase, imperative, no trailing period; add a body only when the why is not obvious.
 
 ## Starter Layout
 
