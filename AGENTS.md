@@ -7,15 +7,14 @@ This app was scaffolded with `remix new`. Use these conventions when continuing 
 ```sh
 bun install
 bun run dev
-bun run hmr
 bun run start
 bun run test
 bun run typecheck
 ```
 
-Use `bun run hmr` for live server and browser updates; `bun run dev` only watches and restarts the server. `bun run start` runs in production mode without a separate build step.
+`bun run dev` watches and restarts the server (refresh the browser to see changes); `bun run start` runs in production mode without a separate build step.
 
-Bun is the package manager (no npm/pnpm lockfiles) and runs every command. `dev` and `start` run `server.ts` (`Bun.serve`). `hmr` runs `hmr.ts` on Bun but the app child it supervises is `server.node.ts` under Node, because `remix/node-hmr` needs Node loader hooks.
+Bun is the package manager (no npm/pnpm lockfiles), the runtime, and the only tool needed — both scripts run `server.ts` via `Bun.serve`.
 
 ## Building Features
 
