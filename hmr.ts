@@ -10,6 +10,14 @@ const hmrEventPort = process.env.HMR_PORT
   : hmrProxyPort + 1
 const appPort = process.env.APP_PORT ? Number.parseInt(process.env.APP_PORT, 10) : hmrEventPort + 1
 
+// run() spawns the entry with process.execPath, and the child needs Node loader hooks
+// (Bun has no module.registerHooks), so point the spawn at Node when this file runs on Bun.
+if (globalThis.Bun) {
+  const node = globalThis.Bun.which('node')
+  if (!node) throw new Error('hmr needs node on PATH: remix/node-hmr spawns the app with Node loader hooks')
+  process.execPath = node
+}
+
 const hmrRunner = run('server.node.ts', {
   env: {
     ...process.env,

@@ -15,7 +15,7 @@ bun run typecheck
 
 Use `bun run hmr` for live server and browser updates; `bun run dev` only watches and restarts the server. `bun run start` runs in production mode without a separate build step.
 
-Bun is the package manager (no npm/pnpm lockfiles). `dev` and `start` run `server.ts` on Bun (`Bun.serve`). `hmr` stays on Node: `hmr.ts` supervises `server.node.ts` because `remix/node-hmr` spawns the entry with Node loader hooks.
+Bun is the package manager (no npm/pnpm lockfiles) and runs every command. `dev` and `start` run `server.ts` (`Bun.serve`). `hmr` runs `hmr.ts` on Bun but the app child it supervises is `server.node.ts` under Node, because `remix/node-hmr` needs Node loader hooks.
 
 ## Building Features
 
