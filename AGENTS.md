@@ -5,17 +5,17 @@ This app was scaffolded with `remix new`. Use these conventions when continuing 
 ## Commands
 
 ```sh
-pnpm i
-pnpm dev
-pnpm hmr
-pnpm start
-pnpm test
-pnpm typecheck
+bun install
+bun run dev
+bun run hmr
+bun run start
+bun run test
+bun run typecheck
 ```
 
-Use `pnpm hmr` for live server and browser updates; `pnpm dev` only watches and restarts the server. `pnpm start` runs in production mode without a separate build step.
+Use `bun run hmr` for live server and browser updates; `bun run dev` only watches and restarts the server. `bun run start` runs in production mode without a separate build step.
 
-`dev` and `start` run on Bun (`Bun.serve`); `hmr` stays on Node because `remix/node-hmr` spawns the entry with Node loader hooks. `server.ts` supports both runtimes.
+Bun is the package manager (no npm/pnpm lockfiles). `dev` and `start` run `server.ts` on Bun (`Bun.serve`). `hmr` stays on Node: `hmr.ts` supervises `server.node.ts` because `remix/node-hmr` spawns the entry with Node loader hooks.
 
 ## Building Features
 
