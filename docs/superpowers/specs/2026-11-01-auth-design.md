@@ -69,7 +69,7 @@ A user row never contains a password hash. Queries that load a "current user" se
 
 1. Parse/validate `email`, `password` (min 8 chars) via `remix/data-schema`.
 2. If email exists, flash error and redirect `/register`.
-3. Hash password with `Bun.password.hash`.
+3. Hash password with Node crypto (scrypt).
 4. Insert user (unverified) + verification token (random UUID, 24h expiry) in a transaction; insert `user_passwords`.
 5. Console.log verification link `${origin}/verify?token=${token}`.
 6. Flash "Check your email to verify your account" and redirect `/login`.
@@ -106,7 +106,7 @@ Simple server-rendered pages using `Document` and `css`:
 
 ## Security
 
-- Passwords hashed with Argon2id via `Bun.password`.
+- Passwords hashed with scrypt via Node crypto.
 - Session cookie signed, httpOnly, sameSite lax, secure auto.
 - CSRF synchronizer token in all mutating forms.
 - `completeAuth` rotates session id on login.
