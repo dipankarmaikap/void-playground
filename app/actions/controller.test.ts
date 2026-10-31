@@ -12,4 +12,25 @@ describe('root controller', () => {
     assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
     assert.match(await response.text(), /<html[\s>]/);
   });
+
+  it('GET /login returns the login page', async () => {
+    let response = await router.fetch(new URL(routes.auth.login.index.href(), 'http://localhost'));
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
+  });
+
+  it('GET /register returns the register page', async () => {
+    let response = await router.fetch(new URL(routes.auth.register.index.href(), 'http://localhost'));
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
+  });
+
+  it('GET /dashboard redirects anonymous visitors to /login', async () => {
+    let response = await router.fetch(new URL(routes.dashboard.href(), 'http://localhost'));
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), '/login');
+  });
 });
