@@ -1,4 +1,5 @@
 import { createController } from 'remix/router';
+import { redirect } from 'remix/response/redirect';
 
 import { requireAuth } from 'remix/middleware/auth';
 import { Auth } from 'remix/middleware/auth';
@@ -21,7 +22,7 @@ export default createController(routes, {
       return context.render(<HomePage />);
     },
     dashboard: {
-      middleware: [requireAuth<User>()],
+      middleware: [requireAuth<User>({ onFailure: () => redirect('/login') })],
       async handler(context) {
         let auth = context.get(Auth) as GoodAuth<User>;
         let user = await db.find(users, auth.identity.id);
