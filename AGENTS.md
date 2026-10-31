@@ -5,18 +5,18 @@ This app was scaffolded with `remix new`. Use these conventions when continuing 
 ## Commands
 
 ```sh
-bun install
-bun run dev
-bun run start
-bun run test
-bun run typecheck
-bun fmt
-bun lint
+npm install
+npm run dev
+npm run start
+npm test
+npm run typecheck
+npm run fmt
+npm run lint
 ```
 
-`typecheck` runs `bun check`; formatting is native `bun fmt`; `bun lint` runs oxlint (shorthand for `bun run lint`).
+`typecheck` runs `bun check`; formatting is native `npm run fmt`; `npm run lint` runs oxlint (shorthand for `bun run lint`).
 
-`bun run dev` watches and restarts the server (refresh the browser to see changes); `bun run start` runs in production mode without a separate build step.
+`npm run dev` watches and restarts the server (refresh the browser to see changes); `npm run start` runs in production mode without a separate build step.
 
 Bun is the package manager (no npm/pnpm lockfiles), the runtime, and the only tool needed — both scripts run `server.ts` via `Bun.serve`.
 

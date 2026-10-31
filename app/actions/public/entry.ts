@@ -22,8 +22,8 @@ const app = run({
   },
 });
 
-if (import.meta.hot) {
-  import.meta.hot.on('server:update', async () => {
+if ((import.meta as any).hot) {
+  (import.meta as any).hot.on('server:update', async () => {
     try {
       await app.ready();
       await app.frames.top.reload();
