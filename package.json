@@ -12,6 +12,9 @@
   "engines": {
     "node": ">=26.13.0"
   },
+  "volta": {
+    "node": "26.13.0"
+  },
   "dependencies": {
     "remix": "^3.1.0"
   },
