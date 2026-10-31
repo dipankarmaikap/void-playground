@@ -11,10 +11,14 @@ import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from '
 
 import { db, users, userPasswords } from '../../data/db.ts';
 import type { User } from '../../data/db.ts';
+import { hashPassword, verifyPassword } from '../../data/password.ts';
 import { routes } from '../../routes.ts';
 import { LoginPage, RegisterPage } from './pages.tsx';
 
-const credentialsProvider = createCredentialsAuthProvider<{ email: string; password: string }, User>({
+const credentialsProvider = createCredentialsAuthProvider<
+  { email: string; password: string },
+  User
+>({
   parse(context) {
     let formData = context.get(FormData)!;
     return {
@@ -27,7 +31,7 @@ const credentialsProvider = createCredentialsAuthProvider<{ email: string; passw
     if (!user || !user.email_verified) return null;
     let creds = await db.findOne(userPasswords, { where: { user_id: user.id } });
     if (!creds) return null;
-    let ok = await Bun.password.verify(password, creds.password_hash);
+    let ok = await verifyPassword(password, creds.password_hash);
     if (!ok) return null;
     return user;
   },
@@ -44,10 +48,7 @@ export const loginController = createController(routes.auth.login, {
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
       return context.render(
-        <LoginPage
-          csrfToken={csrfToken}
-          error={typeof error === 'string' ? error : undefined}
-        />,
+        <LoginPage csrfToken={csrfToken} error={typeof error === 'string' ? error : undefined} />,
       );
     },
     async action(context) {
@@ -98,7 +99,7 @@ export const registerController = createController(routes.auth.register, {
         return redirect('/register');
       }
 
-      let passwordHash = await Bun.password.hash(password);
+      let passwordHash = await hashPassword(password);
       let token = crypto.randomUUID();
       let expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       let userId = crypto.randomUUID();
@@ -138,7 +139,11 @@ export default createController(routes.auth, {
       }
 
       let user = await db.findOne(users, { where: { verification_token: token } });
-      if (!user || user.verification_expires_at == null || user.verification_expires_at <= Date.now()) {
+      if (
+        !user ||
+        user.verification_expires_at == null ||
+        user.verification_expires_at <= Date.now()
+      ) {
         context.session.flash('error', 'Invalid or expired verification link');
         return redirect('/login');
       }

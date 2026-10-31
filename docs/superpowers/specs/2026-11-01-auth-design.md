@@ -9,6 +9,7 @@ Add email/password authentication to the Remix app: registration with email veri
 ## Scope
 
 In scope:
+
 - Register, verify email, login, logout
 - Protected `/dashboard`
 - SQLite-backed users and credentials
@@ -16,6 +17,7 @@ In scope:
 - CSRF protection on form posts
 
 Out of scope (YAGNI):
+
 - Password reset, rate limiting, account deletion, OAuth
 - Real email delivery (console log only)
 - Role/authorization beyond authenticated/unauthenticated
@@ -27,6 +29,7 @@ SQLite file: `data/app.db` (resolved from `import.meta.dirname`).
 Tables:
 
 `users`
+
 - `id` TEXT PRIMARY KEY
 - `email` TEXT NOT NULL UNIQUE
 - `email_verified` INTEGER NOT NULL DEFAULT 0
@@ -35,6 +38,7 @@ Tables:
 - `created_at` INTEGER NOT NULL
 
 `user_passwords`
+
 - `user_id` TEXT PRIMARY KEY, FK -> users.id ON DELETE CASCADE
 - `password_hash` TEXT NOT NULL
 - `updated_at` INTEGER NOT NULL
@@ -62,6 +66,7 @@ A user row never contains a password hash. Queries that load a "current user" se
 ## Flows
 
 ### Register
+
 1. Parse/validate `email`, `password` (min 8 chars) via `remix/data-schema`.
 2. If email exists, flash error and redirect `/register`.
 3. Hash password with `Bun.password.hash`.
@@ -70,26 +75,31 @@ A user row never contains a password hash. Queries that load a "current user" se
 6. Flash "Check your email to verify your account" and redirect `/login`.
 
 ### Verify
+
 1. Look up user by `verification_token` where not expired.
 2. If none/invalid/expired, flash error and redirect `/login`.
 3. Set `email_verified=1`, clear token/expiry.
 4. Flash success and redirect `/login`.
 
 ### Login
+
 1. `verifyCredentials(credentialsProvider, context)`:
    - find user by email; return null if missing, unverified, or password mismatch.
 2. On null: flash "Invalid email or password" and redirect `/login`.
 3. On success: `completeAuth(context)`, `session.set('auth', { userId })`, redirect `/dashboard`.
 
 ### Logout
+
 `session.unset('auth')`, `session.regenerateId(true)`, redirect `/`.
 
 ### Dashboard
+
 Protected by `requireAuth<User>()`. Loads user from `users` (no hash). Renders email + logout form. Anonymous -> redirect `/login`.
 
 ## Components
 
 Simple server-rendered pages using `Document` and `css`:
+
 - `LoginPage` (email, password, csrf, flash error)
 - `RegisterPage` (email, password, csrf, flash error)
 - `DashboardPage` (email, logout form with csrf)

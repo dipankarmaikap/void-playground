@@ -21,7 +21,9 @@ describe('root controller', () => {
   });
 
   it('GET /register returns the register page', async () => {
-    let response = await router.fetch(new URL(routes.auth.register.index.href(), 'http://localhost'));
+    let response = await router.fetch(
+      new URL(routes.auth.register.index.href(), 'http://localhost'),
+    );
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);

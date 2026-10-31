@@ -4,7 +4,7 @@ import { staticFiles } from 'remix/middleware/static';
 import { session } from 'remix/middleware/session';
 import { formData } from 'remix/middleware/form-data';
 import { csrf } from 'remix/middleware/csrf';
-import { auth, createSessionAuthScheme, requireAuth } from 'remix/middleware/auth';
+import { auth, createSessionAuthScheme } from 'remix/middleware/auth';
 
 import { createCookie } from 'remix/cookie';
 import { createCookieSessionStorage } from 'remix/session-storage/cookie';

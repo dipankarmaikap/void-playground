@@ -15,25 +15,55 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
 
     return (
       <Document title="Login">
-        <main mix={css({ margin: 0, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: 'system-ui, sans-serif' })}>
-          <div mix={css({ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <main
+          mix={css({
+            margin: 0,
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            fontFamily: 'system-ui, sans-serif',
+          })}
+        >
+          <div
+            mix={css({
+              width: '100%',
+              maxWidth: '360px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            })}
+          >
             <h1 mix={css({ margin: 0, fontSize: '24px' })}>Login</h1>
             {error ? (
               <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
                 {error}
               </p>
             ) : null}
-            <form method="post" action="/login" mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}>
+            <form
+              method="post"
+              action="/login"
+              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+            >
               <input type="hidden" name="_csrf" value={csrfToken} />
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Email
-                <input name="email" type="email" defaultValue={email ?? ''} required mix={css({ padding: '8px' })} />
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={email ?? ''}
+                  required
+                  mix={css({ padding: '8px' })}
+                />
               </label>
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Password
                 <input name="password" type="password" required mix={css({ padding: '8px' })} />
               </label>
-              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>Log in</button>
+              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
+                Log in
+              </button>
             </form>
             <p mix={css({ margin: 0 })}>
               No account? <a href="/register">Register</a>
@@ -57,25 +87,61 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
 
     return (
       <Document title="Register">
-        <main mix={css({ margin: 0, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: 'system-ui, sans-serif' })}>
-          <div mix={css({ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <main
+          mix={css({
+            margin: 0,
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            fontFamily: 'system-ui, sans-serif',
+          })}
+        >
+          <div
+            mix={css({
+              width: '100%',
+              maxWidth: '360px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            })}
+          >
             <h1 mix={css({ margin: 0, fontSize: '24px' })}>Register</h1>
             {error ? (
               <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
                 {error}
               </p>
             ) : null}
-            <form method="post" action="/register" mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}>
+            <form
+              method="post"
+              action="/register"
+              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+            >
               <input type="hidden" name="_csrf" value={csrfToken} />
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Email
-                <input name="email" type="email" defaultValue={email ?? ''} required mix={css({ padding: '8px' })} />
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={email ?? ''}
+                  required
+                  mix={css({ padding: '8px' })}
+                />
               </label>
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Password
-                <input name="password" type="password" minLength={8} required mix={css({ padding: '8px' })} />
+                <input
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  required
+                  mix={css({ padding: '8px' })}
+                />
               </label>
-              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>Create account</button>
+              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
+                Create account
+              </button>
             </form>
             <p mix={css({ margin: 0 })}>
               Already have an account? <a href="/login">Log in</a>
@@ -99,8 +165,26 @@ export function DashboardPage(handle: Handle<DashboardPageProps>) {
 
     return (
       <Document title="Dashboard">
-        <main mix={css({ margin: 0, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: 'system-ui, sans-serif' })}>
-          <div mix={css({ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <main
+          mix={css({
+            margin: 0,
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            fontFamily: 'system-ui, sans-serif',
+          })}
+        >
+          <div
+            mix={css({
+              width: '100%',
+              maxWidth: '360px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            })}
+          >
             <h1 mix={css({ margin: 0, fontSize: '24px' })}>Dashboard</h1>
             {error ? (
               <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
@@ -108,9 +192,15 @@ export function DashboardPage(handle: Handle<DashboardPageProps>) {
               </p>
             ) : null}
             <p mix={css({ margin: 0 })}>Signed in as {email}</p>
-            <form method="post" action="/logout" mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}>
+            <form
+              method="post"
+              action="/logout"
+              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+            >
               <input type="hidden" name="_csrf" value={csrfToken} />
-              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>Log out</button>
+              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
+                Log out
+              </button>
             </form>
           </div>
         </main>
