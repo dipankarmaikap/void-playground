@@ -7,9 +7,31 @@ import * as checks from 'remix/data-schema/checks';
 
 import { getCsrfToken } from 'remix/middleware/csrf';
 
+import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from 'remix/auth';
+
 import { db, users, userPasswords } from '../../data/db.ts';
+import type { User } from '../../data/db.ts';
 import { routes } from '../../routes.ts';
-import { RegisterPage } from './pages.tsx';
+import { LoginPage, RegisterPage } from './pages.tsx';
+
+const credentialsProvider = createCredentialsAuthProvider<{ email: string; password: string }, User>({
+  parse(context) {
+    let formData = context.get(FormData)!;
+    return {
+      email: String(formData.get('email') ?? ''),
+      password: String(formData.get('password') ?? ''),
+    };
+  },
+  async verify({ email, password }) {
+    let user = await db.findOne(users, { where: { email } });
+    if (!user || !user.email_verified) return null;
+    let creds = await db.findOne(userPasswords, { where: { user_id: user.id } });
+    if (!creds) return null;
+    let ok = await Bun.password.verify(password, creds.password_hash);
+    if (!ok) return null;
+    return user;
+  },
+});
 
 const registerForm = f.object({
   email: f.field(s.string().pipe(checks.email())),
@@ -18,11 +40,25 @@ const registerForm = f.object({
 
 export const loginController = createController(routes.auth.login, {
   actions: {
-    index() {
-      return new Response('OK', { status: 200 });
+    async index(context) {
+      let csrfToken = getCsrfToken(context);
+      let error = context.session.get('error');
+      return context.render(
+        <LoginPage
+          csrfToken={csrfToken}
+          error={typeof error === 'string' ? error : undefined}
+        />,
+      );
     },
-    action() {
-      return new Response('OK', { status: 200 });
+    async action(context) {
+      let user = await verifyCredentials(credentialsProvider, context);
+      if (!user) {
+        context.session.flash('error', 'Invalid email or password');
+        return redirect('/login');
+      }
+      let session = completeAuth(context);
+      session.set('auth', { userId: user.id });
+      return redirect('/dashboard');
     },
   },
 });
@@ -116,8 +152,10 @@ export default createController(routes.auth, {
       context.session.flash('error', 'Email verified. You can now log in.');
       return redirect('/login');
     },
-    logout() {
-      return new Response('OK', { status: 200 });
+    logout(context) {
+      context.session.unset('auth');
+      context.session.regenerateId(true);
+      return redirect('/');
     },
   },
 });
