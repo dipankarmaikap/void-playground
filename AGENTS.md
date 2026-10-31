@@ -14,11 +14,11 @@ npm run fmt
 npm run lint
 ```
 
-`typecheck` runs `bun check`; formatting is native `npm run fmt`; `npm run lint` runs oxlint (shorthand for `bun run lint`).
+`typecheck` runs `tsc --noEmit`; `npm run lint` runs oxlint.
 
 `npm run dev` watches and restarts the server (refresh the browser to see changes); `npm run start` runs in production mode without a separate build step.
 
-Bun is the package manager (no npm/pnpm lockfiles), the runtime, and the only tool needed — both scripts run `server.ts` via `Bun.serve`.
+Node.js is the runtime; npm is the package manager. Scripts run `server.ts` via `remix/node-tsx`.
 
 ## Building Features
 
