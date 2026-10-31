@@ -12,5 +12,8 @@ export default createController(routes, {
     home(context) {
       return context.render(<HomePage />);
     },
+    dashboard() {
+      return new Response('OK', { status: 200 });
+    },
   },
 });
