@@ -3,6 +3,7 @@ import { css } from 'remix/component';
 
 import { Document } from '../document.tsx';
 import { Input } from '../../ui/input.tsx';
+import { Field } from '../../ui/field.tsx';
 
 export interface RegisterPageProps {
   csrfToken: string;
@@ -48,14 +49,12 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
               mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
             >
               <input type="hidden" name="_csrf" value={csrfToken} />
-              <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
-                Email
+              <Field label="Email">
                 <Input name="email" type="email" defaultValue={email ?? ''} required />
-              </label>
-              <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
-                Password
+              </Field>
+              <Field label="Password">
                 <Input name="password" type="password" minLength={8} required />
-              </label>
+              </Field>
               <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
                 Create account
               </button>
