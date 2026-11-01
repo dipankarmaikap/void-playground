@@ -7,7 +7,7 @@ import { db, sessions } from '../app/data/db.ts';
 
 import { cookieFromResponse, createUser, extractCsrf, login, origin } from './http.ts';
 
-async function seedSession(userId: string, ip: string): Promise<string> {
+async function seedSession(userId: string, ip: string, createdAt = Date.now()): Promise<string> {
   let id = crypto.randomUUID();
   await db.create(sessions, {
     id,
@@ -15,8 +15,8 @@ async function seedSession(userId: string, ip: string): Promise<string> {
     data: JSON.stringify([{ auth: { userId } }, {}]),
     ip,
     user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/1.0',
-    created_at: Date.now(),
-    last_active_at: Date.now(),
+    created_at: createdAt,
+    last_active_at: createdAt,
   });
   return id;
 }
@@ -66,6 +66,17 @@ describe('session flow', () => {
       { headers: { Cookie: sessionCookie } },
     );
     assert.equal(followUp.status, 200);
+  });
+
+  it('shows the current device first', async () => {
+    let email = `u-${crypto.randomUUID()}@example.com`;
+    let userId = await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
+    // Newer than the current session, so plain date order would put it first.
+    await seedSession(userId, '9.9.9.9', Date.now() + 60_000);
+
+    let settingsHtml = await getSettingsPage(sessionCookie);
+    assert.ok(settingsHtml.indexOf('(this device)') < settingsHtml.indexOf('9.9.9.9'));
   });
 
   it('logs out all other devices', async () => {

@@ -35,6 +35,8 @@ export default createController(routes.app.settings, {
         createdAt: new Date(row.created_at).toLocaleString(),
         lastActiveAt: new Date(row.last_active_at).toLocaleString(),
       }));
+      // Stable sort keeps newest-first order within each group.
+      views.sort((a, b) => Number(b.current) - Number(a.current));
       let error = context.session.get('error');
       let message = context.session.get('message');
       return context.render(
