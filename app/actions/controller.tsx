@@ -3,7 +3,7 @@ import { redirect } from 'remix/response/redirect';
 
 import { requireAuth } from 'remix/middleware/auth';
 import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
+import type { AuthState, GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { assets } from '../assets.ts';
@@ -11,7 +11,7 @@ import { db, users } from '../data/db.ts';
 import type { User } from '../data/db.ts';
 import { routes } from '../routes.ts';
 import { HomePage } from './home-page.tsx';
-import { DashboardPage } from './auth/pages.tsx';
+import { DashboardPage } from './dashboard-page.tsx';
 
 export default createController(routes, {
   actions: {
@@ -19,6 +19,10 @@ export default createController(routes, {
       return (await assets.fetch(context.request)) ?? new Response('Not Found', { status: 404 });
     },
     home(context) {
+      let auth = context.get(Auth) as AuthState<User>;
+      if (auth?.ok) {
+        return redirect('/dashboard');
+      }
       return context.render(<HomePage />);
     },
     dashboard: {

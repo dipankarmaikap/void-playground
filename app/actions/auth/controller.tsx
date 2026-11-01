@@ -13,7 +13,8 @@ import { db, users, userPasswords } from '../../data/db.ts';
 import type { User } from '../../data/db.ts';
 import { hashPassword, verifyPassword } from '../../data/password.ts';
 import { routes } from '../../routes.ts';
-import { LoginPage, RegisterPage } from './pages.tsx';
+import { LoginPage } from './login-page.tsx';
+import { RegisterPage } from './register-page.tsx';
 
 const credentialsProvider = createCredentialsAuthProvider<
   { email: string; password: string },
