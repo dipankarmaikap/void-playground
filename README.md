@@ -1,31 +1,41 @@
 # My Remix App
 
-A minimal Remix application starter with a home page.
+A Remix 3 app with email/password authentication and DB-backed session management.
 
-## Starter Shape
+## Features
 
-- `app/actions/controller.tsx` owns the top-level route actions.
-- `app/actions/home-page.tsx` and `app/actions/document.tsx` render the route-owned starter UI.
-- `app/actions/public/` contains the browser runtime entry and interactive prompt button.
-- `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs.
-- `app/router.ts` wires routes to handlers and installs the standard Remix component renderer used by actions.
-- `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware.
-- Root `public/` contains static files served unchanged from the app root.
-
-## Growing The App
-
-- Put top-level route actions in `app/actions/controller.tsx`.
-- Add `app/actions/<route-key>/controller.tsx` when a nested route map needs its own actions or middleware.
-- Add directories like `app/data/` or `test/` when the app actually needs them.
-- Move shared UI into `app/ui/` once more than one route needs it.
+- Register with email verification. The verification link is printed to the server console; real email delivery is not wired up yet.
+- Log in and log out, with a protected dashboard at `/app/dashboard`.
+- Passwords hashed with `scrypt`; hashes live in `user_passwords`, never on the user row.
+- SQLite persistence in `data/app.db`. Tests use an in-memory database instead.
+- `/app/settings` lists active sessions (browser, OS, IP, timestamps) and can revoke one device or all other devices.
+- CSRF synchronizer tokens on every mutating form.
 
 ## Commands
 
 ```sh
-npm i
+npm install
 npm run dev
-npm run hmr
 npm run start
 npm test
 npm run typecheck
+npm run lint
 ```
+
+`npm run dev` watches and restarts the server; refresh the browser to see changes. `npm run start` runs in production mode without a separate build step.
+
+## Configuration
+
+- `SESSION_SECRET` signs the `__session` cookie. It is required when `NODE_ENV=production`; development falls back to a fixed local secret.
+- The session cookie lives for 30 days. Authenticated sessions live in the `sessions` table and expire after 30 days of inactivity.
+
+## Layout
+
+- `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs.
+- `app/router.ts` wires routes to controllers and installs the middleware stack: request context, static files, session, form data, CSRF, auth, render.
+- `app/actions/controller.tsx` owns the root routes; `app/actions/auth/` owns login, register, verify, and logout; `app/actions/app/` owns the protected dashboard and settings pages.
+- `app/data/` owns SQLite tables, password hashing, and the hybrid session storage.
+- `app/ui/` holds components shared by more than one route.
+- `app/actions/public/` is the browser entry point; root `public/` serves static files unchanged.
+- `test/` holds cross-cutting request-flow tests and shared helpers.
+- `docs/superpowers/` holds the specs and plans for each feature.

@@ -22,15 +22,17 @@ function deviceLabel(ua: string | null): string {
   else if (/Safari\//.test(value)) browser = 'Safari';
   let os = 'Unknown OS';
   if (/Windows/.test(value)) os = 'Windows';
-  else if (/Mac OS X/.test(value)) os = 'macOS';
   else if (/Android/.test(value)) os = 'Android';
   else if (/iPhone|iPad/.test(value)) os = 'iOS';
+  else if (/Mac OS X/.test(value)) os = 'macOS';
   else if (/Linux/.test(value)) os = 'Linux';
   return `${browser} on ${os}`;
 }
 
 export default createController(routes.app.settings, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect('/login') })],
+  middleware: [
+    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+  ],
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -50,8 +52,6 @@ export default createController(routes.app.settings, {
       }));
       let error = context.session.get('error');
       let message = context.session.get('message');
-      if (typeof error === 'string') context.session.unset('error');
-      if (typeof message === 'string') context.session.unset('message');
       return context.render(
         <SettingsPage
           csrfToken={csrfToken}
@@ -63,23 +63,23 @@ export default createController(routes.app.settings, {
     },
     async action(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
-      let formData = context.formData as FormData;
-      let action = String(formData.get('action') ?? '');
+      let action = String(context.formData.get('action') ?? '');
       let currentId = context.session.id;
 
       if (action === 'revoke') {
-        let sessionId = String(formData.get('session_id') ?? '');
+        let sessionId = String(context.formData.get('session_id') ?? '');
         let row = await db.find(sessions, sessionId);
         if (!row || row.user_id !== auth.identity.id) {
           context.session.flash('error', 'Session not found');
-          return redirect('/app/settings');
+          return redirect(routes.app.settings.index.href());
         }
         await db.delete(sessions, sessionId);
         if (sessionId === currentId) {
           context.session.destroy();
+          return redirect(routes.auth.login.index.href());
         }
         context.session.flash('message', 'Session logged out');
-        return redirect('/settings');
+        return redirect(routes.app.settings.index.href());
       }
 
       if (action === 'revoke_others') {
@@ -87,10 +87,10 @@ export default createController(routes.app.settings, {
           where: and({ user_id: auth.identity.id }, ne('id', currentId)),
         });
         context.session.flash('message', 'Logged out all other devices');
-        return redirect('/settings');
+        return redirect(routes.app.settings.index.href());
       }
 
-      return redirect('/settings');
+      return redirect(routes.app.settings.index.href());
     },
   },
 });

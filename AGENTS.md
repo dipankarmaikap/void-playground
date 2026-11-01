@@ -10,7 +10,6 @@ npm run dev
 npm run start
 npm test
 npm run typecheck
-npm run fmt
 npm run lint
 ```
 
@@ -37,14 +36,20 @@ One feature is one spec plus one plan; specs and plans are committed before impl
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <summary>`, e.g. `feat(auth): add session cookie`. Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Summary in lowercase, imperative, no trailing period; add a body only when the why is not obvious.
 
-## Starter Layout
+## App Layout
 
-- `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs
-- `app/router.ts` wires routes to controllers and installs the standard Remix component renderer used by actions
-- Put top-level route actions in `app/actions/controller.tsx`; add `app/actions/<route-key>/controller.tsx` for nested route maps. `app/actions/controller.test.ts` is the root controller's router smoke test
-- `app/actions/home-page.tsx` and `app/actions/document.tsx` render the route-owned starter UI
-- `app/actions/public/` contains the browser runtime entry and interactive prompt button
-- `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware
-- Root `public/` contains static files served unchanged from the app root
+- `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs. Use `routes.*.href()` in links, forms, and redirects instead of string literals.
+- `app/router.ts` wires routes to controllers and installs the middleware stack: request context, static files, session, form data, CSRF, auth, render.
+- Put top-level route actions in `app/actions/controller.tsx`; give every nested route map its own directory with `controller.tsx` (and `page.tsx` for route-local UI). `app/actions/controller.test.ts` is the root controller's router smoke test.
+- `app/actions/auth/` owns login, register, verify, and logout. `app/actions/app/` owns the protected dashboard and settings pages.
+- `app/data/` owns SQLite tables, password hashing, and the hybrid session storage.
+- `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller.
+- `app/actions/home-page.tsx` and `app/actions/document.tsx` render the route-owned starter UI.
+- `app/actions/public/` contains the browser runtime entry.
+- `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware.
+- Root `public/` contains static files served unchanged from the app root.
+- `test/` holds cross-cutting request-flow tests and shared helpers.
 
-This starter intentionally begins small; add directories like `app/data/`, `app/middleware/`, `app/ui/`, and `test/` only when you need them.
+Protect controllers with `requireAuth()` rather than a path-prefix middleware; controller middleware does not flow into controllers mapped for nested route maps.
+
+Tests use an in-memory SQLite database when `NODE_ENV=test`, so they never touch `data/app.db` and do not leak state across test files.

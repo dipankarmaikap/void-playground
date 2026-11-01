@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { createRequestListener } from 'remix/node-fetch-server';
 
 import { router } from './app/router.ts';
+import { db } from './app/data/db.ts';
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100;
 
@@ -19,7 +20,10 @@ function shutdown() {
   }
 
   shuttingDown = true;
-  server.close(() => process.exit(0));
+  server.close(async () => {
+    await db.close();
+    process.exit(0);
+  });
   server.closeAllConnections();
 }
 

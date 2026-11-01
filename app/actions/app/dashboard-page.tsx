@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { Document } from '../document.tsx';
+import { routes } from '../../routes.ts';
 
 export interface DashboardPageProps {
   csrfToken: string;
@@ -42,12 +43,12 @@ export function DashboardPage(handle: Handle<DashboardPageProps>) {
               </p>
             ) : null}
             <p mix={css({ margin: 0 })}>Signed in as {email}</p>
-            <a href="/app/settings" mix={css({ color: '#0066cc' })}>
+            <a href={routes.app.settings.index.href()} mix={css({ color: '#0066cc' })}>
               Manage logged-in sessions
             </a>
             <form
               method="post"
-              action="/logout"
+              action={routes.auth.logout.href()}
               mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
             >
               <input type="hidden" name="_csrf" value={csrfToken} />

@@ -4,26 +4,37 @@ import { staticFiles } from 'remix/middleware/static';
 import { session } from 'remix/middleware/session';
 import { formData } from 'remix/middleware/form-data';
 import { csrf } from 'remix/middleware/csrf';
-import { auth, createSessionAuthScheme, Auth } from 'remix/middleware/auth';
-import { redirect } from 'remix/response/redirect';
+import { auth, createSessionAuthScheme } from 'remix/middleware/auth';
 
 import { createCookie } from 'remix/cookie';
 
 import controller from './actions/controller.tsx';
 import appController from './actions/app/controller.tsx';
-import authController, { loginController, registerController } from './actions/auth/controller.tsx';
+import authController from './actions/auth/controller.tsx';
+import loginController from './actions/auth/login/controller.tsx';
+import registerController from './actions/auth/register/controller.tsx';
 import settingsController from './actions/app/settings/controller.tsx';
 import { assets } from './assets.ts';
 import { routes } from './routes.ts';
 import { db, users } from './data/db.ts';
 import type { User } from './data/db.ts';
-import { createHybridSessionStorage, sessionRequestContext } from './data/session-storage.ts';
+import {
+  createHybridSessionStorage,
+  sessionRequestContext,
+  SESSION_TTL_SECONDS,
+} from './data/session-storage.ts';
+
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('SESSION_SECRET must be set in production');
+}
 
 let sessionCookie = createCookie('__session', {
-  secrets: [process.env.SESSION_SECRET ?? 'dev-secret-change-me'],
+  secrets: [sessionSecret || 'dev-secret-change-me'],
   httpOnly: true,
   sameSite: 'lax',
   path: '/',
+  maxAge: SESSION_TTL_SECONDS,
 });
 
 let sessionStorage = createHybridSessionStorage();
@@ -41,22 +52,13 @@ let sessionScheme = createSessionAuthScheme<User, { userId: string }>({
 });
 
 const requestContextMiddleware: Middleware = async (context, next) => {
+  // Display-only metadata; without a trusted proxy these headers are client-controlled.
   let ip =
     context.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     context.request.headers.get('x-real-ip') ||
     'unknown';
   let userAgent = context.request.headers.get('user-agent') ?? 'unknown';
   return sessionRequestContext.run({ ip, userAgent }, () => next());
-};
-
-const appAuthMiddleware: Middleware = async (context, next) => {
-  if (String(context.url?.pathname ?? '').startsWith('/app')) {
-    let authState = context.get ? context.get(Auth) : undefined;
-    if (!authState?.ok) {
-      return redirect('/login');
-    }
-  }
-  return next();
 };
 
 export const router = createRouter({
@@ -67,7 +69,6 @@ export const router = createRouter({
     formData(),
     csrf(),
     auth({ schemes: [sessionScheme] }),
-    appAuthMiddleware,
     render({ assets }),
   ],
 });

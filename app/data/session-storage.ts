@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { lt } from 'remix/data-table';
 import { createSession } from 'remix/session';
 import type { Session, SessionStorage } from 'remix/session';
 import { createCookieSessionStorage } from 'remix/session-storage/cookie';
-
 
 import { db, sessions } from './db.ts';
 
@@ -18,6 +18,10 @@ const FIVE_MINUTES = 5 * 60 * 1000;
 const DB_PREFIX = 'db:';
 const cookieStorage = createCookieSessionStorage();
 
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
+
+// Authenticated sessions live in the DB; anonymous ones (mostly CSRF tokens) stay in the cookie.
 export function createHybridSessionStorage(): SessionStorage {
   return {
     async read(cookie) {
@@ -25,7 +29,9 @@ export function createHybridSessionStorage(): SessionStorage {
         let id = cookie.slice(DB_PREFIX.length);
         try {
           let row = await db.find(sessions, id);
-          if (row) {
+          if (row && Date.now() - row.last_active_at > SESSION_TTL_MS) {
+            await db.delete(sessions, id);
+          } else if (row) {
             let now = Date.now();
             if (now - row.last_active_at >= FIVE_MINUTES) {
               db.update(sessions, id, { last_active_at: now }).catch(() => {});
@@ -79,6 +85,9 @@ export function createHybridSessionStorage(): SessionStorage {
             created_at: now,
             last_active_at: now,
           });
+          db.deleteMany(sessions, { where: lt('last_active_at', now - SESSION_TTL_MS) }).catch(
+            () => {},
+          );
         }
         return DB_PREFIX + session.id;
       }
@@ -87,4 +96,3 @@ export function createHybridSessionStorage(): SessionStorage {
     },
   };
 }
-

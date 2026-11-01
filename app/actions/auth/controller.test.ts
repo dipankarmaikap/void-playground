@@ -3,77 +3,125 @@ import { describe, it } from 'remix/test';
 
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
-import { db, users, userPasswords } from '../../data/db.ts';
-import { hashPassword } from '../../data/password.ts';
+import { db, users } from '../../data/db.ts';
+import { cookieFromResponse, createUser, extractCsrf, login, origin } from '../../../test/http.ts';
 
-function cookieFromResponse(res: Response): string {
-  let sc = res.headers.get('Set-Cookie');
-  if (!sc) return '';
-  return sc.split(';')[0];
-}
+const base = origin;
 
 describe('auth controller', () => {
   it('GET /login returns the login page', async () => {
-    let response = await router.fetch(new URL(routes.auth.login.index.href(), 'http://localhost'));
+    let response = await router.fetch(new URL(routes.auth.login.index.href(), base));
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
   });
 
   it('GET /register returns the register page', async () => {
-    let response = await router.fetch(
-      new URL(routes.auth.register.index.href(), 'http://localhost'),
-    );
+    let response = await router.fetch(new URL(routes.auth.register.index.href(), base));
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
   });
 
-  it('GET /login redirects authenticated users to /app/dashboard', async () => {
+  it('GET /login redirects authenticated users to the dashboard', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
-    let userId = crypto.randomUUID();
-    await db.create(users, { id: userId, email, email_verified: true, created_at: Date.now() });
-    await db.create(userPasswords, { user_id: userId, password_hash: hashPassword('password123'), updated_at: Date.now() });
+    await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
 
-    let loginPage = await router.fetch(new URL(routes.auth.login.index.href(), 'http://localhost'));
-    let csrfMatch = (await loginPage.text()).match(/name="_csrf"[^>]*value="([^"]+)"/);
-    let csrf = csrfMatch ? csrfMatch[1] : '';
-    let body = new URLSearchParams({ email, password: 'password123', _csrf: csrf });
-    let loginRes = await router.fetch(new URL(routes.auth.login.action.href(), 'http://localhost'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookieFromResponse(loginPage) },
-      body: body.toString(),
-    });
-    let sessionCookie = cookieFromResponse(loginRes);
-
-    let response = await router.fetch(new URL(routes.auth.login.index.href(), 'http://localhost'), {
+    let response = await router.fetch(new URL(routes.auth.login.index.href(), base), {
       headers: { Cookie: sessionCookie },
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get('Location'), '/app/dashboard');
+    assert.equal(response.headers.get('Location'), routes.app.dashboard.href());
   });
 
-  it('GET /register redirects authenticated users to /app/dashboard', async () => {
+  it('GET /register redirects authenticated users to the dashboard', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
-    let userId = crypto.randomUUID();
-    await db.create(users, { id: userId, email, email_verified: true, created_at: Date.now() });
-    await db.create(userPasswords, { user_id: userId, password_hash: hashPassword('password123'), updated_at: Date.now() });
+    await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
 
-    let loginPage = await router.fetch(new URL(routes.auth.login.index.href(), 'http://localhost'));
-    let csrfMatch = (await loginPage.text()).match(/name="_csrf"[^>]*value="([^"]+)"/);
-    let csrf = csrfMatch ? csrfMatch[1] : '';
-    let body = new URLSearchParams({ email, password: 'password123', _csrf: csrf });
-    let loginRes = await router.fetch(new URL(routes.auth.login.action.href(), 'http://localhost'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookieFromResponse(loginPage) },
-      body: body.toString(),
-    });
-    let sessionCookie = cookieFromResponse(loginRes);
-
-    let response = await router.fetch(new URL(routes.auth.register.index.href(), 'http://localhost'), {
+    let response = await router.fetch(new URL(routes.auth.register.index.href(), base), {
       headers: { Cookie: sessionCookie },
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get('Location'), '/app/dashboard');
+    assert.equal(response.headers.get('Location'), routes.app.dashboard.href());
+  });
+
+  it('rejects login for an unverified user', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    await createUser(email, 'password123', false);
+
+    let page = await router.fetch(new URL(routes.auth.login.index.href(), base));
+    let csrf = extractCsrf(await page.text());
+    let response = await router.fetch(new URL(routes.auth.login.action.href(), base), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: cookieFromResponse(page),
+      },
+      body: new URLSearchParams({ email, password: 'password123', _csrf: csrf }).toString(),
+    });
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+
+    let followUp = await router.fetch(new URL(routes.auth.login.index.href(), base), {
+      headers: { Cookie: cookieFromResponse(response) },
+    });
+    assert.match(await followUp.text(), /Invalid email or password/);
+  });
+
+  it('rejects a login POST without a CSRF token', async () => {
+    let response = await router.fetch(new URL(routes.auth.login.action.href(), base), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ email: 'nobody@example.com', password: 'password123' }).toString(),
+    });
+    assert.equal(response.status, 403);
+  });
+
+  it('does not verify a user with an expired token', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() - 1000,
+    });
+
+    let verifyUrl = new URL(routes.auth.verify.href(), base);
+    verifyUrl.searchParams.set('token', token);
+    let response = await router.fetch(verifyUrl);
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, false);
+  });
+
+  it('rejects a duplicate email without creating another user', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let page = await router.fetch(new URL(routes.auth.register.index.href(), base));
+      let csrf = extractCsrf(await page.text());
+      let response = await router.fetch(new URL(routes.auth.register.action.href(), base), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookieFromResponse(page),
+        },
+        body: new URLSearchParams({ email, password: 'password123', _csrf: csrf }).toString(),
+      });
+      assert.equal(response.status, 302);
+      assert.equal(
+        response.headers.get('Location'),
+        attempt === 0
+          ? routes.auth.login.index.href()
+          : routes.auth.register.index.href(),
+      );
+    }
+
+    let rows = await db.findMany(users, { where: { email } });
+    assert.equal(rows.length, 1);
   });
 });

@@ -1,19 +1,21 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from '../document.tsx';
-import { Input } from '../../ui/input.tsx';
-import { Field } from '../../ui/field.tsx';
+import { Document } from '../../document.tsx';
+import { routes } from '../../../routes.ts';
+import { Input } from '../../../ui/input.tsx';
+import { Field } from '../../../ui/field.tsx';
 
 export interface LoginPageProps {
   csrfToken: string;
   error?: string;
+  message?: string;
   email?: string;
 }
 
 export function LoginPage(handle: Handle<LoginPageProps>) {
   return () => {
-    let { csrfToken, error, email } = handle.props;
+    let { csrfToken, error, message, email } = handle.props;
 
     return (
       <Document title="Login">
@@ -43,9 +45,14 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
                 {error}
               </p>
             ) : null}
+            {message ? (
+              <p mix={css({ margin: 0, color: '#0a7d2b' })} role="status">
+                {message}
+              </p>
+            ) : null}
             <form
               method="post"
-              action="/login"
+              action={routes.auth.login.action.href()}
               mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
             >
               <input type="hidden" name="_csrf" value={csrfToken} />
@@ -60,7 +67,7 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
               </button>
             </form>
             <p mix={css({ margin: 0 })}>
-              No account? <a href="/register">Register</a>
+              No account? <a href={routes.auth.register.index.href()}>Register</a>
             </p>
           </div>
         </main>

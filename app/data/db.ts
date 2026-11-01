@@ -5,8 +5,12 @@ import { column as c, table } from 'remix/data-table';
 import type { TableRow } from 'remix/data-table';
 import { createSqliteDatabase } from 'remix/data-table/sqlite';
 
-const dbPath = join(import.meta.dirname, '..', '..', 'data', 'app.db');
-mkdirSync(dirname(dbPath), { recursive: true });
+const isTest = process.env.NODE_ENV === 'test';
+const dbPath = isTest ? ':memory:' : join(import.meta.dirname, '..', '..', 'data', 'app.db');
+
+if (!isTest) {
+  mkdirSync(dirname(dbPath), { recursive: true });
+}
 
 export const users = table({
   name: 'users',
@@ -80,6 +84,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   last_active_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users(verification_token);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 `);
 
 export type User = TableRow<typeof users>;

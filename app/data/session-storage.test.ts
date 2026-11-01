@@ -1,0 +1,47 @@
+import * as assert from 'remix/assert';
+import { describe, it } from 'remix/test';
+
+import { db, sessions } from './db.ts';
+import { createHybridSessionStorage, SESSION_TTL_MS } from './session-storage.ts';
+
+describe('hybrid session storage', () => {
+  it('drops a session row past the TTL', async () => {
+    let id = crypto.randomUUID();
+    let expiredAt = Date.now() - SESSION_TTL_MS - 1000;
+    await db.create(sessions, {
+      id,
+      user_id: null,
+      data: JSON.stringify([{ auth: { userId: crypto.randomUUID() } }, {}]),
+      ip: null,
+      user_agent: null,
+      created_at: expiredAt,
+      last_active_at: expiredAt,
+    });
+
+    let storage = createHybridSessionStorage();
+    let session = await storage.read(`db:${id}`);
+
+    assert.equal(session.get('auth'), undefined);
+    assert.equal(await db.find(sessions, id), null);
+  });
+
+  it('reads an active session row', async () => {
+    let id = crypto.randomUUID();
+    let userId = crypto.randomUUID();
+    await db.create(sessions, {
+      id,
+      user_id: null,
+      data: JSON.stringify([{ auth: { userId } }, {}]),
+      ip: null,
+      user_agent: null,
+      created_at: Date.now(),
+      last_active_at: Date.now(),
+    });
+
+    let storage = createHybridSessionStorage();
+    let session = await storage.read(`db:${id}`);
+    let auth = session.get('auth') as { userId: string } | undefined;
+
+    assert.equal(auth?.userId, userId);
+  });
+});

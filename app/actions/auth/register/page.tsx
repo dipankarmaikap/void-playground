@@ -1,9 +1,10 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from '../document.tsx';
-import { Input } from '../../ui/input.tsx';
-import { Field } from '../../ui/field.tsx';
+import { Document } from '../../document.tsx';
+import { routes } from '../../../routes.ts';
+import { Input } from '../../../ui/input.tsx';
+import { Field } from '../../../ui/field.tsx';
 
 export interface RegisterPageProps {
   csrfToken: string;
@@ -45,7 +46,7 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
             ) : null}
             <form
               method="post"
-              action="/register"
+              action={routes.auth.register.action.href()}
               mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
             >
               <input type="hidden" name="_csrf" value={csrfToken} />
@@ -60,7 +61,7 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
               </button>
             </form>
             <p mix={css({ margin: 0 })}>
-              Already have an account? <a href="/login">Log in</a>
+              Already have an account? <a href={routes.auth.login.index.href()}>Log in</a>
             </p>
           </div>
         </main>

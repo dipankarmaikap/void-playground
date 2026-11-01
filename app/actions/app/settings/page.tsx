@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { Document } from '../../document.tsx';
+import { routes } from '../../../routes.ts';
 
 export interface SessionView {
   id: string;
@@ -22,6 +23,7 @@ export interface SettingsPageProps {
 export function SettingsPage(handle: Handle<SettingsPageProps>) {
   return () => {
     let { csrfToken, sessions, error, message } = handle.props;
+    let action = routes.app.settings.action.href();
 
     return (
       <Document title="Settings">
@@ -90,7 +92,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
                     Last active: {s.lastActiveAt}
                   </div>
                   {!s.current ? (
-                    <form method="post" action="/app/settings">
+                    <form method="post" action={action}>
                       <input type="hidden" name="_csrf" value={csrfToken} />
                       <input type="hidden" name="action" value="revoke" />
                       <input type="hidden" name="session_id" value={s.id} />
@@ -104,7 +106,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
             </ul>
 
             {sessions.some((s) => !s.current) ? (
-              <form method="post" action="/settings">
+              <form method="post" action={action}>
                 <input type="hidden" name="_csrf" value={csrfToken} />
                 <input type="hidden" name="action" value="revoke_others" />
                 <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
@@ -113,7 +115,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
               </form>
             ) : null}
 
-            <a href="/app/dashboard" mix={css({ color: '#0066cc' })}>
+            <a href={routes.app.dashboard.href()} mix={css({ color: '#0066cc' })}>
               Back to dashboard
             </a>
           </div>
