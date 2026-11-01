@@ -6,6 +6,8 @@ import * as f from 'remix/data-schema/form-data';
 import * as checks from 'remix/data-schema/checks';
 
 import { getCsrfToken } from 'remix/middleware/csrf';
+import { Auth } from 'remix/middleware/auth';
+import type { AuthState } from 'remix/middleware/auth';
 
 import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from 'remix/auth';
 
@@ -46,6 +48,10 @@ const registerForm = f.object({
 export const loginController = createController(routes.auth.login, {
   actions: {
     async index(context) {
+      let auth = context.get(Auth) as AuthState<User>;
+      if (auth?.ok) {
+        return redirect('/app/dashboard');
+      }
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
       return context.render(
@@ -68,6 +74,10 @@ export const loginController = createController(routes.auth.login, {
 export const registerController = createController(routes.auth.register, {
   actions: {
     async index(context) {
+      let auth = context.get(Auth) as AuthState<User>;
+      if (auth?.ok) {
+        return redirect('/app/dashboard');
+      }
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
       return context.render(
