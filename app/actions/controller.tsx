@@ -1,17 +1,13 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { requireAuth } from 'remix/middleware/auth';
 import { Auth } from 'remix/middleware/auth';
-import type { AuthState, GoodAuth } from 'remix/middleware/auth';
-import { getCsrfToken } from 'remix/middleware/csrf';
+import type { AuthState } from 'remix/middleware/auth';
 
 import { assets } from '../assets.ts';
-import { db, users } from '../data/db.ts';
 import type { User } from '../data/db.ts';
 import { routes } from '../routes.ts';
 import { HomePage } from './home-page.tsx';
-import { DashboardPage } from './dashboard-page.tsx';
 
 export default createController(routes, {
   actions: {
@@ -21,18 +17,9 @@ export default createController(routes, {
     home(context) {
       let auth = context.get(Auth) as AuthState<User>;
       if (auth?.ok) {
-        return redirect('/dashboard');
+        return redirect('/app/dashboard');
       }
       return context.render(<HomePage />);
-    },
-    dashboard: {
-      middleware: [requireAuth<User>({ onFailure: () => redirect('/login') })],
-      async handler(context) {
-        let auth = context.get(Auth) as GoodAuth<User>;
-        let user = await db.find(users, auth.identity.id);
-        let csrfToken = getCsrfToken(context);
-        return context.render(<DashboardPage csrfToken={csrfToken} email={user?.email} />);
-      },
     },
   },
 });

@@ -60,7 +60,7 @@ export const loginController = createController(routes.auth.login, {
       }
       let session = completeAuth(context);
       session.set('auth', { userId: user.id });
-      return redirect('/dashboard');
+      return redirect('/app/dashboard');
     },
   },
 });

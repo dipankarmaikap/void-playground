@@ -37,6 +37,20 @@ export const userPasswords = table({
   primaryKey: 'user_id',
 });
 
+export const sessions = table({
+  name: 'sessions',
+  columns: {
+    id: c.text().notNull(),
+    user_id: c.text().nullable(),
+    data: c.text().notNull(),
+    ip: c.text().nullable(),
+    user_agent: c.text().nullable(),
+    created_at: c.integer().notNull(),
+    last_active_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
 export const db = createSqliteDatabase({ filename: dbPath, foreignKeys: true });
 
 await db.executeScript(`
@@ -55,7 +69,19 @@ CREATE TABLE IF NOT EXISTS user_passwords (
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT,
+  data TEXT NOT NULL,
+  ip TEXT,
+  user_agent TEXT,
+  created_at INTEGER NOT NULL,
+  last_active_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `);
 
 export type User = TableRow<typeof users>;
 export type UserPassword = TableRow<typeof userPasswords>;
+export type SessionRow = TableRow<typeof sessions>;

@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from './document.tsx';
+import { Document } from '../document.tsx';
 
 export interface DashboardPageProps {
   csrfToken: string;
@@ -42,6 +42,9 @@ export function DashboardPage(handle: Handle<DashboardPageProps>) {
               </p>
             ) : null}
             <p mix={css({ margin: 0 })}>Signed in as {email}</p>
+            <a href="/app/settings" mix={css({ color: '#0066cc' })}>
+              Manage logged-in sessions
+            </a>
             <form
               method="post"
               action="/logout"

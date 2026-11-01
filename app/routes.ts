@@ -9,5 +9,8 @@ export const routes = route({
     verify: get('/verify'),
     logout: post('/logout'),
   },
-  dashboard: get('/dashboard'),
+  app: route('/app', {
+    dashboard: get('/dashboard'),
+    settings: form('/settings'),
+  }),
 });
