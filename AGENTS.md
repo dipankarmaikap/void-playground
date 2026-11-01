@@ -42,7 +42,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 - `app/router.ts` wires routes to controllers and installs the middleware stack: request context, static files, session, form data, CSRF, auth, render.
 - Put top-level route actions in `app/actions/controller.tsx`; give every nested route map its own directory with `controller.tsx` (and `page.tsx` for route-local UI). `app/actions/controller.test.ts` is the root controller's router smoke test.
 - `app/actions/auth/` owns login, register, verify, and logout. `app/actions/app/` owns the protected dashboard and settings pages.
-- `app/data/` owns SQLite tables, password hashing, and the hybrid session storage.
+- `app/data/` owns SQLite tables, password hashing, the hybrid session storage, and session cookie/scheme setup (`session.ts`).
+- `app/middleware/` holds custom middleware (e.g. request context).
 - `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller.
 - `app/actions/home-page.tsx` and `app/actions/document.tsx` render the route-owned starter UI.
 - `app/actions/public/` contains the browser runtime entry.
