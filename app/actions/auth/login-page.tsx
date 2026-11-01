@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { Document } from '../document.tsx';
+import { Input } from '../../ui/input.tsx';
 
 export interface LoginPageProps {
   csrfToken: string;
@@ -49,17 +50,11 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
               <input type="hidden" name="_csrf" value={csrfToken} />
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Email
-                <input
-                  name="email"
-                  type="email"
-                  defaultValue={email ?? ''}
-                  required
-                  mix={css({ padding: '8px' })}
-                />
+                <Input name="email" type="email" defaultValue={email ?? ''} required />
               </label>
               <label mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                 Password
-                <input name="password" type="password" required mix={css({ padding: '8px' })} />
+                <Input name="password" type="password" required />
               </label>
               <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
                 Log in
