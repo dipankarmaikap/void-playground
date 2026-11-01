@@ -1,22 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../router.ts';
-import { routes } from '../routes.ts';
-import { db, sessions } from '../data/db.ts';
-import { hashPassword } from '../data/password.ts';
-import { users, userPasswords } from '../data/db.ts';
+import { router } from '../app/router.ts';
+import { routes } from '../app/routes.ts';
+import { db, sessions } from '../app/data/db.ts';
+import { hashPassword } from '../app/data/password.ts';
+import { users, userPasswords } from '../app/data/db.ts';
 
-function extractCsrf(html: string): string {
-  let m = html.match(/name="_csrf"[^>]*value="([^"]+)"/);
-  if (!m) m = html.match(/value="([^"]+)"[^>]*name="_csrf"/);
-  return m ? m[1] : '';
-}
-function cookieFromResponse(res: Response): string {
-  let sc = res.headers.get('Set-Cookie');
-  if (!sc) return '';
-  return sc.split(';')[0];
-}
+import { cookieFromResponse, extractCsrf } from './http.ts';
 
 describe('hybrid storage', () => {
   it('anonymous visits create no DB session rows', async () => {
@@ -48,7 +39,6 @@ describe('hybrid storage', () => {
     let userRows = await db.findMany(sessions, { where: { user_id: userId } });
     assert.equal(userRows.length, 1);
 
-    // settings reachable with the issued cookie
     let settingsRes = await router.fetch(new URL(routes.app.settings.index.href(), 'http://localhost'), {
       headers: { Cookie: sc },
     });
