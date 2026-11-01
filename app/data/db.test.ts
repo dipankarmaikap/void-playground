@@ -12,6 +12,6 @@ describe('db', () => {
     let user = await db.find(users, id);
     assert.ok(user);
     assert.equal(user.email, email);
-    assert.equal('password_hash' in (user as any), false);
+    assert.equal('password_hash' in user, false);
   });
 });

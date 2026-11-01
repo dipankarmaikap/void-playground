@@ -22,8 +22,9 @@ const app = run({
   },
 });
 
-if ((import.meta as any).hot) {
-  (import.meta as any).hot.on('server:update', async () => {
+let hot = (import.meta as { hot?: { on: (event: string, cb: () => void | Promise<void>) => void } }).hot;
+if (hot) {
+  hot.on('server:update', async () => {
     try {
       await app.ready();
       await app.frames.top.reload();

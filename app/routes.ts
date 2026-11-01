@@ -1,5 +1,7 @@
 import { form, get, post, route } from 'remix/routes';
 
+import { appRoutes } from './actions/app/routes.ts';
+
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
@@ -9,8 +11,5 @@ export const routes = route({
     verify: get('/verify'),
     logout: post('/logout'),
   },
-  app: route('/app', {
-    dashboard: get('/dashboard'),
-    settings: form('/settings'),
-  }),
+  app: route('/app', appRoutes),
 });

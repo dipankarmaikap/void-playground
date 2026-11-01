@@ -40,7 +40,7 @@ let sessionScheme = createSessionAuthScheme<User, { userId: string }>({
   },
 });
 
-const requestContextMiddleware: Middleware = async (context: any, next: any) => {
+const requestContextMiddleware: Middleware = async (context, next) => {
   let ip =
     context.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     context.request.headers.get('x-real-ip') ||
@@ -49,7 +49,7 @@ const requestContextMiddleware: Middleware = async (context: any, next: any) => 
   return sessionRequestContext.run({ ip, userAgent }, () => next());
 };
 
-const appAuthMiddleware: Middleware = async (context: any, next: any) => {
+const appAuthMiddleware: Middleware = async (context, next) => {
   if (String(context.url?.pathname ?? '').startsWith('/app')) {
     let authState = context.get ? context.get(Auth) : undefined;
     if (!authState?.ok) {
