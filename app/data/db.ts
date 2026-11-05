@@ -45,7 +45,7 @@ export const sessions = table({
   name: 'sessions',
   columns: {
     id: c.text().notNull(),
-    user_id: c.text().nullable(),
+    user_id: c.text().notNull(),
     data: c.text().notNull(),
     ip: c.text().nullable(),
     user_agent: c.text().nullable(),
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY NOT NULL,
-  user_id TEXT,
+  user_id TEXT NOT NULL,
   data TEXT NOT NULL,
   ip TEXT,
   user_agent TEXT,

@@ -4,23 +4,23 @@ Date: 2026-11-02
 
 ## Goal
 
-Store authenticated sessions in a SQLite table so users can view all active sessions (devices) and log out of individual or all other sessions, via an `/app/settings` page.
+Store authenticated sessions in a SQLite table so users can view all active sessions and revoke individual or all other sessions, via an `/app/settings` page.
 
 ## Storage strategy
 
 Session storage is hybrid (`app/data/session-storage.ts`):
 
-- Anonymous sessions (mostly a CSRF token before login) stay in the signed cookie, so anonymous page views never write to the database.
-- Authenticated sessions store only `db:<session id>` in the cookie and their data in the `sessions` table. Session data is never held in the client for a logged-in user.
-- A legacy cookie session that gains `auth` is promoted to the database on its next save.
-- If a `db:` cookie no longer has a row (revoked or expired), the request falls back to an empty anonymous session.
+- Pre-login cookies (holding mostly a CSRF token) stay in the signed cookie, so pre-login page views never write to the database.
+- Authenticated sessions store only `db:<session id>` in the cookie and their data in the `sessions` table. Session data is never held in the client for an authenticated session.
+- A pre-login cookie that gains `auth` is replaced: logging in rotates the session id, so a new Session row is created and the pre-login cookie is discarded.
+- If a `db:` cookie no longer has a row (revoked or expired), the request falls back to an empty pre-login cookie.
 
 ## Data model
 
 New table `sessions`:
 
 - `id` TEXT PK
-- `user_id` TEXT FK -> users.id ON DELETE CASCADE (indexed)
+- `user_id` TEXT NOT NULL FK -> users.id ON DELETE CASCADE (indexed)
 - `data` TEXT NOT NULL (JSON session data)
 - `ip` TEXT
 - `user_agent` TEXT
@@ -40,19 +40,19 @@ New table `sessions`:
 ## Behavior
 
 - Request context (IP, User-Agent) is captured via `AsyncLocalStorage` middleware and stored on session creation.
-- The settings page lists device (browser/OS), IP, created, and last-active timestamps; the current session is marked "(this device)".
-- Revoke deletes the target session row. The revoked browser's cookie no longer resolves to a row, so its next request is anonymous.
-- Revoking the current session destroys the session and redirects to `/login`.
-- "Log out all other devices" deletes all rows for the user except the current one.
+- The settings page lists browser and OS, IP, created, and last-active timestamps; the current session is marked "(this session)".
+- Revoke deletes the target session row. The revoked browser's cookie no longer resolves to a row, so its next request is unauthenticated.
+- Logging out the current session destroys the session and redirects to `/login`.
+- "Revoke all other sessions" deletes all rows for the user except the current one.
 - Flash messages report the outcome on the next render.
 
 ## Security
 
-- Revoke verifies ownership (`session.user_id === current user id`); the current session can only be revoked by its own request and is then destroyed.
+- Revoke verifies ownership (`session.user_id === current user id`); the current session can only be ended by its own request, and is then destroyed.
 - `/app/settings` is protected by `requireAuth()` on the controller.
 - Session ids are random UUIDs inside a signed cookie.
 - `SESSION_SECRET` is required in production.
-- Unknown or expired session ids degrade to an empty session instead of throwing.
+- Unknown or expired session ids degrade to an empty pre-login cookie instead of throwing.
 
 ## Testing
 

@@ -1,4 +1,4 @@
-export function deviceLabel(ua: string | null): string {
+export function browserLabel(ua: string | null): string {
   let value = ua ?? '';
   let browser = 'Unknown browser';
   if (/Edg\//.test(value)) browser = 'Edge';

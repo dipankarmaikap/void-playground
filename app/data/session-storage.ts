@@ -21,7 +21,7 @@ const cookieStorage = createCookieSessionStorage();
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
-// Authenticated sessions live in the DB; anonymous ones (mostly CSRF tokens) stay in the cookie.
+// Authenticated sessions live in the DB; pre-login cookies (mostly CSRF tokens) stay in the cookie.
 export function createHybridSessionStorage(): SessionStorage {
   return {
     async read(cookie) {

@@ -9,7 +9,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { and, ne } from 'remix/data-table';
 import { db, sessions } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
-import { deviceLabel } from '../../../data/user-agent.ts';
+import { browserLabel } from '../../../data/user-agent.ts';
 import { routes } from '../../../routes.ts';
 import { SettingsPage } from './page.tsx';
 import type { SessionView } from './page.tsx';
@@ -30,7 +30,7 @@ export default createController(routes.app.settings, {
       let views: SessionView[] = rows.map((row) => ({
         id: row.id,
         current: row.id === currentId,
-        device: deviceLabel(row.user_agent),
+        browser: browserLabel(row.user_agent),
         ip: row.ip ?? 'unknown',
         createdAt: new Date(row.created_at).toLocaleString(),
         lastActiveAt: new Date(row.last_active_at).toLocaleString(),
@@ -65,7 +65,7 @@ export default createController(routes.app.settings, {
           context.session.destroy();
           return redirect(routes.auth.login.index.href());
         }
-        context.session.flash('message', 'Session logged out');
+        context.session.flash('message', 'Session revoked');
         return redirect(routes.app.settings.index.href());
       }
 
@@ -73,7 +73,7 @@ export default createController(routes.app.settings, {
         await db.deleteMany(sessions, {
           where: and({ user_id: auth.identity.id }, ne('id', currentId)),
         });
-        context.session.flash('message', 'Logged out all other devices');
+        context.session.flash('message', 'Revoked all other sessions');
         return redirect(routes.app.settings.index.href());
       }
 

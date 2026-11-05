@@ -7,7 +7,7 @@ import { routes } from '../../../routes.ts';
 export interface SessionView {
   id: string;
   current: boolean;
-  device: string;
+  browser: string;
   ip: string;
   createdAt: string;
   lastActiveAt: string;
@@ -47,7 +47,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
               gap: '16px',
             })}
           >
-            <h1 mix={css({ margin: 0, fontSize: '24px' })}>Logged-in sessions</h1>
+            <h1 mix={css({ margin: 0, fontSize: '24px' })}>Sessions</h1>
             {error ? (
               <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
                 {error}
@@ -82,7 +82,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
                   })}
                 >
                   <div mix={css({ fontWeight: 600 })}>
-                    {s.device} {s.current ? '(this device)' : ''}
+                    {s.browser} {s.current ? '(this session)' : ''}
                   </div>
                   <div mix={css({ fontSize: '13px', color: '#555' })}>IP: {s.ip}</div>
                   <div mix={css({ fontSize: '13px', color: '#555' })}>
@@ -97,7 +97,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
                       <input type="hidden" name="action" value="revoke" />
                       <input type="hidden" name="session_id" value={s.id} />
                       <button type="submit" mix={css({ padding: '6px 10px', cursor: 'pointer' })}>
-                        Log out
+                        Revoke
                       </button>
                     </form>
                   ) : null}
@@ -110,7 +110,7 @@ export function SettingsPage(handle: Handle<SettingsPageProps>) {
                 <input type="hidden" name="_csrf" value={csrfToken} />
                 <input type="hidden" name="action" value="revoke_others" />
                 <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
-                  Log out all other devices
+                  Revoke all other sessions
                 </button>
               </form>
             ) : null}

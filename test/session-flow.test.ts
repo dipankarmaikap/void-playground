@@ -37,7 +37,7 @@ describe('session flow', () => {
 
     let sessionCookie = await login(router, email, 'password123');
     let settingsHtml = await getSettingsPage(sessionCookie);
-    assert.match(settingsHtml, /Logged-in sessions/);
+    assert.match(settingsHtml, /Sessions/);
     assert.match(settingsHtml, /1\.2\.3\.4/);
 
     let revokeResponse = await router.fetch(
@@ -68,7 +68,7 @@ describe('session flow', () => {
     assert.equal(followUp.status, 200);
   });
 
-  it('shows the current device first', async () => {
+  it('shows the current session first', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
     let userId = await createUser(email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
@@ -76,10 +76,10 @@ describe('session flow', () => {
     await seedSession(userId, '9.9.9.9', Date.now() + 60_000);
 
     let settingsHtml = await getSettingsPage(sessionCookie);
-    assert.ok(settingsHtml.indexOf('(this device)') < settingsHtml.indexOf('9.9.9.9'));
+    assert.ok(settingsHtml.indexOf('(this session)') < settingsHtml.indexOf('9.9.9.9'));
   });
 
-  it('logs out all other devices', async () => {
+  it('revokes all other sessions', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
     let userId = await createUser(email, 'password123');
     await seedSession(userId, '1.1.1.1');
@@ -106,7 +106,7 @@ describe('session flow', () => {
     assert.equal(remaining.length, 1);
 
     let followUp = await getSettingsPage(sessionCookie);
-    assert.match(followUp, /Logged out all other devices/);
+    assert.match(followUp, /Revoked all other sessions/);
   });
 
   it('logout destroys the session', async () => {
