@@ -41,4 +41,4 @@ npm run lint
 - `app/ui/` holds components shared by more than one route.
 - `app/actions/public/` is the browser entry point; root `public/` serves static files unchanged.
 - `test/` holds cross-cutting request-flow tests and shared helpers.
-- `docs/superpowers/` holds the specs and plans for each feature.
+- `docs/specs/` and `docs/plans/` hold the design and implementation plan for each feature.

@@ -26,10 +26,10 @@ Refer to ./.agents/skills/remix/SKILL.md for the Remix mental model and how to f
 
 ## Docs
 
-Superpowers owns `docs/superpowers/`:
+Designs and plans live under `docs/`:
 
-- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` — the validated design, written by the brainstorming skill before any code
-- `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md` — the implementation plan, written by the writing-plans skill, executed by subagent-driven-development or executing-plans
+- `docs/specs/YYYY-MM-DD-<topic>-design.md` — the validated design, written before any code
+- `docs/plans/YYYY-MM-DD-<feature-name>.md` — the implementation plan
 
 One feature is one spec plus one plan; specs and plans are committed before implementation starts.
 
