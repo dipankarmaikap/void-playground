@@ -7,6 +7,7 @@ This app was scaffolded with `remix new`. Use these conventions when continuing 
 ```sh
 npm install
 npm run dev
+npm run hmr
 npm run start
 npm test
 npm run typecheck
@@ -15,7 +16,7 @@ npm run lint
 
 `typecheck` runs `tsc --noEmit`; `npm run lint` runs oxlint.
 
-`npm run dev` watches and restarts the server (refresh the browser to see changes); `npm run start` runs in production mode without a separate build step.
+`npm run dev` watches and restarts the server (refresh the browser to see changes); `npm run hmr` adds live server and browser updates through a stable proxy; `npm run start` runs in production mode without a separate build step.
 
 Node.js is the runtime; npm is the package manager. Scripts run `server.ts` via `remix/node-tsx`.
 
@@ -39,7 +40,9 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 ## App Layout
 
 - `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs. Use `routes.*.href()` in links, forms, and redirects instead of string literals.
-- `app/router.ts` wires routes to controllers and installs the middleware stack: request context, static files, session, form data, CSRF, auth, render.
+- `app/router.ts` wires routes to controllers and installs the middleware stack: request context, async context, static files, session, form data, CSRF, auth, CSP, render.
+- `hmr.ts` supervises the development server for `npm run hmr`, proxying requests while server and browser modules reload.
+- Authored `<script>` and `<style>` tags need the request nonce from `getCspNonce(getContext())`; import maps, module preloads, and `css()` styles get it from `render()` automatically.
 - Put top-level route actions in `app/actions/controller.tsx`; give every nested route map its own directory with `controller.tsx` (and `page.tsx` for route-local UI). `app/actions/controller.test.ts` is the root controller's router smoke test.
 - `app/actions/auth/` owns login, register, verify, and logout. `app/actions/app/` owns the protected dashboard and settings pages.
 - `app/data/` owns SQLite tables, password hashing, the hybrid session storage, and session cookie/scheme setup (`session.ts`).

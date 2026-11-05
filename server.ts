@@ -1,15 +1,24 @@
 import { createServer } from 'node:http';
 import { createRequestListener } from 'remix/node-fetch-server';
 
+import { assets } from './app/assets.ts';
 import { router } from './app/router.ts';
 import { db } from './app/data/db.ts';
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100;
+const hmrProxyPort = process.env.HMR_PROXY_PORT
+  ? Number.parseInt(process.env.HMR_PROXY_PORT, 10)
+  : null;
+const isHmr = process.env.REMIX_NODE_HMR === '1';
 
-const server = createServer(createRequestListener(router.fetch));
+const server = createServer(createRequestListener(router.fetch, { trustProxy: isHmr }));
 
 server.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
+  if (isHmr) {
+    import('remix/node-hmr/runtime').then((nodeHmr) => nodeHmr.emitServerReady());
+  }
+
+  console.log(`Server listening on http://localhost:${hmrProxyPort ?? port}`);
 });
 
 let shuttingDown = false;
@@ -20,9 +29,8 @@ function shutdown() {
   }
 
   shuttingDown = true;
-  server.close(async () => {
-    await db.close();
-    process.exit(0);
+  server.close(() => {
+    Promise.all([assets.close(), db.close()]).finally(() => process.exit(0));
   });
   server.closeAllConnections();
 }

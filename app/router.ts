@@ -1,4 +1,6 @@
 import { createRouter, type RouterContext } from 'remix/router';
+import { asyncContext } from 'remix/middleware/async-context';
+import { csp } from 'remix/middleware/csp';
 import { render } from 'remix/middleware/render';
 import { staticFiles } from 'remix/middleware/static';
 import { session } from 'remix/middleware/session';
@@ -17,14 +19,34 @@ import { requestContextMiddleware } from './middleware/request-context.ts';
 import { routes } from './routes.ts';
 import { sessionCookie, sessionStorage, sessionScheme } from './data/session.ts';
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 export const router = createRouter({
   middleware: [
     requestContextMiddleware,
+    asyncContext(),
     staticFiles('./public', { index: false }),
     session(sessionCookie, sessionStorage),
     formData(),
     csrf(),
     auth({ schemes: [sessionScheme] }),
+    csp({
+      policy({ nonce }) {
+        return {
+          defaultSrc: ["'self'"],
+          scriptSrc: [`'nonce-${nonce}'`],
+          styleSrc: [`'nonce-${nonce}'`],
+          imgSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'none'"],
+          ...(isDevelopment
+            ? { connectSrc: ["'self'", 'http://localhost:*', 'http://127.0.0.1:*'] }
+            : {}),
+        };
+      },
+    }),
     render({ assets }),
   ],
 });
