@@ -33,6 +33,20 @@ Designs and plans live under `docs/`:
 
 One feature is one spec plus one plan; specs and plans are committed before implementation starts.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues at `dipankarmaikap/void-playground`, using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles, each label string matching its name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Commits
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <summary>`, e.g. `feat(auth): add session cookie`. Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Summary in lowercase, imperative, no trailing period; add a body only when the why is not obvious.
