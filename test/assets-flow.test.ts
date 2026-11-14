@@ -31,13 +31,17 @@ describe('source asset requests', () => {
       let authenticated = await router.fetch(assetUrl, {
         headers: { Cookie: sessionCookie },
       });
+      let assetBase = await router.fetch(new URL('/assets', origin), {
+        headers: { Cookie: sessionCookie },
+      });
 
       assert.equal(authenticated.status, 200);
+      assert.equal(assetBase.status, 404);
       assert.doesNotMatch(
         authenticated.headers.get('Cache-Control') ?? '',
         /private|no-store/i,
       );
-      assert.equal(lookups.length, 0, 'assets must bypass Session and Auth database reads');
+      assert.equal(lookups.length, 0, 'asset requests must bypass Session and Auth database reads');
     } finally {
       db.find = originalFind;
     }

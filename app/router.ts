@@ -50,7 +50,7 @@ const privateAppHtml: Middleware = async (context, next) => {
 };
 
 const sourceAssets: Middleware = async (context, next) => {
-  if (!context.url.pathname.startsWith('/assets/')) {
+  if (context.url.pathname !== '/assets' && !context.url.pathname.startsWith('/assets/')) {
     return next();
   }
   return (await assets.fetch(context.request)) ?? new Response('Not Found', { status: 404 });
