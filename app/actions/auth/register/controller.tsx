@@ -12,11 +12,13 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { db, users, userPasswords } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { hashPassword } from '../../../data/password.ts';
+import { DISPLAY_NAME_MAX_LENGTH } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';
 
 const registerForm = f.object({
   email: f.field(s.string().pipe(checks.email())),
+  display_name: f.field(s.defaulted(s.string(), '')),
   password: f.field(s.string().pipe(checks.minLength(8))),
 });
 
@@ -41,15 +43,35 @@ export default createController(routes.auth.register, {
       );
     },
     async action(context) {
+      let emailValue = context.formData.get('email');
+      let submittedEmail = typeof emailValue === 'string' ? emailValue : undefined;
+      let displayNameValue = context.formData.get('display_name');
+      let submittedDisplayName =
+        typeof displayNameValue === 'string' ? displayNameValue : undefined;
+
       let parsed = s.parseSafe(registerForm, context.formData);
       if (!parsed.success) {
         let csrfToken = getCsrfToken(context);
-        let emailValue = context.formData.get('email');
         return context.render(
           <RegisterPage
             csrfToken={csrfToken}
             error={parsed.issues[0]?.message ?? 'Invalid input'}
-            email={typeof emailValue === 'string' ? emailValue : undefined}
+            email={submittedEmail}
+            displayName={submittedDisplayName}
+          />,
+          { status: 400 },
+        );
+      }
+
+      let displayName = parsed.value.display_name.trim();
+      if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+        let csrfToken = getCsrfToken(context);
+        return context.render(
+          <RegisterPage
+            csrfToken={csrfToken}
+            error={`Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer`}
+            email={submittedEmail}
+            displayName={submittedDisplayName}
           />,
           { status: 400 },
         );
@@ -74,6 +96,7 @@ export default createController(routes.auth.register, {
           await tx.create(users, {
             id: userId,
             email,
+            display_name: displayName || null,
             email_verified: false,
             verification_token: token,
             verification_expires_at: expiresAt,

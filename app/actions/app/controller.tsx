@@ -19,7 +19,11 @@ export default createController(routes.app, {
       let identity = user ?? auth.identity;
       let csrfToken = getCsrfToken(context);
       return context.render(
-        <DashboardPage csrfToken={csrfToken} email={identity.email} />,
+        <DashboardPage
+          csrfToken={csrfToken}
+          email={identity.email}
+          displayName={identity.display_name}
+        />,
       );
     },
   },

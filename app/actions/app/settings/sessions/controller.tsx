@@ -43,6 +43,7 @@ export default createController(routes.app.settings.sessions, {
         <SessionsPage
           csrfToken={csrfToken}
           email={identity.email}
+          displayName={identity.display_name}
           sessions={views}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}

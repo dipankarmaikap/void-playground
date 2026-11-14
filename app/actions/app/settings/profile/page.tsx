@@ -2,12 +2,18 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { AppShell } from '../../../../ui/app-shell.tsx';
+import { Button } from '../../../../ui/button.tsx';
+import { Field } from '../../../../ui/field.tsx';
+import { Input } from '../../../../ui/input.tsx';
 import { colors, radius, shadow } from '../../../../ui/theme.ts';
+import { DISPLAY_NAME_MAX_LENGTH } from '../../../../config.ts';
+import { routes } from '../../../../routes.ts';
 
 export interface ProfilePageProps {
   csrfToken: string;
   email: string;
   displayName?: string | null;
+  displayNameValue?: string;
   error?: string;
   message?: string;
 }
@@ -61,6 +67,10 @@ const cardStyle = css({
   boxShadow: shadow.card,
 });
 
+const editCardStyle = css({
+  marginTop: '1rem',
+});
+
 const cardHeadingStyle = css({
   margin: '0 0 1rem',
   fontSize: '1rem',
@@ -87,10 +97,18 @@ const detailStyle = css({
   overflowWrap: 'anywhere',
 });
 
+const formStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  alignItems: 'flex-start',
+});
+
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    let { csrfToken, email, displayName, error, message } = handle.props;
+    let { csrfToken, email, displayName, displayNameValue, error, message } = handle.props;
     let trimmedDisplayName = displayName?.trim() || null;
+    let formValue = displayNameValue ?? trimmedDisplayName ?? '';
 
     return (
       <AppShell
@@ -129,6 +147,23 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               <dd mix={detailStyle}>{email}</dd>
             </div>
           </dl>
+        </section>
+        <section aria-labelledby="edit-display-name-heading" mix={[cardStyle, editCardStyle]}>
+          <h2 id="edit-display-name-heading" mix={cardHeadingStyle}>
+            Display name
+          </h2>
+          <form method="post" action={routes.app.settings.profile.action.href()} mix={formStyle}>
+            <input type="hidden" name="_csrf" value={csrfToken} />
+            <Field label="Display name" hint="Leave blank to use your email address instead.">
+              <Input
+                name="display_name"
+                autoComplete="nickname"
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
+                defaultValue={formValue}
+              />
+            </Field>
+            <Button type="submit">Save profile</Button>
+          </form>
         </section>
       </AppShell>
     );

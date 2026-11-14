@@ -26,11 +26,13 @@ export async function createUser(
   email: string,
   password: string,
   verified = true,
+  displayName: string | null = null,
 ): Promise<string> {
   let id = crypto.randomUUID();
   await db.create(users, {
     id,
     email,
+    display_name: displayName,
     email_verified: verified,
     created_at: Date.now(),
   });

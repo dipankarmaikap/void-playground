@@ -3,13 +3,14 @@ import { describe, it } from 'remix/test';
 
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
-import { createUser, login, origin } from '../../../test/http.ts';
+import { db, users } from '../../data/db.ts';
+import { createUser, extractCsrf, login, origin } from '../../../test/http.ts';
 
-async function loginNewUser() {
+async function loginNewUser(displayName: string | null = null) {
   let email = `app-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
+  let userId = await createUser(email, 'password123', true, displayName);
   let sessionCookie = await login(router, email, 'password123');
-  return { email, sessionCookie };
+  return { email, userId, sessionCookie };
 }
 
 async function getAuthenticatedHtml(path: string, sessionCookie: string) {
@@ -18,6 +19,29 @@ async function getAuthenticatedHtml(path: string, sessionCookie: string) {
   });
   assert.equal(response.status, 200);
   return response.text();
+}
+
+async function postProfile(
+  sessionCookie: string,
+  body: Record<string, string>,
+  options: { includeCsrf?: boolean } = {},
+) {
+  let params = new URLSearchParams(body);
+  if (options.includeCsrf !== false) {
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+    params.set('_csrf', extractCsrf(html));
+  }
+  return router.fetch(new URL(routes.app.settings.profile.action.href(), origin), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: sessionCookie,
+    },
+    body: params.toString(),
+  });
 }
 
 describe('app controller', () => {
@@ -88,6 +112,120 @@ describe('app controller', () => {
     assert.match(html, new RegExp(email));
     assert.match(html, /action="\/logout"/);
     assert.match(html, /<main id="main"[\s\S]*?<h1[^>]*>Profile<\/h1>/);
+  });
+
+  it('renders the profile form with the current display name', async () => {
+    let { email, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+
+    assert.match(html, /<form[^>]*method="post"[^>]*action="\/app\/settings"/);
+    assert.match(html, /name="display_name"[^>]*value="Ada Lovelace"/);
+    assert.match(html, /autocomplete="nickname"/);
+    assert.match(html, /maxlength="80"/);
+    assert.match(html, /Save profile/);
+    assert.match(html, /name="_csrf" value="[^"]+"/);
+    assert.match(html, /Ada Lovelace/);
+    assert.ok(html.includes(email));
+  });
+
+  it('updates the display name through the CSRF-protected profile form', async () => {
+    let { userId, sessionCookie } = await loginNewUser();
+    let response = await postProfile(sessionCookie, { display_name: '  Grace Hopper  ' });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), routes.app.settings.profile.index.href());
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+    assert.match(html, /<p role="status"[^>]*>Profile updated<\/p>/);
+    assert.match(html, /name="display_name"[^>]*value="Grace Hopper"/);
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.display_name, 'Grace Hopper');
+  });
+
+  it('clears the display name with a blank submission', async () => {
+    let { userId, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let response = await postProfile(sessionCookie, { display_name: '   ' });
+
+    assert.equal(response.status, 302);
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.display_name, null);
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+    assert.match(html, /Not set/);
+    assert.match(html, /name="display_name"[^>]*value=""/);
+  });
+
+  it('rejects an overlong display name and keeps the submitted value', async () => {
+    let { userId, sessionCookie } = await loginNewUser();
+    let tooLong = 'y'.repeat(81);
+    let response = await postProfile(sessionCookie, { display_name: tooLong });
+
+    assert.equal(response.status, 302);
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.display_name, null);
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+    assert.match(html, /<p role="alert"[^>]*>[^<]*80 characters[^<]*<\/p>/);
+    assert.match(html, /name="display_name"[^>]*value="y{81}"/);
+  });
+
+  it('rejects a profile POST without a CSRF token', async () => {
+    let { sessionCookie } = await loginNewUser();
+    let response = await postProfile(
+      sessionCookie,
+      { display_name: 'Nobody' },
+      { includeCsrf: false },
+    );
+
+    assert.equal(response.status, 403);
+  });
+
+  it('shows the display name with the email beneath in the dashboard and sidebar', async () => {
+    let { email, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
+
+    assert.match(html, /Welcome back, Ada Lovelace/);
+    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    assert.ok(sidebar.includes('Ada Lovelace'));
+    assert.ok(sidebar.includes(email));
+    assert.ok(sidebar.indexOf('Ada Lovelace') < sidebar.indexOf(email));
+  });
+
+  it('falls back to the email identity when no display name is set', async () => {
+    let { email, sessionCookie } = await loginNewUser();
+    let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
+
+    assert.match(html, /Welcome back, /);
+    assert.ok(html.includes(`Welcome back, ${email}`));
+    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    assert.ok(sidebar.includes(email));
+  });
+
+  it('threads the display name into the sessions shell', async () => {
+    let { email, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.sessions.index.href(),
+      sessionCookie,
+    );
+
+    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    assert.ok(sidebar.includes('Ada Lovelace'));
+    assert.ok(sidebar.indexOf('Ada Lovelace') < sidebar.indexOf(email));
   });
 
   it('renders the sessions page inside the shell', async () => {

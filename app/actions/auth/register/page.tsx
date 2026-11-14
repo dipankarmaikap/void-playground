@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { APP_NAME } from '../../../config.ts';
+import { APP_NAME, DISPLAY_NAME_MAX_LENGTH } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
 import { AuthLayout } from '../../../ui/auth-layout.tsx';
 import { Button } from '../../../ui/button.tsx';
@@ -14,6 +14,7 @@ export interface RegisterPageProps {
   csrfToken: string;
   error?: string;
   email?: string;
+  displayName?: string;
 }
 
 const headerStyle = css({
@@ -69,7 +70,7 @@ const linkStyle = css({
 
 export function RegisterPage(handle: Handle<RegisterPageProps>) {
   return () => {
-    let { csrfToken, error, email } = handle.props;
+    let { csrfToken, error, email, displayName } = handle.props;
 
     return (
       <Document
@@ -95,6 +96,17 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
                 autoComplete="email"
                 defaultValue={email ?? ''}
                 required
+              />
+            </Field>
+            <Field
+              label="Display name (optional)"
+              hint="Shown in the app instead of your email address."
+            >
+              <Input
+                name="display_name"
+                autoComplete="nickname"
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
+                defaultValue={displayName ?? ''}
               />
             </Field>
             <Field label="Password">

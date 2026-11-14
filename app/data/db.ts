@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { column as c, table } from 'remix/data-table';
+import { column as c, getTableReference, table } from 'remix/data-table';
 import type { TableRow } from 'remix/data-table';
 import { createSqliteDatabase } from 'remix/data-table/sqlite';
 
@@ -17,6 +17,7 @@ export const users = table({
   columns: {
     id: c.text().notNull(),
     email: c.text().notNull(),
+    display_name: c.text().nullable(),
     email_verified: c.boolean().notNull(),
     verification_token: c.text().nullable(),
     verification_expires_at: c.integer().nullable(),
@@ -61,6 +62,7 @@ await db.executeScript(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY NOT NULL,
   email TEXT NOT NULL UNIQUE,
+  display_name TEXT,
   email_verified INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
   verification_expires_at INTEGER,
@@ -88,6 +90,10 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users(verification_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 `);
+
+if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
+  await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');
+}
 
 export type User = TableRow<typeof users>;
 export type UserPassword = TableRow<typeof userPasswords>;

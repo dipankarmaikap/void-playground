@@ -5,6 +5,7 @@ import { colors } from './theme.ts';
 
 export interface FieldProps {
   label: string;
+  hint?: string;
   children: RemixNode;
   error?: string;
 }
@@ -18,6 +19,13 @@ const fieldStyle = css({
   fontWeight: 600,
 });
 
+const hintStyle = css({
+  color: colors.muted,
+  fontSize: '0.8125rem',
+  fontWeight: 400,
+  lineHeight: 1.4,
+});
+
 const errorStyle = css({
   color: colors.danger,
   fontSize: '12px',
@@ -26,12 +34,13 @@ const errorStyle = css({
 
 export function Field(handle: Handle<FieldProps>) {
   return () => {
-    let { label, children, error } = handle.props;
+    let { label, hint, children, error } = handle.props;
 
     return (
       <label mix={fieldStyle}>
         {label}
         {children}
+        {hint ? <span mix={hintStyle}>{hint}</span> : null}
         {error ? <span mix={errorStyle}>{error}</span> : null}
       </label>
     );
