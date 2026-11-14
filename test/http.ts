@@ -54,12 +54,26 @@ export async function postForm(
   fields: Record<string, string>,
   cookie?: string,
 ): Promise<Response> {
-  let page = await app.fetch(new URL(url, origin), {
+  return submitForm(app, url, url, fields, cookie);
+}
+
+/**
+ * Loads `pageUrl` for a CSRF token, then submits `fields` to `actionUrl`.
+ * Use this when a form posts to a URL that has no GET page of its own.
+ */
+export async function submitForm(
+  app: TestApp,
+  pageUrl: string,
+  actionUrl: string,
+  fields: Record<string, string>,
+  cookie?: string,
+): Promise<Response> {
+  let page = await app.fetch(new URL(pageUrl, origin), {
     headers: cookie ? { Cookie: cookie } : undefined,
   });
   let csrf = extractCsrf(await page.text());
   let body = new URLSearchParams({ ...fields, _csrf: csrf });
-  return app.fetch(new URL(url, origin), {
+  return app.fetch(new URL(actionUrl, origin), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -75,4 +89,27 @@ export async function login(app: TestApp, email: string, password: string): Prom
   let cookie = cookieFromResponse(response);
   assert.ok(cookie, 'login should set a session cookie');
   return cookie;
+}
+
+/**
+ * Creates a verified User whose email starts with `emailPrefix`, then signs them in.
+ * The unique suffix keeps test files independent when they share the in-memory database.
+ */
+export async function createUserAndLogin(
+  app: TestApp,
+  emailPrefix: string,
+  displayName: string | null = null,
+): Promise<string> {
+  let email = `${emailPrefix}-${crypto.randomUUID()}@example.com`;
+  await createUser(email, 'password123', true, displayName);
+  return login(app, email, 'password123');
+}
+
+/** Fetches `path` as the signed-in User and asserts the page rendered. */
+export async function getHtml(app: TestApp, path: string, cookie: string): Promise<string> {
+  let response = await app.fetch(new URL(path, origin), {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(response.status, 200, `${path} should render`);
+  return response.text();
 }

@@ -1,6 +1,14 @@
 import type { Handle } from 'remix/component';
 
-export type IconName = 'menu' | 'home' | 'settings' | 'user' | 'monitor' | 'log-out';
+export type IconName =
+  | 'menu'
+  | 'home'
+  | 'users'
+  | 'settings'
+  | 'user'
+  | 'monitor'
+  | 'archive'
+  | 'log-out';
 
 export interface IconProps {
   name: IconName;
@@ -55,6 +63,15 @@ function iconPaths(name: IconName) {
           <circle cx="12" cy="12" r="3" />
         </>
       );
+    case 'users':
+      return (
+        <>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </>
+      );
     case 'user':
       return (
         <>
@@ -76,6 +93,14 @@ function iconPaths(name: IconName) {
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
           <path d="m16 17 5-5-5-5" />
           <path d="M21 12H9" />
+        </>
+      );
+    case 'archive':
+      return (
+        <>
+          <rect width="20" height="5" x="2" y="3" rx="1" />
+          <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+          <path d="M10 12h4" />
         </>
       );
   }
