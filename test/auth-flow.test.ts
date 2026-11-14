@@ -5,19 +5,10 @@ import { router } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
 import { db, users } from '../app/data/db.ts';
 
-import { cookieFromResponse, extractCsrf, login, origin } from './http.ts';
+import { cookieFromResponse, login, origin, postForm } from './http.ts';
 
 async function register(body: Record<string, string>) {
-  let page = await router.fetch(new URL(routes.auth.register.index.href(), origin));
-  let csrf = extractCsrf(await page.text());
-  let response = await router.fetch(new URL(routes.auth.register.action.href(), origin), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: cookieFromResponse(page),
-    },
-    body: new URLSearchParams({ ...body, _csrf: csrf }).toString(),
-  });
+  let response = await postForm(router, routes.auth.register.action.href(), body);
   return { response, html: await response.text() };
 }
 
@@ -27,19 +18,10 @@ describe('auth flow', () => {
     let normalizedEmail = email.trim().toLowerCase();
     let password = 'password123';
 
-    let registerPage = await router.fetch(new URL(routes.auth.register.index.href(), origin));
-    let csrf = extractCsrf(await registerPage.text());
-    let registerResponse = await router.fetch(
-      new URL(routes.auth.register.action.href(), origin),
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Cookie: cookieFromResponse(registerPage),
-        },
-        body: new URLSearchParams({ email, password, _csrf: csrf }).toString(),
-      },
-    );
+    let registerResponse = await postForm(router, routes.auth.register.action.href(), {
+      email,
+      password,
+    });
     assert.equal(registerResponse.status, 302);
     assert.equal(registerResponse.headers.get('Location'), routes.auth.login.index.href());
 
@@ -146,22 +128,12 @@ describe('auth flow', () => {
   });
 
   it('renders the register form with a validation error', async () => {
-    let registerPage = await router.fetch(new URL(routes.auth.register.index.href(), origin));
-    let csrf = extractCsrf(await registerPage.text());
-    let response = await router.fetch(new URL(routes.auth.register.action.href(), origin), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookieFromResponse(registerPage),
-      },
-      body: new URLSearchParams({
-        email: 'not-an-email',
-        password: 'password123',
-        _csrf: csrf,
-      }).toString(),
+    let { response, html } = await register({
+      email: 'not-an-email',
+      password: 'password123',
     });
 
     assert.equal(response.status, 400);
-    assert.match(await response.text(), /Expected valid email/);
+    assert.match(html, /Expected valid email/);
   });
 });

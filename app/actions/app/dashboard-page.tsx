@@ -1,16 +1,17 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
+import { APP_NAME } from '../../config.ts';
 import { routes } from '../../routes.ts';
 import { AppShell } from '../../ui/app-shell.tsx';
 import { Icon } from '../../ui/icon.tsx';
 import { identityOf } from '../../ui/identity.ts';
+import type { UserIdentity } from '../../ui/identity.ts';
 import { colors, radius, shadow } from '../../ui/theme.ts';
 
 export interface DashboardPageProps {
   csrfToken: string;
-  email: string;
-  displayName?: string | null;
+  identity: UserIdentity;
 }
 
 const headerStyle = css({
@@ -104,21 +105,20 @@ const shortcutDescriptionStyle = css({
 
 export function DashboardPage(handle: Handle<DashboardPageProps>) {
   return () => {
-    let { csrfToken, email, displayName } = handle.props;
-    let identity = identityOf({ email, displayName });
+    let { csrfToken, identity: userIdentity } = handle.props;
+    let identity = identityOf(userIdentity);
 
     return (
       <AppShell
         csrfToken={csrfToken}
-        displayName={displayName}
-        email={email}
+        identity={userIdentity}
         section="dashboard"
         title="Dashboard"
-        description="Your My Remix App dashboard and shortcuts."
+        description={`Your ${APP_NAME} dashboard and shortcuts.`}
       >
         <header mix={headerStyle}>
           <h1 mix={headingStyle}>Welcome back, {identity.name}</h1>
-          <p mix={introStyle}>You are signed in as {email}.</p>
+          <p mix={introStyle}>You are signed in as {userIdentity.email}.</p>
         </header>
         <section aria-labelledby="shortcuts-heading">
           <h2 id="shortcuts-heading" mix={sectionHeadingStyle}>

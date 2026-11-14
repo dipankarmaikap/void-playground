@@ -5,6 +5,15 @@ import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
 import { Icon } from '../../../../ui/icon.tsx';
+import type { UserIdentity } from '../../../../ui/identity.ts';
+import {
+  noticeErrorStyle,
+  noticeSpacingStyle,
+  noticeStatusStyle,
+  pageHeaderStyle,
+  pageHeadingStyle,
+  pageIntroStyle,
+} from '../../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../../ui/theme.ts';
 
 export interface SessionView {
@@ -18,53 +27,11 @@ export interface SessionView {
 
 export interface SessionsPageProps {
   csrfToken: string;
-  email: string;
-  displayName?: string | null;
+  identity: UserIdentity;
   sessions: SessionView[];
   error?: string;
   message?: string;
 }
-
-const headerStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-  marginBottom: '1.5rem',
-});
-
-const headingStyle = css({
-  margin: 0,
-  fontSize: '1.75rem',
-  lineHeight: 1.2,
-  letterSpacing: '-0.02em',
-});
-
-const introStyle = css({
-  margin: 0,
-  color: colors.muted,
-  fontSize: '0.9375rem',
-  lineHeight: 1.6,
-});
-
-const errorStyle = css({
-  margin: '0 0 1rem',
-  padding: '10px 12px',
-  border: `1px solid ${colors.danger}`,
-  borderRadius: radius.sm,
-  background: colors.dangerSoft,
-  color: colors.danger,
-  fontSize: '0.875rem',
-});
-
-const statusStyle = css({
-  margin: '0 0 1rem',
-  padding: '10px 12px',
-  border: `1px solid ${colors.success}`,
-  borderRadius: radius.sm,
-  background: colors.successSoft,
-  color: colors.success,
-  fontSize: '0.875rem',
-});
 
 const listStyle = css({
   listStyle: 'none',
@@ -180,32 +147,31 @@ const dangerCopyStyle = css({
 
 export function SessionsPage(handle: Handle<SessionsPageProps>) {
   return () => {
-    let { csrfToken, email, displayName, sessions, error, message } = handle.props;
+    let { csrfToken, identity, sessions, error, message } = handle.props;
     let action = routes.app.settings.sessions.action.href();
     let hasOtherSessions = sessions.some((session) => !session.current);
 
     return (
       <AppShell
         csrfToken={csrfToken}
-        displayName={displayName}
-        email={email}
+        identity={identity}
         section="sessions"
         title="Sessions"
         description="Review and revoke the browsers signed in to your account."
       >
-        <header mix={headerStyle}>
-          <h1 mix={headingStyle}>Sessions</h1>
-          <p mix={introStyle}>
+        <header mix={pageHeaderStyle}>
+          <h1 mix={pageHeadingStyle}>Sessions</h1>
+          <p mix={pageIntroStyle}>
             These are the browsers currently signed in to your account. Revoke one you no longer use.
           </p>
         </header>
         {error ? (
-          <p role="alert" mix={errorStyle}>
+          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={statusStyle}>
+          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
             {message}
           </p>
         ) : null}

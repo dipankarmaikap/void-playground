@@ -45,6 +45,43 @@ const buttonStyle = css({
   },
 });
 
+/** Anchor styling that mirrors {@link Button} for link actions. */
+export const linkButtonStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  padding: '10px 16px',
+  border: '1px solid transparent',
+  borderRadius: radius.md,
+  background: colors.accent,
+  color: '#ffffff',
+  fontFamily,
+  fontSize: '0.9375rem',
+  fontWeight: 600,
+  lineHeight: 1.2,
+  textDecoration: 'none',
+  '&:hover': {
+    background: colors.accentHover,
+  },
+  '&[data-variant="secondary"]': {
+    background: colors.surface,
+    color: colors.text,
+    borderColor: colors.border,
+  },
+  '&[data-variant="secondary"]:hover': {
+    background: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  '&[data-variant="danger"]': {
+    background: colors.danger,
+    color: '#ffffff',
+  },
+  '&[data-variant="danger"]:hover': {
+    background: '#991b1b',
+  },
+});
+
 export function Button(handle: Handle<ButtonProps>) {
   return () => {
     let { variant = 'primary', ...buttonProps } = handle.props;

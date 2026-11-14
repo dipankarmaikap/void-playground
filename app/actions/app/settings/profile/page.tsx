@@ -4,60 +4,28 @@ import { css } from 'remix/component';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
 import { Field } from '../../../../ui/field.tsx';
+import type { UserIdentity } from '../../../../ui/identity.ts';
 import { Input } from '../../../../ui/input.tsx';
+import {
+  formStackStartStyle,
+  noticeErrorStyle,
+  noticeSpacingStyle,
+  noticeStatusStyle,
+  pageHeaderStyle,
+  pageHeadingStyle,
+  pageIntroStyle,
+} from '../../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../../ui/theme.ts';
-import { DISPLAY_NAME_MAX_LENGTH } from '../../../../config.ts';
+import { APP_NAME, DISPLAY_NAME_MAX_LENGTH } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
 
 export interface ProfilePageProps {
   csrfToken: string;
-  email: string;
-  displayName?: string | null;
+  identity: UserIdentity;
   displayNameValue?: string;
   error?: string;
   message?: string;
 }
-
-const headerStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-  marginBottom: '1.5rem',
-});
-
-const headingStyle = css({
-  margin: 0,
-  fontSize: '1.75rem',
-  lineHeight: 1.2,
-  letterSpacing: '-0.02em',
-});
-
-const introStyle = css({
-  margin: 0,
-  color: colors.muted,
-  fontSize: '0.9375rem',
-  lineHeight: 1.6,
-});
-
-const errorStyle = css({
-  margin: '0 0 1rem',
-  padding: '10px 12px',
-  border: `1px solid ${colors.danger}`,
-  borderRadius: radius.sm,
-  background: colors.dangerSoft,
-  color: colors.danger,
-  fontSize: '0.875rem',
-});
-
-const statusStyle = css({
-  margin: '0 0 1rem',
-  padding: '10px 12px',
-  border: `1px solid ${colors.success}`,
-  borderRadius: radius.sm,
-  background: colors.successSoft,
-  color: colors.success,
-  fontSize: '0.875rem',
-});
 
 const cardStyle = css({
   padding: '1.25rem',
@@ -97,39 +65,31 @@ const detailStyle = css({
   overflowWrap: 'anywhere',
 });
 
-const formStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
-  alignItems: 'flex-start',
-});
-
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    let { csrfToken, email, displayName, displayNameValue, error, message } = handle.props;
-    let trimmedDisplayName = displayName?.trim() || null;
+    let { csrfToken, identity, displayNameValue, error, message } = handle.props;
+    let trimmedDisplayName = identity.displayName?.trim() || null;
     let formValue = displayNameValue ?? trimmedDisplayName ?? '';
 
     return (
       <AppShell
         csrfToken={csrfToken}
-        displayName={displayName}
-        email={email}
+        identity={identity}
         section="profile"
         title="Profile"
-        description="Manage your My Remix App display name and account identity."
+        description={`Manage your ${APP_NAME} display name and account identity.`}
       >
-        <header mix={headerStyle}>
-          <h1 mix={headingStyle}>Profile</h1>
-          <p mix={introStyle}>This is the identity the app uses to greet you.</p>
+        <header mix={pageHeaderStyle}>
+          <h1 mix={pageHeadingStyle}>Profile</h1>
+          <p mix={pageIntroStyle}>This is the identity the app uses to greet you.</p>
         </header>
         {error ? (
-          <p role="alert" mix={errorStyle}>
+          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={statusStyle}>
+          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
             {message}
           </p>
         ) : null}
@@ -144,7 +104,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </div>
             <div>
               <dt mix={termStyle}>Email</dt>
-              <dd mix={detailStyle}>{email}</dd>
+              <dd mix={detailStyle}>{identity.email}</dd>
             </div>
           </dl>
         </section>
@@ -152,7 +112,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <h2 id="edit-display-name-heading" mix={cardHeadingStyle}>
             Display name
           </h2>
-          <form method="post" action={routes.app.settings.profile.action.href()} mix={formStyle}>
+          <form
+            method="post"
+            action={routes.app.settings.profile.action.href()}
+            mix={formStackStartStyle}
+          >
             <input type="hidden" name="_csrf" value={csrfToken} />
             <Field label="Display name" hint="Leave blank to use your email address instead.">
               <Input

@@ -4,7 +4,7 @@ import { describe, it } from 'remix/test';
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
 import { db, users } from '../../data/db.ts';
-import { createUser, extractCsrf, login, origin } from '../../../test/http.ts';
+import { createUser, login, origin, postForm } from '../../../test/http.ts';
 
 async function loginNewUser(displayName: string | null = null) {
   let email = `app-${crypto.randomUUID()}@example.com`;
@@ -21,27 +21,27 @@ async function getAuthenticatedHtml(path: string, sessionCookie: string) {
   return response.text();
 }
 
+function beforeLogout(html: string) {
+  return html.slice(0, html.indexOf('action="/logout"'));
+}
+
 async function postProfile(
   sessionCookie: string,
   body: Record<string, string>,
   options: { includeCsrf?: boolean } = {},
 ) {
-  let params = new URLSearchParams(body);
-  if (options.includeCsrf !== false) {
-    let html = await getAuthenticatedHtml(
-      routes.app.settings.profile.index.href(),
-      sessionCookie,
-    );
-    params.set('_csrf', extractCsrf(html));
+  let url = routes.app.settings.profile.action.href();
+  if (options.includeCsrf === false) {
+    return router.fetch(new URL(url, origin), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: sessionCookie,
+      },
+      body: new URLSearchParams(body).toString(),
+    });
   }
-  return router.fetch(new URL(routes.app.settings.profile.action.href(), origin), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: sessionCookie,
-    },
-    body: params.toString(),
-  });
+  return postForm(router, url, body, sessionCookie);
 }
 
 describe('app controller', () => {
@@ -73,8 +73,11 @@ describe('app controller', () => {
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<summary[^>]*>[\s\S]*?Menu[\s\S]*?<\/summary>/);
     assert.match(html, /<nav aria-label="Main"/);
-    assert.match(html, /<nav aria-label="Settings"/);
-    for (let href of ['/app/dashboard', '/app/settings', '/app/settings/sessions']) {
+    assert.doesNotMatch(html, /<nav aria-label="Settings"/);
+    for (let href of [
+      routes.app.dashboard.href(),
+      routes.app.settings.profile.index.href(),
+    ]) {
       assert.match(
         html,
         new RegExp(`<a[^>]*href="${href}"[^>]*data-rmx-document`),
@@ -82,11 +85,8 @@ describe('app controller', () => {
       );
     }
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*aria-current="page"/);
-    assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*>[\s\S]*?Profile[\s\S]*?<\/a>/);
-    assert.match(
-      html,
-      /<a[^>]*href="\/app\/settings\/sessions"[^>]*>[\s\S]*?Sessions[\s\S]*?<\/a>/,
-    );
+    assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*>[\s\S]*?Settings[\s\S]*?<\/a>/);
+    assert.doesNotMatch(html, /<a[^>]*href="\/app\/settings"[^>]*aria-current="page"/);
     assert.match(html, new RegExp(email));
     assert.match(html, /action="\/logout"/);
     assert.match(html, /name="_csrf" value="[^"]+"/);
@@ -114,7 +114,10 @@ describe('app controller', () => {
     assert.match(html, /<meta name="description" content="[^"]*display name/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<nav aria-label="Main"/);
-    assert.match(html, /<nav aria-label="Settings"/);
+    assert.match(
+      html,
+      /<nav aria-label="Settings"[\s\S]*?Profile[\s\S]*?Sessions[\s\S]*?<\/nav>/,
+    );
     assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*aria-current="page"/);
     assert.match(html, new RegExp(email));
     assert.match(html, /action="\/logout"/);
@@ -207,7 +210,7 @@ describe('app controller', () => {
     let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
 
     assert.match(html, /Welcome back, Ada Lovelace/);
-    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    let sidebar = beforeLogout(html);
     assert.ok(sidebar.includes('Ada Lovelace'));
     assert.ok(sidebar.includes(email));
     assert.ok(sidebar.indexOf('Ada Lovelace') < sidebar.indexOf(email));
@@ -219,7 +222,7 @@ describe('app controller', () => {
 
     assert.match(html, /Welcome back, /);
     assert.ok(html.includes(`Welcome back, ${email}`));
-    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    let sidebar = beforeLogout(html);
     assert.ok(sidebar.includes(email));
   });
 
@@ -230,7 +233,7 @@ describe('app controller', () => {
       sessionCookie,
     );
 
-    let sidebar = html.slice(0, html.indexOf('action="/logout"'));
+    let sidebar = beforeLogout(html);
     assert.ok(sidebar.includes('Ada Lovelace'));
     assert.ok(sidebar.indexOf('Ada Lovelace') < sidebar.indexOf(email));
   });
@@ -245,6 +248,10 @@ describe('app controller', () => {
     assert.match(html, /<title>Sessions \| My Remix App<\/title>/);
     assert.match(html, /<meta name="description" content="[^"]*browsers signed in/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
+    assert.match(
+      html,
+      /<nav aria-label="Settings"[\s\S]*?Profile[\s\S]*?Sessions[\s\S]*?<\/nav>/,
+    );
     assert.match(html, /<a[^>]*href="\/app\/settings\/sessions"[^>]*aria-current="page"/);
     assert.match(html, /<h1[^>]*>Sessions<\/h1>/);
     assert.match(html, /This session/);

@@ -6,19 +6,28 @@ import { routes } from '../routes.ts';
 import { Document } from '../actions/document.tsx';
 import { Button } from './button.tsx';
 import { Icon } from './icon.tsx';
+import type { IconName } from './icon.tsx';
 import { identityOf } from './identity.ts';
+import type { UserIdentity } from './identity.ts';
 import { colors, fontFamily, radius, shadow } from './theme.ts';
 
 export type AppSection = 'dashboard' | 'profile' | 'sessions';
 
 export interface AppShellProps {
   csrfToken: string;
-  displayName?: string | null;
-  email: string;
+  identity: UserIdentity;
   section: AppSection;
   title: string;
   description: string;
   children: RemixNode;
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: IconName;
+  current: boolean;
+  active: boolean;
 }
 
 const skipLinkStyle = css({
@@ -219,12 +228,46 @@ const mainStyle = css({
 
 export function AppShell(handle: Handle<AppShellProps>) {
   return () => {
-    let { csrfToken, displayName, email, section, title, description, children } = handle.props;
-    let identity = identityOf({ email, displayName });
+    let { csrfToken, identity: userIdentity, section, title, description, children } =
+      handle.props;
+    let identity = identityOf(userIdentity);
     let settingsActive = section === 'profile' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
     let profileHref = routes.app.settings.profile.index.href();
     let sessionsHref = routes.app.settings.sessions.index.href();
+    let mainNav: NavItem[] = [
+      {
+        href: dashboardHref,
+        label: 'Dashboard',
+        icon: 'home',
+        current: section === 'dashboard',
+        active: section === 'dashboard',
+      },
+      {
+        // The Settings main destination intentionally opens Profile.
+        href: profileHref,
+        label: 'Settings',
+        icon: 'settings',
+        current: section === 'profile',
+        active: settingsActive,
+      },
+    ];
+    let settingsNav: NavItem[] = [
+      {
+        href: profileHref,
+        label: 'Profile',
+        icon: 'user',
+        current: section === 'profile',
+        active: section === 'profile',
+      },
+      {
+        href: sessionsHref,
+        label: 'Sessions',
+        icon: 'monitor',
+        current: section === 'sessions',
+        active: section === 'sessions',
+      },
+    ];
 
     return (
       <Document title={title} description={description} noindex>
@@ -246,50 +289,38 @@ export function AppShell(handle: Handle<AppShellProps>) {
                 {APP_NAME}
               </a>
               <nav aria-label="Main" mix={navStyle}>
-                <a
-                  href={dashboardHref}
-                  data-rmx-document=""
-                  aria-current={section === 'dashboard' ? 'page' : undefined}
-                  data-active={section === 'dashboard' ? 'true' : undefined}
-                  mix={navLinkStyle}
-                >
-                  <Icon name="home" />
-                  <span>Dashboard</span>
-                </a>
-                <a
-                  href={profileHref}
-                  data-rmx-document=""
-                  aria-current={section === 'profile' ? 'page' : undefined}
-                  data-active={settingsActive ? 'true' : undefined}
-                  mix={navLinkStyle}
-                >
-                  <Icon name="settings" />
-                  <span>Settings</span>
-                </a>
+                {mainNav.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    data-rmx-document=""
+                    aria-current={item.current ? 'page' : undefined}
+                    data-active={item.active ? 'true' : undefined}
+                    mix={navLinkStyle}
+                  >
+                    <Icon name={item.icon} />
+                    <span>{item.label}</span>
+                  </a>
+                ))}
               </nav>
-              <nav aria-label="Settings" mix={subnavStyle}>
-                <p mix={subnavHeadingStyle}>Settings</p>
-                <a
-                  href={profileHref}
-                  data-rmx-document=""
-                  aria-current={section === 'profile' ? 'page' : undefined}
-                  data-active={section === 'profile' ? 'true' : undefined}
-                  mix={navLinkStyle}
-                >
-                  <Icon name="user" />
-                  <span>Profile</span>
-                </a>
-                <a
-                  href={sessionsHref}
-                  data-rmx-document=""
-                  aria-current={section === 'sessions' ? 'page' : undefined}
-                  data-active={section === 'sessions' ? 'true' : undefined}
-                  mix={navLinkStyle}
-                >
-                  <Icon name="monitor" />
-                  <span>Sessions</span>
-                </a>
-              </nav>
+              {settingsActive ? (
+                <nav aria-label="Settings" mix={subnavStyle}>
+                  <p mix={subnavHeadingStyle}>Settings</p>
+                  {settingsNav.map((item) => (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      data-rmx-document=""
+                      aria-current={item.current ? 'page' : undefined}
+                      data-active={item.active ? 'true' : undefined}
+                      mix={navLinkStyle}
+                    >
+                      <Icon name={item.icon} />
+                      <span>{item.label}</span>
+                    </a>
+                  ))}
+                </nav>
+              ) : null}
               <div mix={footerStyle}>
                 <div mix={identityStyle}>
                   <span mix={identityNameStyle}>{identity.name}</span>

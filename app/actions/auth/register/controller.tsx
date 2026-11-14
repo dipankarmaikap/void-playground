@@ -11,8 +11,8 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { db, users, userPasswords } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
+import { parseDisplayName } from '../../../data/display-name.ts';
 import { hashPassword } from '../../../data/password.ts';
-import { DISPLAY_NAME_MAX_LENGTH } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';
 
@@ -63,13 +63,13 @@ export default createController(routes.auth.register, {
         );
       }
 
-      let displayName = parsed.value.display_name.trim();
-      if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+      let displayName = parseDisplayName(parsed.value.display_name);
+      if (!displayName.ok) {
         let csrfToken = getCsrfToken(context);
         return context.render(
           <RegisterPage
             csrfToken={csrfToken}
-            error={`Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer`}
+            error={displayName.error}
             email={submittedEmail}
             displayName={submittedDisplayName}
           />,
@@ -96,7 +96,7 @@ export default createController(routes.auth.register, {
           await tx.create(users, {
             id: userId,
             email,
-            display_name: displayName || null,
+            display_name: displayName.value,
             email_verified: false,
             verification_token: token,
             verification_expires_at: expiresAt,

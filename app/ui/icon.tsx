@@ -1,29 +1,22 @@
 import type { Handle } from 'remix/component';
 
-export type IconName =
-  | 'menu'
-  | 'home'
-  | 'settings'
-  | 'user'
-  | 'monitor'
-  | 'log-out'
-  | 'mail'
-  | 'chevron-right';
+export type IconName = 'menu' | 'home' | 'settings' | 'user' | 'monitor' | 'log-out';
 
 export interface IconProps {
   name: IconName;
-  size?: number;
 }
+
+const ICON_SIZE = 20;
 
 export function Icon(handle: Handle<IconProps>) {
   return () => {
-    let { name, size = 20 } = handle.props;
+    let { name } = handle.props;
 
     return (
       <svg
         viewBox="0 0 24 24"
-        width={size}
-        height={size}
+        width={ICON_SIZE}
+        height={ICON_SIZE}
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -85,14 +78,5 @@ function iconPaths(name: IconName) {
           <path d="M21 12H9" />
         </>
       );
-    case 'mail':
-      return (
-        <>
-          <rect width="20" height="16" x="2" y="4" rx="2" />
-          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-        </>
-      );
-    case 'chevron-right':
-      return <path d="m9 18 6-6-6-6" />;
   }
 }

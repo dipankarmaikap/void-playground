@@ -45,7 +45,7 @@ describe('root controller', () => {
     assert.match(html, /<meta name="twitter:description" content="[^"]*My Remix App/);
   });
 
-  it('GET / remains public for an authenticated user and links to the app', async () => {
+  it('GET / remains public for an authenticated user and links to every destination', async () => {
     let email = `home-${crypto.randomUUID()}@example.com`;
     await createUser(email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
@@ -58,9 +58,9 @@ describe('root controller', () => {
     assert.equal(response.status, 200);
     assert.match(html, /<title>Home \| My Remix App<\/title>/);
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*>Go to dashboard<\/a>/);
-    assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*>Account settings<\/a>/);
-    assert.doesNotMatch(html, /href="\/register"/);
-    assert.doesNotMatch(html, /href="\/login"/);
+    assert.match(html, /<a[^>]*href="\/register"[^>]*>Create account<\/a>/);
+    assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);
+    assert.doesNotMatch(html, /href="\/app\/settings"/);
   });
 
   it('GET / applies a nonce-based content security policy', async () => {

@@ -1,4 +1,4 @@
-export interface IdentityInput {
+export interface UserIdentity {
   email: string;
   displayName?: string | null;
 }
@@ -10,7 +10,9 @@ export interface Identity {
   email: string | null;
 }
 
-export function identityOf(input: IdentityInput): Identity {
-  let displayName = input.displayName?.trim() || null;
-  return displayName ? { name: displayName, email: input.email } : { name: input.email, email: null };
+export function identityOf(identity: UserIdentity): Identity {
+  let displayName = identity.displayName?.trim() || null;
+  return displayName
+    ? { name: displayName, email: identity.email }
+    : { name: identity.email, email: null };
 }

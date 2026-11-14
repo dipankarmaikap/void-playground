@@ -44,17 +44,33 @@ export async function createUser(
   return id;
 }
 
-export async function login(app: TestApp, email: string, password: string): Promise<string> {
-  let page = await app.fetch(new URL(routes.auth.login.index.href(), origin));
+/**
+ * Loads the form at `url` for a CSRF token and cookie, then submits `fields` back to it.
+ * Pass `cookie` when the form is behind authentication.
+ */
+export async function postForm(
+  app: TestApp,
+  url: string,
+  fields: Record<string, string>,
+  cookie?: string,
+): Promise<Response> {
+  let page = await app.fetch(new URL(url, origin), {
+    headers: cookie ? { Cookie: cookie } : undefined,
+  });
   let csrf = extractCsrf(await page.text());
-  let response = await app.fetch(new URL(routes.auth.login.action.href(), origin), {
+  let body = new URLSearchParams({ ...fields, _csrf: csrf });
+  return app.fetch(new URL(url, origin), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: cookieFromResponse(page),
+      Cookie: cookie ?? cookieFromResponse(page),
     },
-    body: new URLSearchParams({ email, password, _csrf: csrf }).toString(),
+    body: body.toString(),
   });
+}
+
+export async function login(app: TestApp, email: string, password: string): Promise<string> {
+  let response = await postForm(app, routes.auth.login.action.href(), { email, password });
   assert.equal(response.status, 302, 'login should redirect');
   let cookie = cookieFromResponse(response);
   assert.ok(cookie, 'login should set a session cookie');

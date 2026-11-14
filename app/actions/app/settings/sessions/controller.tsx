@@ -7,7 +7,7 @@ import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { and, ne } from 'remix/data-table';
-import { db, sessions, users } from '../../../../data/db.ts';
+import { db, sessions } from '../../../../data/db.ts';
 import type { User } from '../../../../data/db.ts';
 import { browserLabel } from '../../../../data/user-agent.ts';
 import { routes } from '../../../../routes.ts';
@@ -19,8 +19,7 @@ export default createController(routes.app.settings.sessions, {
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
-      let user = await db.find(users, auth.identity.id);
-      let identity = user ?? auth.identity;
+      let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       let rows = await db.findMany(sessions, {
         where: { user_id: auth.identity.id },
@@ -42,8 +41,7 @@ export default createController(routes.app.settings.sessions, {
       return context.render(
         <SessionsPage
           csrfToken={csrfToken}
-          email={identity.email}
-          displayName={identity.display_name}
+          identity={{ email: identity.email, displayName: identity.display_name }}
           sessions={views}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}

@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import { APP_NAME, DISPLAY_NAME_MAX_LENGTH } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
@@ -7,7 +6,15 @@ import { AuthLayout } from '../../../ui/auth-layout.tsx';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
-import { colors, radius } from '../../../ui/theme.ts';
+import {
+  authHeaderStyle,
+  authHeadingStyle,
+  authIntroStyle,
+  formStackStyle,
+  noticeErrorStyle,
+  pageFooterStyle,
+  textLinkStyle,
+} from '../../../ui/page-styles.ts';
 import { Document } from '../../document.tsx';
 
 export interface RegisterPageProps {
@@ -16,57 +23,6 @@ export interface RegisterPageProps {
   email?: string;
   displayName?: string;
 }
-
-const headerStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.375rem',
-});
-
-const headingStyle = css({
-  margin: 0,
-  fontSize: '1.5rem',
-  lineHeight: 1.2,
-});
-
-const subtitleStyle = css({
-  margin: 0,
-  color: colors.muted,
-  fontSize: '0.9375rem',
-  lineHeight: 1.5,
-});
-
-const errorStyle = css({
-  margin: 0,
-  padding: '10px 12px',
-  border: `1px solid ${colors.danger}`,
-  borderRadius: radius.sm,
-  background: colors.dangerSoft,
-  color: colors.danger,
-  fontSize: '0.875rem',
-});
-
-const formStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
-});
-
-const footerStyle = css({
-  margin: 0,
-  color: colors.muted,
-  fontSize: '0.875rem',
-});
-
-const linkStyle = css({
-  color: colors.accent,
-  fontWeight: 600,
-  textDecoration: 'none',
-  '&:hover': {
-    color: colors.accentHover,
-    textDecoration: 'underline',
-  },
-});
 
 export function RegisterPage(handle: Handle<RegisterPageProps>) {
   return () => {
@@ -78,16 +34,16 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
         description={`Create a ${APP_NAME} account with your email address.`}
       >
         <AuthLayout>
-          <header mix={headerStyle}>
-            <h1 mix={headingStyle}>Register</h1>
-            <p mix={subtitleStyle}>Create your account with your email address.</p>
+          <header mix={authHeaderStyle}>
+            <h1 mix={authHeadingStyle}>Register</h1>
+            <p mix={authIntroStyle}>Create your account with your email address.</p>
           </header>
           {error ? (
-            <p role="alert" mix={errorStyle}>
+            <p role="alert" mix={noticeErrorStyle}>
               {error}
             </p>
           ) : null}
-          <form method="post" action={routes.auth.register.action.href()} mix={formStyle}>
+          <form method="post" action={routes.auth.register.action.href()} mix={formStackStyle}>
             <input type="hidden" name="_csrf" value={csrfToken} />
             <Field label="Email">
               <Input
@@ -120,9 +76,9 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
             </Field>
             <Button type="submit">Create account</Button>
           </form>
-          <p mix={footerStyle}>
+          <p mix={pageFooterStyle}>
             Already have an account?{' '}
-            <a href={routes.auth.login.index.href()} mix={linkStyle}>
+            <a href={routes.auth.login.index.href()} mix={textLinkStyle}>
               Log in
             </a>
           </p>

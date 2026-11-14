@@ -3,7 +3,8 @@ import { css } from 'remix/component';
 
 import { APP_NAME } from '../config.ts';
 import { routes } from '../routes.ts';
-import { colors, fontFamily, radius } from '../ui/theme.ts';
+import { linkButtonStyle } from '../ui/button.tsx';
+import { colors, fontFamily } from '../ui/theme.ts';
 import { Document } from './document.tsx';
 
 export interface HomePageProps {
@@ -65,32 +66,6 @@ const actionsStyle = css({
   marginTop: '0.5rem',
 });
 
-const actionStyle = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '10px 18px',
-  border: '1px solid transparent',
-  borderRadius: radius.md,
-  background: colors.accent,
-  color: '#ffffff',
-  fontSize: '0.9375rem',
-  fontWeight: 600,
-  textDecoration: 'none',
-  '&:hover': {
-    background: colors.accentHover,
-  },
-  '&[data-variant="secondary"]': {
-    background: colors.surface,
-    color: colors.text,
-    borderColor: colors.border,
-  },
-  '&[data-variant="secondary"]:hover': {
-    background: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-});
-
 export function HomePage(handle: Handle<HomePageProps>) {
   return () => {
     let { authenticated } = handle.props;
@@ -108,26 +83,33 @@ export function HomePage(handle: Handle<HomePageProps>) {
             <p mix={introStyle}>Create an account or log in to get started.</p>
             {authenticated ? (
               <nav aria-label="Your account" mix={actionsStyle}>
-                <a href={routes.app.dashboard.href()} mix={actionStyle}>
+                <a href={routes.app.dashboard.href()} mix={linkButtonStyle}>
                   Go to dashboard
                 </a>
                 <a
-                  href={routes.app.settings.profile.index.href()}
+                  href={routes.auth.register.index.href()}
                   data-variant="secondary"
-                  mix={actionStyle}
+                  mix={linkButtonStyle}
                 >
-                  Account settings
-                </a>
-              </nav>
-            ) : (
-              <nav aria-label="Get started" mix={actionsStyle}>
-                <a href={routes.auth.register.index.href()} mix={actionStyle}>
                   Create account
                 </a>
                 <a
                   href={routes.auth.login.index.href()}
                   data-variant="secondary"
-                  mix={actionStyle}
+                  mix={linkButtonStyle}
+                >
+                  Log in
+                </a>
+              </nav>
+            ) : (
+              <nav aria-label="Get started" mix={actionsStyle}>
+                <a href={routes.auth.register.index.href()} mix={linkButtonStyle}>
+                  Create account
+                </a>
+                <a
+                  href={routes.auth.login.index.href()}
+                  data-variant="secondary"
+                  mix={linkButtonStyle}
                 >
                   Log in
                 </a>
