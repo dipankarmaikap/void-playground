@@ -162,7 +162,7 @@ describe('auth controller', () => {
     assert.equal(user?.email_verified, false);
   });
 
-  it('renders a confirmation form for a valid verification link without changing the User', async () => {
+  it('renders a verification form for a valid link without changing the User', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
     let userId = await createUser(email, 'password123', false);
@@ -186,7 +186,7 @@ describe('auth controller', () => {
     assert.equal(user?.verification_token, token);
   });
 
-  it('verifies a User only after a valid confirmation POST', async () => {
+  it('verifies a User only after a valid verification POST', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
     let userId = await createUser(email, 'password123', false);
