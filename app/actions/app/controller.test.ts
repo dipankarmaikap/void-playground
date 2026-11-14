@@ -50,6 +50,13 @@ describe('app controller', () => {
     assert.match(html, /<summary[^>]*>[\s\S]*?Menu[\s\S]*?<\/summary>/);
     assert.match(html, /<nav aria-label="Main"/);
     assert.match(html, /<nav aria-label="Settings"/);
+    for (let href of ['/app/dashboard', '/app/settings', '/app/settings/sessions']) {
+      assert.match(
+        html,
+        new RegExp(`<a[^>]*href="${href}"[^>]*data-rmx-document`),
+        `${href} should navigate as a full document so the mobile drawer closes`,
+      );
+    }
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*aria-current="page"/);
     assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*>[\s\S]*?Profile[\s\S]*?<\/a>/);
     assert.match(
