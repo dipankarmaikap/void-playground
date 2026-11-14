@@ -6,6 +6,7 @@ import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { findClient, listClients } from '../../../data/clients.ts';
+import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
 import { ClientsIndexPage } from './index-page.tsx';
@@ -20,12 +21,14 @@ export default createController(routes.app.clients, {
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
       let message = context.session.get('message');
-      let clients = await listClients();
+      let status = parseClientStatusFilter(context.url.searchParams.get('status'));
+      let clients = await listClients({ status });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
           clients={clients}
+          status={status}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,

@@ -3,6 +3,7 @@ import { css } from 'remix/component';
 
 import { APP_NAME } from '../../../config.ts';
 import { clientTypeLabel } from '../../../data/client-names.ts';
+import type { ClientStatus } from '../../../data/client-status.ts';
 import { clientDisplayName } from '../../../data/clients.ts';
 import type { Client } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
@@ -23,12 +24,45 @@ export interface ClientsIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
   clients: Client[];
+  status: ClientStatus;
   error?: string;
   message?: string;
 }
 
 const toolbarStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.75rem',
   marginBottom: '1.25rem',
+});
+
+const statusNavStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: '0.5rem',
+});
+
+const statusLinkStyle = css({
+  padding: '0.5rem 0.875rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.md,
+  background: colors.surface,
+  color: colors.text,
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  textDecoration: 'none',
+  '&:hover': {
+    background: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  '&[data-active="true"]': {
+    background: colors.accentSoft,
+    borderColor: colors.accent,
+    color: colors.accent,
+  },
 });
 
 const listStyle = css({
@@ -81,7 +115,13 @@ const emptyStyle = css({
 
 export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
   return () => {
-    let { csrfToken, identity, clients, error, message } = handle.props;
+    let { csrfToken, identity, clients, status, error, message } = handle.props;
+    let activeHref = routes.app.clients.index.href();
+    let archivedHref = routes.app.clients.index.href(
+      {},
+      { searchParams: { status: 'archived' } },
+    );
+    let archived = status === 'archived';
 
     return (
       <AppShell
@@ -94,7 +134,9 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Clients</h1>
           <p mix={pageIntroStyle}>
-            One shared client book. Every signed-in user can view and edit these profiles.
+            {archived
+              ? 'Archived clients keep their details and can be restored to the active directory.'
+              : 'One shared client book. Every signed-in user can view and edit these profiles.'}
           </p>
         </header>
         {error ? (
@@ -111,9 +153,31 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
           <a href={routes.app.clients.new.index.href()} mix={linkButtonStyle}>
             New client
           </a>
+          <nav aria-label="Client status" mix={statusNavStyle}>
+            <a
+              href={activeHref}
+              data-active={archived ? undefined : 'true'}
+              aria-current={archived ? undefined : 'page'}
+              mix={statusLinkStyle}
+            >
+              Active
+            </a>
+            <a
+              href={archivedHref}
+              data-active={archived ? 'true' : undefined}
+              aria-current={archived ? 'page' : undefined}
+              mix={statusLinkStyle}
+            >
+              Archived
+            </a>
+          </nav>
         </div>
         {clients.length === 0 ? (
-          <p mix={emptyStyle}>No active clients yet. Add your first client to get started.</p>
+          <p mix={emptyStyle}>
+            {archived
+              ? 'No archived clients. Archiving an active client keeps it here so you can restore it later.'
+              : 'No active clients yet. Add your first client to get started.'}
+          </p>
         ) : (
           <ul mix={listStyle}>
             {clients.map((client) => {

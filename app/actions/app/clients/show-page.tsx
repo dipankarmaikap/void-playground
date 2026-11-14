@@ -18,6 +18,7 @@ import {
   pageIntroStyle,
 } from '../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
+import { ClientStatusControls } from './sections/status-controls.tsx';
 
 export interface ClientProfilePageProps {
   csrfToken: string;
@@ -149,6 +150,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
           >
             Edit client
           </a>
+          <ClientStatusControls csrfToken={csrfToken} client={client} />
           <a href={routes.app.clients.index.href()} mix={backLinkStyle}>
             Back to clients
           </a>

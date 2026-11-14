@@ -1,4 +1,4 @@
-import { form, get, route } from 'remix/routes';
+import { form, get, post, route } from 'remix/routes';
 
 /**
  * Leaves are explicit because this app has no method-override middleware.
@@ -9,4 +9,8 @@ export const clientRoutes = route({
   new: form('/new'),
   show: get('/:clientId'),
   edit: form('/:clientId/edit'),
+  lifecycle: route('/:clientId', {
+    archive: post('/archive'),
+    restore: post('/restore'),
+  }),
 });
