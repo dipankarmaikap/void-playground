@@ -72,6 +72,11 @@ describe('app controller', () => {
     assert.match(html, /<meta name="description" content="[^"]*dashboard/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<summary[^>]*>[\s\S]*?Menu[\s\S]*?<\/summary>/);
+    assert.match(
+      html,
+      /<\/details>\s*<aside[^>]*>[\s\S]*?<nav aria-label="Main"/,
+      'the desktop sidebar should not be inside the collapsed mobile disclosure',
+    );
     assert.match(html, /<nav aria-label="Main"/);
     assert.doesNotMatch(html, /<nav aria-label="Settings"/);
     for (let href of [

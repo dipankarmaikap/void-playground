@@ -30,6 +30,15 @@ interface NavItem {
   active: boolean;
 }
 
+interface SidebarProps {
+  csrfToken: string;
+  identity: UserIdentity;
+  mainNav: NavItem[];
+  settingsNav: NavItem[];
+  settingsActive: boolean;
+  variant: 'desktop' | 'mobile';
+}
+
 const skipLinkStyle = css({
   position: 'absolute',
   top: '-100px',
@@ -59,15 +68,10 @@ const layoutStyle = css({
   },
 });
 
-const drawerStyle = css({
+const mobileDrawerStyle = css({
   display: 'block',
   '@media (min-width: 48rem)': {
-    display: 'contents',
-  },
-  '@media (max-width: 47.999rem)': {
-    '&:not([open]) aside': {
-      display: 'none',
-    },
+    display: 'none',
   },
 });
 
@@ -96,7 +100,7 @@ const menuStyle = css({
   },
 });
 
-const sidebarStyle = css({
+const sidebarBaseStyle = {
   display: 'flex',
   boxSizing: 'border-box',
   flexDirection: 'column',
@@ -104,21 +108,31 @@ const sidebarStyle = css({
   padding: '1.25rem',
   borderRight: `1px solid ${colors.border}`,
   background: colors.surface,
-  '@media (min-width: 48rem)': {
-    position: 'sticky',
-    top: 0,
-    height: '100vh',
-    overflowY: 'auto',
-  },
+} as const;
+
+const desktopSidebarStyle = css({
+  ...sidebarBaseStyle,
+  position: 'sticky',
+  top: 0,
+  height: '100vh',
+  overflowY: 'auto',
   '@media (max-width: 47.999rem)': {
-    position: 'fixed',
-    // Start below the Menu summary row so the control stays visible and tappable.
-    inset: '4rem auto 0 0',
-    zIndex: 20,
-    width: '17rem',
-    maxWidth: '85vw',
-    overflowY: 'auto',
-    boxShadow: shadow.card,
+    display: 'none',
+  },
+});
+
+const mobileSidebarStyle = css({
+  ...sidebarBaseStyle,
+  position: 'fixed',
+  // Start below the Menu summary row so the control stays visible and tappable.
+  inset: '4rem auto 0 0',
+  zIndex: 20,
+  width: '17rem',
+  maxWidth: '85vw',
+  overflowY: 'auto',
+  boxShadow: shadow.card,
+  '@media (min-width: 48rem)': {
+    display: 'none',
   },
 });
 
@@ -226,11 +240,72 @@ const mainStyle = css({
   },
 });
 
+function AppSidebar(handle: Handle<SidebarProps>) {
+  return () => {
+    let { csrfToken, identity: userIdentity, mainNav, settingsNav, settingsActive, variant } =
+      handle.props;
+    let identity = identityOf(userIdentity);
+
+    return (
+      <aside mix={variant === 'desktop' ? desktopSidebarStyle : mobileSidebarStyle}>
+        <a href={routes.app.dashboard.href()} data-rmx-document="" mix={brandStyle}>
+          {APP_NAME}
+        </a>
+        <nav aria-label="Main" mix={navStyle}>
+          {mainNav.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              data-rmx-document=""
+              aria-current={item.current ? 'page' : undefined}
+              data-active={item.active ? 'true' : undefined}
+              mix={navLinkStyle}
+            >
+              <Icon name={item.icon} />
+              <span>{item.label}</span>
+            </a>
+          ))}
+        </nav>
+        {settingsActive ? (
+          <nav aria-label="Settings" mix={subnavStyle}>
+            <p mix={subnavHeadingStyle}>Settings</p>
+            {settingsNav.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                data-rmx-document=""
+                aria-current={item.current ? 'page' : undefined}
+                data-active={item.active ? 'true' : undefined}
+                mix={navLinkStyle}
+              >
+                <Icon name={item.icon} />
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        <div mix={footerStyle}>
+          <div mix={identityStyle}>
+            <span mix={identityNameStyle}>{identity.name}</span>
+            {identity.email ? <span mix={identityEmailStyle}>{identity.email}</span> : null}
+          </div>
+          <form method="post" action={routes.auth.logout.href()} mix={logoutFormStyle}>
+            <input type="hidden" name="_csrf" value={csrfToken} />
+            <Button variant="secondary">
+              <Icon name="log-out" />
+              <span>Log out</span>
+            </Button>
+          </form>
+        </div>
+      </aside>
+    );
+  };
+}
+
 export function AppShell(handle: Handle<AppShellProps>) {
   return () => {
     let { csrfToken, identity: userIdentity, section, title, description, children } =
       handle.props;
-    let identity = identityOf(userIdentity);
     let settingsActive = section === 'profile' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
     let profileHref = routes.app.settings.profile.index.href();
@@ -275,67 +350,28 @@ export function AppShell(handle: Handle<AppShellProps>) {
           Skip to main content
         </a>
         <div mix={layoutStyle}>
-          <details mix={drawerStyle}>
+          <details mix={mobileDrawerStyle}>
             <summary mix={menuStyle}>
               <Icon name="menu" />
               <span>Menu</span>
             </summary>
-            <aside mix={sidebarStyle}>
-              {/*
-                Full-document navigation resets the <details> drawer to closed on mobile.
-                Without data-rmx-document Remix reconciles in place and keeps the live open state.
-              */}
-              <a href={dashboardHref} data-rmx-document="" mix={brandStyle}>
-                {APP_NAME}
-              </a>
-              <nav aria-label="Main" mix={navStyle}>
-                {mainNav.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    data-rmx-document=""
-                    aria-current={item.current ? 'page' : undefined}
-                    data-active={item.active ? 'true' : undefined}
-                    mix={navLinkStyle}
-                  >
-                    <Icon name={item.icon} />
-                    <span>{item.label}</span>
-                  </a>
-                ))}
-              </nav>
-              {settingsActive ? (
-                <nav aria-label="Settings" mix={subnavStyle}>
-                  <p mix={subnavHeadingStyle}>Settings</p>
-                  {settingsNav.map((item) => (
-                    <a
-                      key={item.label}
-                      href={item.href}
-                      data-rmx-document=""
-                      aria-current={item.current ? 'page' : undefined}
-                      data-active={item.active ? 'true' : undefined}
-                      mix={navLinkStyle}
-                    >
-                      <Icon name={item.icon} />
-                      <span>{item.label}</span>
-                    </a>
-                  ))}
-                </nav>
-              ) : null}
-              <div mix={footerStyle}>
-                <div mix={identityStyle}>
-                  <span mix={identityNameStyle}>{identity.name}</span>
-                  {identity.email ? <span mix={identityEmailStyle}>{identity.email}</span> : null}
-                </div>
-                <form method="post" action={routes.auth.logout.href()} mix={logoutFormStyle}>
-                  <input type="hidden" name="_csrf" value={csrfToken} />
-                  <Button variant="secondary">
-                    <Icon name="log-out" />
-                    <span>Log out</span>
-                  </Button>
-                </form>
-              </div>
-            </aside>
+            <AppSidebar
+              csrfToken={csrfToken}
+              identity={userIdentity}
+              mainNav={mainNav}
+              settingsNav={settingsNav}
+              settingsActive={settingsActive}
+              variant="mobile"
+            />
           </details>
+          <AppSidebar
+            csrfToken={csrfToken}
+            identity={userIdentity}
+            mainNav={mainNav}
+            settingsNav={settingsNav}
+            settingsActive={settingsActive}
+            variant="desktop"
+          />
           <main id="main" mix={mainStyle}>
             {children}
           </main>
