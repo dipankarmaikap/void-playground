@@ -5,6 +5,7 @@ import type { Client } from '../../../../data/db.ts';
 import type { ClientFormValues } from '../form-values.ts';
 import { contactSection } from './contact-fields.tsx';
 import { profileSection } from './profile-fields.tsx';
+import { taxSection } from './tax-fields.tsx';
 
 export interface ClientFormSectionProps {
   values: ClientFormValues;
@@ -15,6 +16,13 @@ export interface ClientFormSectionResult {
   values: Partial<ClientFormValues>;
   changes: Partial<Client>;
   issues: Issue[];
+  /** Non-blocking notice to flash after a successful save (for example a duplicate warning). */
+  warning?: string;
+}
+
+export interface ClientFormSectionContext {
+  /** The Client being edited; absent when creating a Client. */
+  clientId?: string;
 }
 
 /**
@@ -27,7 +35,14 @@ export interface ClientFormSection {
   /** Stable identity for rendering and diagnostics. */
   key: string;
   render: (props: ClientFormSectionProps) => RemixNode;
-  parse: (formData: FormData) => ClientFormSectionResult;
+  parse: (
+    formData: FormData,
+    context?: ClientFormSectionContext,
+  ) => ClientFormSectionResult | Promise<ClientFormSectionResult>;
 }
 
-export const clientFormSections: ClientFormSection[] = [profileSection, contactSection];
+export const clientFormSections: ClientFormSection[] = [
+  profileSection,
+  contactSection,
+  taxSection,
+];

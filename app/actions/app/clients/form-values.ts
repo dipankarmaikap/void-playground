@@ -23,6 +23,11 @@ export interface ClientFormValues {
   contact_role?: string;
   contact_email?: string;
   contact_phone?: string;
+  /** Tax identifier fields were added in #9; one optional identifier per Client. */
+  tax_country: string;
+  tax_type: string;
+  tax_value: string;
+  tax_state_code: string;
 }
 
 export function emptyClientFormValues(): ClientFormValues {
@@ -38,6 +43,10 @@ export function emptyClientFormValues(): ClientFormValues {
     contact_role: '',
     contact_email: '',
     contact_phone: '',
+    tax_country: '',
+    tax_type: '',
+    tax_value: '',
+    tax_state_code: '',
   };
 }
 
@@ -54,6 +63,10 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
     contact_role: client.contact_role ?? '',
     contact_email: client.contact_email ?? '',
     contact_phone: client.contact_phone ?? '',
+    tax_country: client.tax_country ?? '',
+    tax_type: client.tax_type ?? '',
+    tax_value: client.tax_value ?? '',
+    tax_state_code: client.tax_state_code ?? '',
   };
 }
 
@@ -70,6 +83,10 @@ export function readClientFormValues(formData: FormData): ClientFormValues {
     contact_role: readText(formData, 'contact_role'),
     contact_email: readText(formData, 'contact_email'),
     contact_phone: readText(formData, 'contact_phone'),
+    tax_country: readText(formData, 'tax_country'),
+    tax_type: readText(formData, 'tax_type'),
+    tax_value: readText(formData, 'tax_value'),
+    tax_state_code: readText(formData, 'tax_state_code'),
   };
 }
 

@@ -19,6 +19,7 @@ import {
 } from '../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
 import { ClientContactSummary } from './sections/contact-summary.tsx';
+import { ClientTaxSummary } from './tax-summary.tsx';
 
 export interface ClientProfilePageProps {
   csrfToken: string;
@@ -144,6 +145,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
           </dl>
         </section>
         <ClientContactSummary client={client} />
+        {client.tax_value ? <ClientTaxSummary client={client} /> : null}
         <div mix={actionsStyle}>
           <a
             href={routes.app.clients.edit.index.href({ clientId: client.id })}

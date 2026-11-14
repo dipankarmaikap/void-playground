@@ -35,9 +35,14 @@ export default createController(routes.app.clients.edit, {
       let client = await findClient(context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
-      let parsed = clientFormSections.map((section) => section.parse(context.formData));
+      let parsed = await Promise.all(
+        clientFormSections.map((section) =>
+          section.parse(context.formData, { clientId: client.id }),
+        ),
+      );
       let issues = parsed.flatMap((result) => result.issues);
       let changes = Object.assign({}, ...parsed.map((result) => result.changes));
+      let warning = parsed.find((result) => result.warning)?.warning;
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;
 
@@ -56,7 +61,10 @@ export default createController(routes.app.clients.edit, {
       }
 
       await updateClient(client.id, changes);
-      context.session.flash('message', 'Client updated');
+      context.session.flash(
+        'message',
+        warning ? `Client updated. ${warning}` : 'Client updated',
+      );
       return redirect(routes.app.clients.show.href({ clientId: client.id }));
     },
   },

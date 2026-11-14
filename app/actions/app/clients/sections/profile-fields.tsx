@@ -106,14 +106,19 @@ export const profileSection: ClientFormSection = {
   key: 'profile',
   render: (props) => <ProfileFields values={props.values} issues={props.issues} />,
   parse(formData) {
-    let values: ClientFormValues = {
+    let values: Partial<ClientFormValues> = {
       type: readText(formData, 'type'),
       legal_name: readText(formData, 'legal_name'),
       preferred_name: readText(formData, 'preferred_name'),
       trading_name: readText(formData, 'trading_name'),
       industry: readText(formData, 'industry'),
     };
-    let parsed = parseClientNames(values);
+    let parsed = parseClientNames({
+      type: values.type ?? '',
+      legal_name: values.legal_name ?? '',
+      preferred_name: values.preferred_name,
+      trading_name: values.trading_name,
+    });
 
     if (!parsed.ok) {
       return {
@@ -128,7 +133,7 @@ export const profileSection: ClientFormSection = {
 
     return {
       values,
-      changes: { ...parsed.value, industry: values.industry.trim() || null },
+      changes: { ...parsed.value, industry: (values.industry ?? '').trim() || null },
       issues: [],
     };
   },
