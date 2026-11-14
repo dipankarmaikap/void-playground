@@ -20,6 +20,7 @@ import {
 import { colors, radius, shadow } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './sections/contact-summary.tsx';
+import { ClientStatusControls } from './sections/status-controls.tsx';
 import { ClientTaxSummary } from './tax-summary.tsx';
 
 export interface ClientProfilePageProps {
@@ -155,6 +156,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
           >
             Edit client
           </a>
+          <ClientStatusControls csrfToken={csrfToken} client={client} />
           <a href={routes.app.clients.index.href()} mix={backLinkStyle}>
             Back to clients
           </a>
