@@ -56,6 +56,40 @@ export const sessions = table({
   primaryKey: 'id',
 });
 
+export const clients = table({
+  name: 'clients',
+  columns: {
+    id: c.text().notNull(),
+    type: c.enum(['individual', 'business'] as const).notNull(),
+    legal_name: c.text().notNull(),
+    preferred_name: c.text().nullable(),
+    trading_name: c.text().nullable(),
+    industry: c.text().nullable(),
+    email: c.text().nullable(),
+    phone: c.text().nullable(),
+    contact_name: c.text().nullable(),
+    contact_role: c.text().nullable(),
+    contact_email: c.text().nullable(),
+    contact_phone: c.text().nullable(),
+    billing_line1: c.text().nullable(),
+    billing_locality: c.text().nullable(),
+    billing_region: c.text().nullable(),
+    billing_postal_code: c.text().nullable(),
+    billing_country: c.text().nullable(),
+    billing_currency: c.text().nullable(),
+    tax_country: c.text().nullable(),
+    tax_type: c.text().nullable(),
+    tax_value: c.text().nullable(),
+    tax_state_name: c.text().nullable(),
+    tax_state_code: c.text().nullable(),
+    status: c.enum(['active', 'archived'] as const).notNull(),
+    archived_at: c.integer().nullable(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
 export const db = createSqliteDatabase({ filename: dbPath, foreignKeys: true });
 
 await db.executeScript(`
@@ -89,12 +123,58 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users(verification_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS clients (
+  id TEXT PRIMARY KEY NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('individual', 'business')),
+  legal_name TEXT NOT NULL,
+  preferred_name TEXT,
+  trading_name TEXT,
+  industry TEXT,
+  email TEXT,
+  phone TEXT,
+  contact_name TEXT,
+  contact_role TEXT,
+  contact_email TEXT,
+  contact_phone TEXT,
+  billing_line1 TEXT,
+  billing_locality TEXT,
+  billing_region TEXT,
+  billing_postal_code TEXT,
+  billing_country TEXT,
+  billing_currency TEXT,
+  tax_country TEXT,
+  tax_type TEXT,
+  tax_value TEXT,
+  tax_state_name TEXT,
+  tax_state_code TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+  archived_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status);
+CREATE INDEX IF NOT EXISTS idx_clients_type ON clients(type);
+CREATE INDEX IF NOT EXISTS idx_clients_legal_name ON clients(legal_name);
+CREATE INDEX IF NOT EXISTS idx_clients_tax_value ON clients(tax_value);
 `);
 
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');
 }
 
+// Later Client tickets are expected to add nullable columns. Keep each ALTER guarded so an
+// existing database never fails on a column it already has, and add one statement at a time.
+const clientExtraColumns: Array<[string, string]> = [];
+
+for (let [columnName, sqlType] of clientExtraColumns) {
+  if (!(await db.hasColumn(getTableReference(clients), columnName))) {
+    await db.executeScript(`ALTER TABLE clients ADD COLUMN ${columnName} ${sqlType};`);
+  }
+}
+
 export type User = TableRow<typeof users>;
 export type UserPassword = TableRow<typeof userPasswords>;
 export type SessionRow = TableRow<typeof sessions>;
+export type Client = TableRow<typeof clients>;
