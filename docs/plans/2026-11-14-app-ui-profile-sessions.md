@@ -22,7 +22,7 @@
 - [x] Add `APP_NAME = 'My Remix App'` and a `Document` component that owns the title suffix, description, `noindex`, and social-preview metadata.
 - [x] Build a distinct public welcome screen with register and login actions; authenticated Users keep the same page plus a dashboard link.
 - [x] Put login and registration in a shared centered card layout with links between the flows.
-- [x] Keep registration optional display-name input, Email Verification, and the existing verification wording.
+- [x] Keep Email Verification and the existing verification wording unchanged.
 
 ## Task 2: Authenticated shell and Session settings (#3)
 
