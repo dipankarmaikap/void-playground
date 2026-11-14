@@ -130,6 +130,12 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
                 <dd mix={detailStyle}>{client.trading_name}</dd>
               </div>
             ) : null}
+            {client.industry ? (
+              <div>
+                <dt mix={termStyle}>Industry</dt>
+                <dd mix={detailStyle}>{client.industry}</dd>
+              </div>
+            ) : null}
             <div>
               <dt mix={termStyle}>Status</dt>
               <dd mix={detailStyle}>{client.status === 'active' ? 'Active' : 'Archived'}</dd>

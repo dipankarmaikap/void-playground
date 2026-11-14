@@ -11,10 +11,11 @@ export interface ClientFormValues {
   legal_name: string;
   preferred_name: string;
   trading_name: string;
+  industry: string;
 }
 
 export function emptyClientFormValues(): ClientFormValues {
-  return { type: '', legal_name: '', preferred_name: '', trading_name: '' };
+  return { type: '', legal_name: '', preferred_name: '', trading_name: '', industry: '' };
 }
 
 export function clientFormValuesOf(client: Client): ClientFormValues {
@@ -23,6 +24,7 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
     legal_name: client.legal_name,
     preferred_name: client.preferred_name ?? '',
     trading_name: client.trading_name ?? '',
+    industry: client.industry ?? '',
   };
 }
 
@@ -32,6 +34,7 @@ export function readClientFormValues(formData: FormData): ClientFormValues {
     legal_name: readText(formData, 'legal_name'),
     preferred_name: readText(formData, 'preferred_name'),
     trading_name: readText(formData, 'trading_name'),
+    industry: readText(formData, 'industry'),
   };
 }
 

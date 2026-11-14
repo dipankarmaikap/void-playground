@@ -90,6 +90,12 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
               variant={tradingNameIssue ? 'error' : 'default'}
             />
           </Field>
+          <Field
+            label="Industry"
+            hint="Optional. Describe the line of work in your own words."
+          >
+            <Input name="industry" defaultValue={values.industry} />
+          </Field>
         </div>
       </>
     );
@@ -105,6 +111,7 @@ export const profileSection: ClientFormSection = {
       legal_name: readText(formData, 'legal_name'),
       preferred_name: readText(formData, 'preferred_name'),
       trading_name: readText(formData, 'trading_name'),
+      industry: readText(formData, 'industry'),
     };
     let parsed = parseClientNames(values);
 
@@ -119,6 +126,10 @@ export const profileSection: ClientFormSection = {
       };
     }
 
-    return { values, changes: parsed.value, issues: [] };
+    return {
+      values,
+      changes: { ...parsed.value, industry: values.industry.trim() || null },
+      issues: [],
+    };
   },
 };
