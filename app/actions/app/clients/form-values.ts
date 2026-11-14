@@ -12,10 +12,28 @@ export interface ClientFormValues {
   preferred_name: string;
   trading_name: string;
   industry: string;
+  billing_line1: string;
+  billing_locality: string;
+  billing_region: string;
+  billing_postal_code: string;
+  billing_country: string;
+  billing_currency: string;
 }
 
 export function emptyClientFormValues(): ClientFormValues {
-  return { type: '', legal_name: '', preferred_name: '', trading_name: '', industry: '' };
+  return {
+    type: '',
+    legal_name: '',
+    preferred_name: '',
+    trading_name: '',
+    industry: '',
+    billing_line1: '',
+    billing_locality: '',
+    billing_region: '',
+    billing_postal_code: '',
+    billing_country: '',
+    billing_currency: '',
+  };
 }
 
 export function clientFormValuesOf(client: Client): ClientFormValues {
@@ -25,6 +43,12 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
     preferred_name: client.preferred_name ?? '',
     trading_name: client.trading_name ?? '',
     industry: client.industry ?? '',
+    billing_line1: client.billing_line1 ?? '',
+    billing_locality: client.billing_locality ?? '',
+    billing_region: client.billing_region ?? '',
+    billing_postal_code: client.billing_postal_code ?? '',
+    billing_country: client.billing_country ?? '',
+    billing_currency: client.billing_currency ?? '',
   };
 }
 
@@ -35,6 +59,12 @@ export function readClientFormValues(formData: FormData): ClientFormValues {
     preferred_name: readText(formData, 'preferred_name'),
     trading_name: readText(formData, 'trading_name'),
     industry: readText(formData, 'industry'),
+    billing_line1: readText(formData, 'billing_line1'),
+    billing_locality: readText(formData, 'billing_locality'),
+    billing_region: readText(formData, 'billing_region'),
+    billing_postal_code: readText(formData, 'billing_postal_code'),
+    billing_country: readText(formData, 'billing_country'),
+    billing_currency: readText(formData, 'billing_currency'),
   };
 }
 

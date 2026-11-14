@@ -10,7 +10,7 @@ import {
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { Select } from '../../../../ui/select.tsx';
-import { issueFor, readText } from '../form-values.ts';
+import { emptyClientFormValues, issueFor, readText } from '../form-values.ts';
 import type { ClientFormValues } from '../form-values.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
@@ -107,6 +107,7 @@ export const profileSection: ClientFormSection = {
   render: (props) => <ProfileFields values={props.values} issues={props.issues} />,
   parse(formData) {
     let values: ClientFormValues = {
+      ...emptyClientFormValues(),
       type: readText(formData, 'type'),
       legal_name: readText(formData, 'legal_name'),
       preferred_name: readText(formData, 'preferred_name'),
