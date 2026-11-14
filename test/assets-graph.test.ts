@@ -3,6 +3,8 @@ import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
 import { router } from '../app/router.ts';
+import { routes } from '../app/routes.ts';
+import { createUserAndLogin, extractCsrf, origin } from './http.ts';
 
 describe('browser asset graph', () => {
   it('allows only the shared route contract and its browser-safe route modules', async () => {
@@ -44,6 +46,7 @@ describe('browser asset graph', () => {
   it('renders current import-map, preload, and entry metadata on each document response', async () => {
     let originalGetScriptEntry = assets.getScriptEntry;
     let version = 1;
+    let sessionCookie = await createUserAndLogin(router, 'asset-refresh');
 
     assets.getScriptEntry = async function (path) {
       let entry = await originalGetScriptEntry.call(assets, path);
@@ -75,6 +78,37 @@ describe('browser asset graph', () => {
           ),
         );
       }
+
+      let formPage = await router.fetch(
+        new URL(routes.app.clients.new.index.href(), origin),
+        { headers: { Cookie: sessionCookie } },
+      );
+      let csrf = extractCsrf(await formPage.text());
+
+      version = 3;
+      let validation = await router.fetch(
+        new URL(routes.app.clients.new.action.href(), origin),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Cookie: sessionCookie,
+          },
+          body: new URLSearchParams({
+            type: 'individual',
+            legal_name: '',
+            _csrf: csrf,
+          }).toString(),
+        },
+      );
+      let validationHtml = await validation.text();
+
+      assert.equal(validation.status, 400);
+      assert.match(validationHtml, /src="\/assets\/entry-v3\.ts"/);
+      assert.match(validationHtml, /href="\/assets\/preload-v3\.js"/);
+      assert.ok(
+        validationHtml.includes('"route-contract-v3":"/assets/module-v3.js"'),
+      );
     } finally {
       assets.getScriptEntry = originalGetScriptEntry;
     }

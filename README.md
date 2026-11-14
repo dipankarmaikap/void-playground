@@ -4,7 +4,7 @@ A Remix 3 app with email/password authentication, DB-backed Sessions, and a shar
 
 ## Features
 
-- Register with Email Verification. Opening a link is read-only; confirmation happens in a CSRF-protected form submission. The link is printed to the server console; real email delivery is not wired up yet.
+- Register with Email Verification. Opening a link is read-only; verification happens in a CSRF-protected form submission. The link is printed to the server console; real email delivery is not wired up yet.
 - Log in and Log out, with a protected dashboard at `/app/dashboard`.
 - Manage a shared Client book at `/app/clients`: create and edit Individual and Business profiles, search and filter, and archive or restore records. The directory shows 20 Clients per page.
 - Passwords hashed with `scrypt`; hashes live in `user_passwords`, never on the user row.

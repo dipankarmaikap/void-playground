@@ -11,27 +11,23 @@ export default createController(routes.auth.verify, {
   actions: {
     async index(context) {
       let token = context.url.searchParams.get('token');
-      let user = token
-        ? await db.findOne(users, { where: { verification_token: token } })
-        : null;
+      let user = await findValidVerificationUser(token);
 
-      if (!user || !isTokenValid(user.verification_expires_at)) {
+      if (!user || token == null) {
         context.session.flash('error', 'Invalid or expired verification link');
         return redirect(routes.auth.login.index.href());
       }
 
       return context.render(
-        <VerifyEmailPage csrfToken={getCsrfToken(context)} token={token!} />,
+        <VerifyEmailPage csrfToken={getCsrfToken(context)} token={token} />,
       );
     },
     async action(context) {
       let tokenValue = context.formData.get('token');
       let token = typeof tokenValue === 'string' ? tokenValue : '';
-      let user = token
-        ? await db.findOne(users, { where: { verification_token: token } })
-        : null;
+      let user = await findValidVerificationUser(token);
 
-      if (!user || !isTokenValid(user.verification_expires_at)) {
+      if (!user) {
         context.session.flash('error', 'Invalid or expired verification link');
         return redirect(routes.auth.login.index.href());
       }
@@ -47,6 +43,13 @@ export default createController(routes.auth.verify, {
     },
   },
 });
+
+async function findValidVerificationUser(token: string | null) {
+  if (!token) return null;
+  let user = await db.findOne(users, { where: { verification_token: token } });
+  if (!user || !isTokenValid(user.verification_expires_at)) return null;
+  return user;
+}
 
 function isTokenValid(expiresAt: number | null): boolean {
   return expiresAt != null && expiresAt > Date.now();

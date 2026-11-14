@@ -1,5 +1,8 @@
 import type { Client } from './db.ts';
-import { validateClientTextFields } from './client-text.ts';
+import {
+  BILLING_CURRENCY_LENGTH_MESSAGE,
+  validateClientTextFields,
+} from './client-text.ts';
 
 export interface Country {
   /** ISO 3166-1 alpha-2 code. */
@@ -304,7 +307,7 @@ export function parseClientBilling(input: ClientBillingInput): ClientBillingResu
     } else {
       issues.push({
         field: 'billing_currency',
-        message: 'Enter a 3-letter currency code, such as INR or USD.',
+        message: BILLING_CURRENCY_LENGTH_MESSAGE,
       });
     }
   }

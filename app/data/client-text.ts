@@ -22,6 +22,9 @@ export const CLIENT_TEXT_LIMITS = {
 
 export type ClientTextField = keyof typeof CLIENT_TEXT_LIMITS;
 
+export const BILLING_CURRENCY_LENGTH_MESSAGE =
+  'Enter a 3-letter currency code, such as INR or USD.';
+
 const CLIENT_TEXT_LABELS: Record<ClientTextField, string> = {
   legal_name: 'Legal name',
   preferred_name: 'Preferred name',
@@ -63,7 +66,7 @@ export function validateClientTextFields<const Field extends ClientTextField>(
         field,
         message:
           field === 'billing_currency'
-            ? 'Enter a 3-letter currency code, such as INR or USD.'
+            ? BILLING_CURRENCY_LENGTH_MESSAGE
             : `${CLIENT_TEXT_LABELS[field]} must be ${maxLength} characters or fewer.`,
       });
     }

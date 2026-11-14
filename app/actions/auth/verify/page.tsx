@@ -26,19 +26,19 @@ export function VerifyEmailPage(handle: Handle<VerifyEmailPageProps>) {
     return (
       <Document
         title="Verify your email"
-        description={`Confirm your email address to finish creating a ${APP_NAME} account.`}
+        description={`Verify your email address to complete your registration for ${APP_NAME}.`}
       >
         <AuthLayout>
           <header mix={authHeaderStyle}>
             <h1 mix={authHeadingStyle}>Verify your email</h1>
             <p mix={authIntroStyle}>
-              Confirm that you control this email address to finish creating your account.
+              Verify that you control this email address to complete your registration.
             </p>
           </header>
           <form method="post" action={routes.auth.verify.action.href()} mix={formStackStyle}>
             <input type="hidden" name="_csrf" value={csrfToken} />
             <input type="hidden" name="token" value={token} />
-            <Button type="submit">Confirm email address</Button>
+            <Button type="submit">Verify email address</Button>
           </form>
           <p mix={pageFooterStyle}>
             Already verified?{' '}

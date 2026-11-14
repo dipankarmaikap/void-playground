@@ -126,6 +126,48 @@ describe('Client free-text length limits', () => {
     }
   });
 
+  it('rejects over-limit name submissions before trimming whitespace', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let cases = [
+      {
+        field: 'legal_name',
+        type: 'individual',
+        value: ` ${'L'.repeat(120)}`,
+      },
+      {
+        field: 'preferred_name',
+        type: 'individual',
+        value: ` ${'P'.repeat(120)}`,
+      },
+      {
+        field: 'trading_name',
+        type: 'business',
+        value: ` ${'T'.repeat(120)}`,
+      },
+    ];
+
+    for (let { field, type, value } of cases) {
+      let fields: Record<string, string> = {
+        type,
+        legal_name: uniqueName(`Name length ${field}`),
+      };
+      fields[field] = value;
+
+      let response = await postForm(
+        router,
+        routes.app.clients.new.action.href(),
+        fields,
+        sessionCookie,
+      );
+
+      assert.equal(response.status, 400, `${field} must count surrounding whitespace`);
+      let html = await response.text();
+      assert.ok(html.includes(value), `${field} should preserve the raw submitted value`);
+      assert.match(html, /120 characters or fewer/);
+      assert.equal(await db.findOne(clients, { where: { legal_name: fields.legal_name } }), null);
+    }
+  });
+
   it('preserves stored Client data when edit fields exceed their limits', async () => {
     let sessionCookie = await createUserAndLogin(router, 'client-length');
     let values = maxLengthValues();

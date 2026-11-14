@@ -143,6 +143,32 @@ describe('Client directory pagination', () => {
     assert.ok(!second.includes('individual distractor'));
   });
 
+  it('paginates literal wildcard searches without matching wildcard lookalikes', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    for (let number = 1; number <= 25; number += 1) {
+      await seedClient({
+        id: `literal-${String(number).padStart(2, '0')}`,
+        legalName: `Literal ${String(number).padStart(2, '0')} 100% Match`,
+      });
+    }
+    await seedClient({ id: 'wildcard-distractor', legalName: 'Literal 100X Match' });
+
+    let first = await getHtml(router, indexHref({ q: '100%' }), sessionCookie);
+    assert.equal(clientItemCount(first), 20);
+    assert.ok(first.includes('Literal 01 100% Match'));
+    assert.ok(first.includes('Literal 20 100% Match'));
+    assert.ok(!first.includes('Literal 21 100% Match'));
+    assert.ok(!first.includes('100X Match'));
+
+    let nextUrl = new URL(nextHref(first).replaceAll('&amp;', '&'), origin);
+    assert.equal(nextUrl.searchParams.get('q'), '100%');
+    let second = await getHtml(router, `${nextUrl.pathname}${nextUrl.search}`, sessionCookie);
+    assert.equal(clientItemCount(second), 5);
+    assert.ok(second.includes('Literal 21 100% Match'));
+    assert.ok(second.includes('Literal 25 100% Match'));
+    assert.ok(!second.includes('100X Match'));
+  });
+
   it('normalizes invalid page numbers to the first page', async () => {
     let sessionCookie = await createUserAndLogin(router, 'client-page');
     await seedClient({ id: 'only-client', legalName: 'Only Client' });

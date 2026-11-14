@@ -39,8 +39,6 @@ export const documentScriptEntry = createContextKey<ScriptEntry>(await assets.ge
 
 /** Refreshes document import-map and preload metadata from the watched asset graph. */
 export const documentScriptEntryMiddleware: Middleware = async (context, next) => {
-  if (context.method === 'GET' || context.method === 'HEAD') {
-    context.set(documentScriptEntry, await assets.getScriptEntry(entry));
-  }
+  context.set(documentScriptEntry, await assets.getScriptEntry(entry));
   return next();
 };

@@ -58,14 +58,15 @@ export function parseClientNames(input: ClientNameInput): ClientNameResult {
     issues.push({ field: 'type', message: 'Choose Individual or Business.' });
   }
 
-  let legalName = input.legal_name.trim();
-  if (!legalName) {
-    issues.push({ field: 'legal_name', message: 'Enter the legal name.' });
-  } else if (legalName.length > CLIENT_NAME_MAX_LENGTH) {
+  let legalNameInput = input.legal_name;
+  let legalName = legalNameInput.trim();
+  if (legalNameInput.length > CLIENT_NAME_MAX_LENGTH) {
     issues.push({
       field: 'legal_name',
       message: `Legal name must be ${CLIENT_NAME_MAX_LENGTH} characters or fewer.`,
     });
+  } else if (!legalName) {
+    issues.push({ field: 'legal_name', message: 'Enter the legal name.' });
   }
 
   let preferredName = parseOptionalName(input.preferred_name, 'preferred_name', issues);
@@ -103,13 +104,14 @@ function parseOptionalName(
   field: 'preferred_name' | 'trading_name',
   issues: ClientNameIssue[],
 ): string | null {
-  let value = input?.trim() ?? '';
-  if (value.length > CLIENT_NAME_MAX_LENGTH) {
+  let submitted = input ?? '';
+  if (submitted.length > CLIENT_NAME_MAX_LENGTH) {
     issues.push({
       field,
       message: `Name must be ${CLIENT_NAME_MAX_LENGTH} characters or fewer.`,
     });
     return null;
   }
+  let value = submitted.trim();
   return value || null;
 }
