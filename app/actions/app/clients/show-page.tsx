@@ -18,6 +18,7 @@ import {
   pageIntroStyle,
 } from '../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
+import { ClientContactSummary } from './sections/contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
 
 export interface ClientProfilePageProps {
@@ -143,6 +144,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
             </div>
           </dl>
         </section>
+        <ClientContactSummary client={client} />
         <div mix={actionsStyle}>
           <a
             href={routes.app.clients.edit.index.href({ clientId: client.id })}

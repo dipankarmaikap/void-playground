@@ -3,6 +3,7 @@ import type { Issue } from 'remix/data-schema';
 
 import type { Client } from '../../../../data/db.ts';
 import type { ClientFormValues } from '../form-values.ts';
+import { contactSection } from './contact-fields.tsx';
 import { profileSection } from './profile-fields.tsx';
 
 export interface ClientFormSectionProps {
@@ -29,4 +30,4 @@ export interface ClientFormSection {
   parse: (formData: FormData) => ClientFormSectionResult;
 }
 
-export const clientFormSections: ClientFormSection[] = [profileSection];
+export const clientFormSections: ClientFormSection[] = [profileSection, contactSection];
