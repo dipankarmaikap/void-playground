@@ -2,7 +2,7 @@ import type { Handle } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
 import { APP_NAME } from '../../../../config.ts';
-import { clientDisplayName } from '../../../../data/clients.ts';
+import { clientDisplayLabel } from '../../../../data/client-names.ts';
 import type { Client } from '../../../../data/db.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
@@ -23,7 +23,7 @@ export interface EditClientPageProps {
 export function EditClientPage(handle: Handle<EditClientPageProps>) {
   return () => {
     let { csrfToken, identity, client, values, issues } = handle.props;
-    let label = clientDisplayName(client);
+    let label = clientDisplayLabel(client);
 
     return (
       <AppShell

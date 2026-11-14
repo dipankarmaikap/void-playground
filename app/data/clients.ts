@@ -2,11 +2,9 @@ import { and, eq, ilike, or } from 'remix/data-table';
 import type { Predicate } from 'remix/data-table';
 
 import type { ClientType } from './client-names.ts';
-import { clientDisplayLabel } from './client-names.ts';
+import type { ClientStatus } from './client-status.ts';
 import { clients, db } from './db.ts';
 import type { Client } from './db.ts';
-
-export type ClientStatus = Client['status'];
 
 export type ClientTypeFilter = ClientType | 'all';
 
@@ -27,16 +25,6 @@ const SEARCH_FIELDS = [
   'phone',
   'contact_email',
   'contact_phone',
-] as const;
-
-const SEARCH_COLUMNS = [
-  clients.legal_name,
-  clients.preferred_name,
-  clients.trading_name,
-  clients.email,
-  clients.phone,
-  clients.contact_email,
-  clients.contact_phone,
 ] as const;
 
 const LIKE_WILDCARDS = /[%_]/;
@@ -60,7 +48,7 @@ export async function listClients(filter: ClientListFilter = {}): Promise<Client
   let literalSearch = q !== '' && LIKE_WILDCARDS.test(q);
   if (q && !literalSearch) {
     let pattern = `%${q}%`;
-    predicates.push(or(...SEARCH_COLUMNS.map((column) => ilike(column, pattern))));
+    predicates.push(or(...SEARCH_FIELDS.map((field) => ilike(clients[field], pattern))));
   }
 
   let clientsInView = await db.findMany(clients, {
@@ -104,8 +92,4 @@ export async function updateClient(
   changes: Partial<Client>,
 ): Promise<Client> {
   return db.update(clients, id, { ...changes, updated_at: Date.now() });
-}
-
-export function clientDisplayName(client: Client): string {
-  return clientDisplayLabel(client);
 }

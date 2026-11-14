@@ -4,21 +4,7 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUser, login, origin, postForm } from '../../../../test/http.ts';
-
-async function loginNewUser() {
-  let email = `contacts-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
-}
+import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -30,7 +16,7 @@ function uniqueEmail(prefix: string) {
 
 describe('client contacts', () => {
   it('creates, views, and edits an Individual email and phone', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Contact Individual');
     let email = uniqueEmail('person');
     let phone = '+91 98765 43210';
@@ -51,7 +37,7 @@ describe('client contacts', () => {
     assert.equal(row.phone, phone);
     assert.equal(row.contact_name, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /<dt[^>]*>Email<\/dt>/);
     assert.match(profile, new RegExp(email));
     assert.match(profile, /<dt[^>]*>Phone<\/dt>/);
@@ -71,13 +57,13 @@ describe('client contacts', () => {
     assert.equal(stored?.email, updatedEmail);
     assert.equal(stored?.phone, updatedPhone);
 
-    let updatedProfile = await getHtml(location, sessionCookie);
+    let updatedProfile = await getHtml(router, location, sessionCookie);
     assert.match(updatedProfile, new RegExp(updatedEmail));
     assert.ok(updatedProfile.includes(updatedPhone));
   });
 
   it('trims contact values and stores blank optional values as null', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Optional Contacts');
     let email = uniqueEmail('trimmed');
 
@@ -109,7 +95,7 @@ describe('client contacts', () => {
   });
 
   it('accepts an Individual with no contact details', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('No Contacts');
 
     let created = await postForm(
@@ -127,12 +113,12 @@ describe('client contacts', () => {
     assert.equal(row.email, null);
     assert.equal(row.phone, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.doesNotMatch(profile, /<h2[^>]*>Contacts<\/h2>/);
   });
 
   it('rejects an invalid Individual email and keeps the submitted values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Invalid Email');
     let badEmail = 'not-an-email';
     let phone = '+91 98765 43210';
@@ -157,7 +143,7 @@ describe('client contacts', () => {
   });
 
   it('rejects an invalid Individual phone number and keeps the submitted values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Invalid Phone');
     let email = uniqueEmail('valid');
     let badPhone = 'call me maybe';
@@ -181,7 +167,7 @@ describe('client contacts', () => {
   });
 
   it('creates, views, and edits Business shared and primary-contact details', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Contact Business');
     let sharedEmail = uniqueEmail('shared');
     let sharedPhone = '+44 20 7946 0958';
@@ -218,7 +204,7 @@ describe('client contacts', () => {
     assert.equal(row.contact_email, contactEmail);
     assert.equal(row.contact_phone, contactPhone);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /<dt[^>]*>Email<\/dt>/);
     assert.match(profile, new RegExp(sharedEmail));
     assert.match(profile, /<dt[^>]*>Phone<\/dt>/);
@@ -253,12 +239,12 @@ describe('client contacts', () => {
     assert.equal(stored?.contact_role, updatedRole);
     assert.equal(stored?.contact_name, contactName);
 
-    let updatedProfile = await getHtml(location, sessionCookie);
+    let updatedProfile = await getHtml(router, location, sessionCookie);
     assert.match(updatedProfile, new RegExp(updatedRole));
   });
 
   it('requires a primary contact name when any other primary-contact field is present', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Named Contact Required');
     let role = 'Operations';
     let contactEmail = uniqueEmail('ops');
@@ -289,7 +275,7 @@ describe('client contacts', () => {
   });
 
   it('accepts a Business primary contact with only a name', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Name Only Contact');
     let contactName = uniqueName('Sam Rivera');
 
@@ -317,7 +303,7 @@ describe('client contacts', () => {
   });
 
   it('rejects invalid primary-contact email and phone values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Invalid Contact Details');
     let contactName = uniqueName('Jordan Lee');
 
@@ -348,7 +334,7 @@ describe('client contacts', () => {
   });
 
   it('allows the same email, phone, and primary contact across Clients', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let sharedEmail = uniqueEmail('duplicate');
     let sharedPhone = '+91 90000 00000';
     let contactName = uniqueName('Shared Contact');
@@ -385,8 +371,8 @@ describe('client contacts', () => {
   });
 
   it('persists contacts for a second authenticated User to view and edit', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'contacts');
+    let secondCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Shared Contacts');
     let email = uniqueEmail('owner');
     let phone = '+61 2 9374 4000';
@@ -403,7 +389,7 @@ describe('client contacts', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(location, secondCookie);
+    let secondProfile = await getHtml(router, location, secondCookie);
     assert.match(secondProfile, new RegExp(email));
     assert.ok(secondProfile.includes(phone));
 
@@ -426,7 +412,7 @@ describe('client contacts', () => {
   });
 
   it('keeps Business primary-contact values through a type change', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Contact Type Change');
     let contactName = uniqueName('Casey Morgan');
     let contactRole = 'Procurement';
@@ -473,7 +459,14 @@ describe('client contacts', () => {
     assert.equal(individualRow?.contact_role, contactRole);
     assert.equal(individualRow?.contact_email, contactEmail);
 
+    let individualProfile = await getHtml(router, location, sessionCookie);
+    assert.doesNotMatch(individualProfile, /<dt[^>]*>Primary contact<\/dt>/);
+    assert.doesNotMatch(individualProfile, /<dt[^>]*>Contact email<\/dt>/);
+    assert.doesNotMatch(individualProfile, new RegExp(contactName));
+    assert.doesNotMatch(individualProfile, new RegExp(contactEmail));
+
     let individualEdit = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -494,13 +487,13 @@ describe('client contacts', () => {
     );
     assert.equal(backToBusiness.status, 302);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /<dt[^>]*>Primary contact<\/dt>/);
     assert.ok(profile.includes(contactName));
   });
 
   it('rejects contact edits without a CSRF token', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Contact CSRF');
     let originalEmail = uniqueEmail('original');
 

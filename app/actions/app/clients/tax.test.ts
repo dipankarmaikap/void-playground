@@ -4,26 +4,12 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUser, login, origin, postForm } from '../../../../test/http.ts';
+import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
 
 /** A structurally valid 15-character GSTIN (format only; nothing is verified). */
 const VALID_GSTIN = '27AAPCS2319F1Z5';
 /** A structurally valid 15-character alphanumeric UIN. */
 const VALID_UIN = 'AA1234567890123';
-
-async function loginNewUser() {
-  let email = `tax-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
-}
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -61,7 +47,7 @@ async function createProfile(
 
 describe('client tax identifiers', () => {
   it('records a generic tax identifier with its country, type, and value', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Generic Tax Client');
 
     let { location } = await createProfile(sessionCookie, {
@@ -79,7 +65,7 @@ describe('client tax identifiers', () => {
     assert.equal(row.tax_state_name, null);
     assert.equal(row.tax_state_code, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /<p role="status"[^>]*>Client created<\/p>/);
     assert.match(profile, /<h2[^>]*>Tax identifier<\/h2>/);
     assert.match(profile, /GB123456789/);
@@ -88,7 +74,7 @@ describe('client tax identifiers', () => {
   });
 
   it('records an India GSTIN with its State or UT name and code', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('GSTIN Client');
 
     let { location } = await createProfile(sessionCookie, {
@@ -107,7 +93,7 @@ describe('client tax identifiers', () => {
     assert.equal(row.tax_state_name, 'Maharashtra');
     assert.equal(row.tax_state_code, '27');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, new RegExp(VALID_GSTIN));
     assert.match(profile, />GSTIN</);
     assert.match(profile, />India</);
@@ -115,6 +101,7 @@ describe('client tax identifiers', () => {
     assert.match(profile, /\(27\)/);
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -123,7 +110,7 @@ describe('client tax identifiers', () => {
   });
 
   it('records an India UIN with its State or UT name and code', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('UIN Client');
 
     await createProfile(sessionCookie, {
@@ -144,7 +131,7 @@ describe('client tax identifiers', () => {
   });
 
   it('treats blank tax fields as not recorded and never claims unregistered status', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('No Tax Client');
 
     let { location } = await createProfile(sessionCookie, { legal_name: legalName });
@@ -157,14 +144,15 @@ describe('client tax identifiers', () => {
     assert.equal(row.tax_state_name, null);
     assert.equal(row.tax_state_code, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.doesNotMatch(profile, /<h2[^>]*>Tax identifier<\/h2>/);
     assert.doesNotMatch(profile, /unregistered/i);
 
-    let newPage = await getHtml(routes.app.clients.new.index.href(), sessionCookie);
+    let newPage = await getHtml(router, routes.app.clients.new.index.href(), sessionCookie);
     assert.doesNotMatch(newPage, /unregistered/i);
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -173,7 +161,7 @@ describe('client tax identifiers', () => {
   });
 
   it('clears the identifier when every tax field is blank on edit', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Cleared Tax Client');
     let { location } = await createProfile(sessionCookie, {
       legal_name: legalName,
@@ -199,12 +187,12 @@ describe('client tax identifiers', () => {
     assert.equal(stored?.tax_state_name, null);
     assert.equal(stored?.tax_state_code, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.doesNotMatch(profile, /<h2[^>]*>Tax identifier<\/h2>/);
   });
 
   it('rejects an invalid India GSTIN and preserves the submitted tax values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Invalid GSTIN Client');
 
     let response = await postForm(
@@ -233,7 +221,7 @@ describe('client tax identifiers', () => {
   });
 
   it('rejects an invalid India UIN', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Invalid UIN Client');
 
     let response = await postForm(
@@ -257,7 +245,7 @@ describe('client tax identifiers', () => {
   });
 
   it('requires a State or UT for an India tax identifier', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Stateless GSTIN Client');
 
     let response = await postForm(
@@ -281,7 +269,7 @@ describe('client tax identifiers', () => {
   });
 
   it('only accepts GSTIN or UIN for an India tax identifier', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('India VAT Client');
 
     let response = await postForm(
@@ -302,7 +290,7 @@ describe('client tax identifiers', () => {
   });
 
   it('keeps at most one tax identifier per client', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Single Tax Client');
     await createProfile(sessionCookie, {
       legal_name: legalName,
@@ -334,6 +322,7 @@ describe('client tax identifiers', () => {
     assert.equal(stored?.tax_state_name, 'Maharashtra');
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -345,6 +334,7 @@ describe('client tax identifiers', () => {
     assert.equal((editPage.match(/name="tax_country"/g) ?? []).length, 1);
 
     let profile = await getHtml(
+      router,
       routes.app.clients.show.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -353,7 +343,7 @@ describe('client tax identifiers', () => {
   });
 
   it('warns about a duplicate tax identifier but still saves the client', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let firstLegalName = uniqueName('First GSTIN Client');
     await createProfile(sessionCookie, {
       legal_name: firstLegalName,
@@ -376,14 +366,14 @@ describe('client tax identifiers', () => {
     assert.ok(row, 'the duplicate identifier must still be saved');
     assert.equal(row.tax_value, VALID_GSTIN);
 
-    let profile = await getHtml(created.location, sessionCookie);
+    let profile = await getHtml(router, created.location, sessionCookie);
     assert.match(profile, /<p role="status"[^>]*>Client created\./);
     assert.match(profile, /already recorded on another client/);
     assert.match(profile, /saved anyway/);
   });
 
   it('does not warn when a client keeps its own tax identifier', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Own GSTIN Client');
     let ownGstin = '27AAPCS2319F2Z7';
     let { location } = await createProfile(sessionCookie, {
@@ -410,14 +400,14 @@ describe('client tax identifiers', () => {
     );
     assert.equal(edited.status, 302);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /<p role="status"[^>]*>Client updated<\/p>/);
     assert.doesNotMatch(profile, /already recorded/);
   });
 
   it('shares tax identifiers with a second authenticated User', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'tax');
+    let secondCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Shared Tax Client');
 
     let { location } = await createProfile(firstCookie, {
@@ -429,7 +419,7 @@ describe('client tax identifiers', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(location, secondCookie);
+    let secondProfile = await getHtml(router, location, secondCookie);
     assert.match(secondProfile, /GB222222222/);
 
     let edited = await postForm(
@@ -456,7 +446,7 @@ describe('client tax identifiers', () => {
   });
 
   it('rejects tax identifier mutations without a CSRF token', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('No CSRF Tax Client');
 
     let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {

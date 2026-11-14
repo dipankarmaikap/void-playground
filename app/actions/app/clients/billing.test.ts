@@ -4,7 +4,7 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUser, login, origin, postForm } from '../../../../test/http.ts';
+import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
 
 const blankBilling = {
   billing_line1: '',
@@ -14,20 +14,6 @@ const blankBilling = {
   billing_country: '',
   billing_currency: '',
 };
-
-async function loginNewUser() {
-  let email = `billing-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
-}
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -61,7 +47,7 @@ function locationOf(response: Response) {
 
 describe('client billing details', () => {
   it('creates a client with no billing address or currency', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('No Billing Client');
 
     let created = await createClient(sessionCookie, { legal_name: legalName });
@@ -76,14 +62,14 @@ describe('client billing details', () => {
     assert.equal(row.billing_country, null);
     assert.equal(row.billing_currency, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /No billing details recorded\./);
     assert.doesNotMatch(profile, /Billing address/);
     assert.doesNotMatch(profile, /Default currency/);
   });
 
   it('requires address line 1 and country when any address field is entered', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Partial Address');
 
     let response = await postForm(
@@ -101,7 +87,7 @@ describe('client billing details', () => {
     let html = await response.text();
     assert.match(html, /<p role="alert"[^>]*>Please correct the fields below\.<\/p>/);
     assert.match(html, /Enter billing address line 1\./);
-    assert.match(html, /Choose a billing country\./);
+    assert.match(html, /Enter a billing country\./);
     assert.match(html, /name="billing_line1"[^>]*aria-invalid="true"/);
     assert.match(html, /name="billing_country"[^>]*aria-invalid="true"/);
     assert.match(html, /name="billing_locality"[^>]*value="Bengaluru"/);
@@ -119,12 +105,12 @@ describe('client billing details', () => {
     );
     assert.equal(missingCountry.status, 400);
     let missingCountryHtml = await missingCountry.text();
-    assert.match(missingCountryHtml, /Choose a billing country\./);
+    assert.match(missingCountryHtml, /Enter a billing country\./);
     assert.doesNotMatch(missingCountryHtml, /Enter billing address line 1\./);
   });
 
   it('accepts an address without locality, region, or postal code', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Minimal Address');
 
     let created = await createClient(sessionCookie, {
@@ -142,14 +128,14 @@ describe('client billing details', () => {
     assert.equal(row.billing_postal_code, null);
     assert.equal(row.billing_country, 'IN');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /Billing address/);
     assert.match(profile, /12 Residency Road/);
     assert.match(profile, />India</);
   });
 
   it('stores and edits the full billing address on an Individual profile', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Individual Billing');
 
     let created = await createClient(sessionCookie, {
@@ -172,7 +158,7 @@ describe('client billing details', () => {
     assert.equal(row.billing_country, 'US');
     assert.equal(row.billing_currency, 'USD');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /500 Congress Avenue/);
     assert.match(profile, /Austin/);
     assert.match(profile, /Texas/);
@@ -181,13 +167,14 @@ describe('client billing details', () => {
     assert.match(profile, /USD/);
 
     let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
-    let editPage = await getHtml(editPath, sessionCookie);
+    let editPage = await getHtml(router, editPath, sessionCookie);
     assert.match(editPage, /name="billing_line1"[^>]*value="500 Congress Avenue"/);
     assert.match(editPage, /name="billing_locality"[^>]*value="Austin"/);
     assert.match(editPage, /name="billing_region"[^>]*value="Texas"/);
     assert.match(editPage, /name="billing_postal_code"[^>]*value="78701"/);
-    assert.match(editPage, /<option[^>]*value="US"[^>]*selected/);
-    assert.match(editPage, /<option[^>]*value="USD"[^>]*selected/);
+    assert.match(editPage, /name="billing_country"[^>]*value="United States"/);
+    assert.match(editPage, /name="billing_currency"[^>]*value="USD"/);
+    assert.match(editPage, /<datalist id="billing-countries"/);
 
     let edited = await postForm(
       router,
@@ -208,13 +195,13 @@ describe('client billing details', () => {
     let stored = await db.find(clients, row.id);
     assert.equal(stored?.billing_line1, '600 Congress Avenue');
 
-    let updatedProfile = await getHtml(location, sessionCookie);
+    let updatedProfile = await getHtml(router, location, sessionCookie);
     assert.match(updatedProfile, /600 Congress Avenue/);
     assert.match(updatedProfile, /<p role="status"[^>]*>Client updated<\/p>/);
   });
 
   it('stores billing details on a Business profile', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Business Billing Legal');
     let tradingName = uniqueName('Business Billing Trading');
 
@@ -236,7 +223,7 @@ describe('client billing details', () => {
     assert.equal(row.billing_country, 'AE');
     assert.equal(row.billing_currency, 'AED');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /Business client profile/);
     assert.match(profile, /Sheikh Zayed Road 1/);
     assert.match(profile, /Dubai/);
@@ -244,16 +231,17 @@ describe('client billing details', () => {
     assert.match(profile, /AED/);
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
-    assert.match(editPage, /<option[^>]*value="AE"[^>]*selected/);
-    assert.match(editPage, /<option[^>]*value="AED"[^>]*selected/);
+    assert.match(editPage, /name="billing_country"[^>]*value="United Arab Emirates"/);
+    assert.match(editPage, /name="billing_currency"[^>]*value="AED"/);
   });
 
-  it('suggests a currency from the billing country when currency is blank', async () => {
-    let sessionCookie = await loginNewUser();
-    let legalName = uniqueName('Suggested Currency');
+  it('stores a blank currency as null while keeping the address and shows the suggestion before save', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let legalName = uniqueName('Blank Currency');
 
     let created = await createClient(sessionCookie, {
       legal_name: legalName,
@@ -265,21 +253,89 @@ describe('client billing details', () => {
 
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
-    assert.equal(row.billing_currency, 'INR', 'India should suggest INR');
+    assert.equal(row.billing_line1, '14 MG Road');
+    assert.equal(row.billing_country, 'IN');
+    assert.equal(row.billing_currency, null, 'a blank currency should stay unrecorded');
 
-    let profile = await getHtml(location, sessionCookie);
-    assert.match(profile, /INR/);
-    assert.match(profile, /Indian Rupee/);
+    let profile = await getHtml(router, location, sessionCookie);
+    assert.match(profile, /Billing address/);
+    assert.match(profile, />India</);
+    assert.doesNotMatch(profile, /Default currency/);
+    assert.doesNotMatch(profile, /Indian Rupee/);
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
-    assert.match(editPage, /<option[^>]*value="INR"[^>]*selected/);
+    assert.match(editPage, /Suggested for India: INR — Indian Rupee/);
+    assert.match(editPage, /Leave blank to record no currency/);
+    assert.match(editPage, /name="billing_country"[^>]*value="India"/);
+    assert.match(editPage, /name="billing_currency"[^>]*value=""/);
+  });
+
+  it('accepts an unlisted country as entered and canonicalizes known country names', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let legalName = uniqueName('Unlisted Country');
+
+    let created = await createClient(sessionCookie, {
+      legal_name: legalName,
+      billing_line1: '1 Coast Road',
+      billing_locality: 'Willemstad',
+      billing_country: '  Curaçao  ',
+      billing_currency: '',
+    });
+    let location = locationOf(created);
+
+    let row = await db.findOne(clients, { where: { legal_name: legalName } });
+    assert.ok(row);
+    assert.equal(row.billing_country, 'Curaçao', 'an unlisted country should be kept as entered');
+    assert.equal(row.billing_currency, null);
+
+    let profile = await getHtml(router, location, sessionCookie);
+    assert.match(profile, /Curaçao/);
+    assert.doesNotMatch(profile, /Default currency/);
+
+    let editPage = await getHtml(
+      router,
+      routes.app.clients.edit.index.href({ clientId: row.id }),
+      sessionCookie,
+    );
+    assert.match(editPage, /name="billing_country"[^>]*value="Curaçao"/);
+
+    let namedCountry = uniqueName('Named Country');
+    await createClient(sessionCookie, {
+      legal_name: namedCountry,
+      billing_line1: '2 Marine Drive',
+      billing_country: ' india ',
+    });
+    let namedRow = await db.findOne(clients, { where: { legal_name: namedCountry } });
+    assert.equal(namedRow?.billing_country, 'IN', 'a known country name should canonicalize');
+  });
+
+  it('accepts an unlisted 3-letter currency code', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let legalName = uniqueName('Unlisted Currency');
+
+    let created = await createClient(sessionCookie, {
+      legal_name: legalName,
+      billing_line1: '10 Market Street',
+      billing_country: 'CM',
+      billing_currency: 'xaf',
+    });
+    let location = locationOf(created);
+
+    let row = await db.findOne(clients, { where: { legal_name: legalName } });
+    assert.ok(row);
+    assert.equal(row.billing_currency, 'XAF', 'an unlisted 3-letter code should be accepted');
+
+    let profile = await getHtml(router, location, sessionCookie);
+    assert.match(profile, /Default currency/);
+    assert.match(profile, /XAF/);
   });
 
   it('keeps an explicit currency instead of the country suggestion', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Explicit Currency');
 
     await createClient(sessionCookie, {
@@ -296,7 +352,7 @@ describe('client billing details', () => {
   });
 
   it('accepts a manual currency with no billing address', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Manual Currency');
 
     let created = await createClient(sessionCookie, {
@@ -311,7 +367,7 @@ describe('client billing details', () => {
     assert.equal(row.billing_country, null);
     assert.equal(row.billing_currency, 'EUR');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.doesNotMatch(profile, /Billing address/);
     assert.match(profile, /Default currency/);
     assert.match(profile, /EUR/);
@@ -319,7 +375,7 @@ describe('client billing details', () => {
   });
 
   it('rejects an invalid currency and preserves the submitted values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Invalid Currency');
 
     let response = await postForm(
@@ -329,7 +385,7 @@ describe('client billing details', () => {
         legal_name: legalName,
         billing_line1: '7 Church Street',
         billing_country: 'IN',
-        billing_currency: 'ZZZ',
+        billing_currency: 'EURO',
       }),
       sessionCookie,
     );
@@ -338,17 +394,17 @@ describe('client billing details', () => {
     let html = await response.text();
     assert.match(html, /<p role="alert"[^>]*>Please correct the fields below\.<\/p>/);
     assert.match(html, /3-letter currency code/i);
-    assert.match(html, /<option[^>]*value="ZZZ"[^>]*selected/);
+    assert.match(html, /name="billing_currency"[^>]*value="EURO"/);
     assert.match(html, /name="billing_currency"[^>]*aria-invalid="true"/);
     assert.match(html, /name="billing_line1"[^>]*value="7 Church Street"/);
-    assert.match(html, /<option[^>]*value="IN"[^>]*selected/);
+    assert.match(html, /name="billing_country"[^>]*value="India"/);
 
     let persisted = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.equal(persisted, null);
   });
 
   it('keeps the stored billing details when an edit fails validation', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Stable Billing');
 
     let created = await createClient(sessionCookie, {
@@ -368,7 +424,7 @@ describe('client billing details', () => {
         legal_name: legalName,
         billing_line1: '2 Invalid Street',
         billing_country: 'IN',
-        billing_currency: 'ZZZ',
+        billing_currency: 'EURO',
       }),
       sessionCookie,
     );
@@ -377,20 +433,20 @@ describe('client billing details', () => {
     let html = await response.text();
     assert.match(html, /3-letter currency code/i);
     assert.match(html, /name="billing_line1"[^>]*value="2 Invalid Street"/);
-    assert.match(html, /<option[^>]*value="ZZZ"[^>]*selected/);
+    assert.match(html, /name="billing_currency"[^>]*value="EURO"/);
 
     let stored = await db.find(clients, row.id);
     assert.equal(stored?.billing_line1, '1 Original Street');
     assert.equal(stored?.billing_currency, 'INR');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, /1 Original Street/);
     assert.doesNotMatch(profile, /2 Invalid Street/);
   });
 
   it('shares billing details with a second authenticated User', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'billing');
+    let secondCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Shared Billing');
 
     let created = await createClient(firstCookie, {
@@ -404,7 +460,7 @@ describe('client billing details', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(location, secondCookie);
+    let secondProfile = await getHtml(router, location, secondCookie);
     assert.match(secondProfile, /8 Shared Lane/);
     assert.match(secondProfile, /Pune/);
 
@@ -431,7 +487,7 @@ describe('client billing details', () => {
   });
 
   it('rejects billing mutations without a CSRF token', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('No Token Billing');
 
     let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {

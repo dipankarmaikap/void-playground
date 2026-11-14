@@ -11,7 +11,6 @@ import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { Select } from '../../../../ui/select.tsx';
 import { issueFor, readText } from '../form-values.ts';
-import type { ClientFormValues } from '../form-values.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const nameGroupStyle = css({
@@ -106,23 +105,18 @@ export const profileSection: ClientFormSection = {
   key: 'profile',
   render: (props) => <ProfileFields values={props.values} issues={props.issues} />,
   parse(formData) {
-    let values: Partial<ClientFormValues> = {
-      type: readText(formData, 'type'),
-      legal_name: readText(formData, 'legal_name'),
+    let type = readText(formData, 'type');
+    let legalName = readText(formData, 'legal_name');
+    let industry = readText(formData, 'industry');
+    let parsed = parseClientNames({
+      type,
+      legal_name: legalName,
       preferred_name: readText(formData, 'preferred_name'),
       trading_name: readText(formData, 'trading_name'),
-      industry: readText(formData, 'industry'),
-    };
-    let parsed = parseClientNames({
-      type: values.type ?? '',
-      legal_name: values.legal_name ?? '',
-      preferred_name: values.preferred_name,
-      trading_name: values.trading_name,
     });
 
     if (!parsed.ok) {
       return {
-        values,
         changes: {},
         issues: parsed.issues.map((issue) => ({
           message: issue.message,
@@ -132,8 +126,7 @@ export const profileSection: ClientFormSection = {
     }
 
     return {
-      values,
-      changes: { ...parsed.value, industry: (values.industry ?? '').trim() || null },
+      changes: { ...parsed.value, industry: industry.trim() || null },
       issues: [],
     };
   },

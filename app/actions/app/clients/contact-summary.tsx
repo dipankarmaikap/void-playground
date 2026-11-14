@@ -1,9 +1,8 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { hasClientContacts } from '../../../../data/client-contacts.ts';
-import type { Client } from '../../../../data/db.ts';
-import { colors, radius, shadow } from '../../../../ui/theme.ts';
+import type { Client } from '../../../data/db.ts';
+import { colors, radius, shadow } from '../../../ui/theme.ts';
 
 export interface ClientContactSummaryProps {
   client: Client;
@@ -46,11 +45,25 @@ const detailStyle = css({
 export function ClientContactSummary(handle: Handle<ClientContactSummaryProps>) {
   return () => {
     let { client } = handle.props;
-    if (!hasClientContacts(client)) return null;
 
-    let hasPrimaryContact = Boolean(
-      client.contact_name || client.contact_role || client.contact_email || client.contact_phone,
+    // A primary contact belongs to a Business; Individual profiles only show the shared
+    // email and phone, while preserved business-only values stay in storage.
+    let isBusiness = client.type === 'business';
+    let hasPrimaryContact =
+      isBusiness &&
+      Boolean(
+        client.contact_name ||
+          client.contact_role ||
+          client.contact_email ||
+          client.contact_phone,
+      );
+    let hasVisibleContacts = Boolean(
+      client.email ||
+        client.phone ||
+        hasPrimaryContact ||
+        (isBusiness && (client.contact_email || client.contact_phone)),
     );
+    if (!hasVisibleContacts) return null;
 
     return (
       <section aria-labelledby="client-contacts-heading" mix={cardStyle}>
@@ -79,13 +92,13 @@ export function ClientContactSummary(handle: Handle<ClientContactSummaryProps>) 
               </dd>
             </div>
           ) : null}
-          {client.contact_email ? (
+          {isBusiness && client.contact_email ? (
             <div>
               <dt mix={termStyle}>Contact email</dt>
               <dd mix={detailStyle}>{client.contact_email}</dd>
             </div>
           ) : null}
-          {client.contact_phone ? (
+          {isBusiness && client.contact_phone ? (
             <div>
               <dt mix={termStyle}>Contact phone</dt>
               <dd mix={detailStyle}>{client.contact_phone}</dd>

@@ -5,27 +5,13 @@ import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {
-  createUser,
+  createUserAndLogin,
   extractCsrf,
-  login,
+  getHtml,
   origin,
   postForm,
   submitForm,
 } from '../../../../test/http.ts';
-
-async function loginNewUser() {
-  let email = `lifecycle-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
-}
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -84,7 +70,7 @@ function restore(sessionCookie: string, clientId: string) {
 }
 
 async function csrfFrom(path: string, sessionCookie: string) {
-  let html = await getHtml(path, sessionCookie);
+  let html = await getHtml(router, path, sessionCookie);
   let token = extractCsrf(html);
   assert.ok(token, 'the page should render a CSRF token');
   return token;
@@ -92,7 +78,7 @@ async function csrfFrom(path: string, sessionCookie: string) {
 
 describe('client lifecycle', () => {
   it('starts new Clients as Active and offers an Archive control', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('Active Start');
     let preferredName = uniqueName('Actively Known');
 
@@ -106,7 +92,7 @@ describe('client lifecycle', () => {
     assert.equal(row?.status, 'active');
     assert.equal(row?.archived_at, null);
 
-    let profile = await getHtml(profilePath, sessionCookie);
+    let profile = await getHtml(router, profilePath, sessionCookie);
     assert.match(profile, /<dd[^>]*>Active<\/dd>/);
     assert.match(profile, /Archive client/);
     assert.doesNotMatch(profile, /Restore client/);
@@ -121,7 +107,7 @@ describe('client lifecycle', () => {
   });
 
   it('archives a Client without deleting its profile and confirms through status feedback', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('Archive Preserve');
     let tradingName = uniqueName('Archive Trading');
     let industry = uniqueName('Archived industry');
@@ -150,7 +136,7 @@ describe('client lifecycle', () => {
     assert.equal(after.created_at, before.created_at);
     assert.ok(after.updated_at >= before.updated_at, 'archiving should refresh updated_at');
 
-    let profile = await getHtml(profilePath, sessionCookie);
+    let profile = await getHtml(router, profilePath, sessionCookie);
     assert.match(profile, /<p role="status"[^>]*>Client archived<\/p>/);
     assert.match(profile, /<dd[^>]*>Archived<\/dd>/);
     assert.match(profile, /Restore client/);
@@ -165,7 +151,7 @@ describe('client lifecycle', () => {
   });
 
   it('hides archived Clients from the default directory and lists them in the archived view', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let keptName = uniqueName('Still Active');
     let archivedName = uniqueName('Now Archived');
 
@@ -182,7 +168,7 @@ describe('client lifecycle', () => {
       { searchParams: { status: 'archived' } },
     );
 
-    let activeDirectory = await getHtml(activeHref, sessionCookie);
+    let activeDirectory = await getHtml(router, activeHref, sessionCookie);
     assert.match(activeDirectory, new RegExp(keptName));
     assert.doesNotMatch(activeDirectory, new RegExp(archivedName));
     assert.match(
@@ -191,7 +177,7 @@ describe('client lifecycle', () => {
     );
     assert.match(statusToggle(activeDirectory), /href="[^"]*status=archived"[^>]*>Archived<\/a>/);
 
-    let archivedDirectory = await getHtml(archivedHref, sessionCookie);
+    let archivedDirectory = await getHtml(router, archivedHref, sessionCookie);
     assert.match(archivedDirectory, new RegExp(archivedName));
     assert.doesNotMatch(archivedDirectory, new RegExp(keptName));
     assert.match(
@@ -202,7 +188,7 @@ describe('client lifecycle', () => {
   });
 
   it('restores an archived Client to Active and keeps its details', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('Restore Me');
     let preferredName = uniqueName('Restored');
 
@@ -223,18 +209,18 @@ describe('client lifecycle', () => {
     assert.equal(row?.legal_name, legalName);
     assert.equal(row?.preferred_name, preferredName);
 
-    let profile = await getHtml(profilePath, sessionCookie);
+    let profile = await getHtml(router, profilePath, sessionCookie);
     assert.match(profile, /<p role="status"[^>]*>Client restored<\/p>/);
     assert.match(profile, /<dd[^>]*>Active<\/dd>/);
     assert.match(profile, /Archive client/);
 
-    let directory = await getHtml(routes.app.clients.index.href(), sessionCookie);
+    let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(directory, new RegExp(legalName));
   });
 
   it('shares archive and restore across authenticated Users', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'lifecycle');
+    let secondCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('Shared Lifecycle');
 
     let { id, profilePath } = await createClient(firstCookie, {
@@ -246,6 +232,7 @@ describe('client lifecycle', () => {
     assert.equal((await db.find(clients, id))?.status, 'archived');
 
     let archivedDirectory = await getHtml(
+      router,
       routes.app.clients.index.href({}, { searchParams: { status: 'archived' } }),
       secondCookie,
     );
@@ -254,16 +241,16 @@ describe('client lifecycle', () => {
     assert.equal((await restore(secondCookie, id)).status, 302);
     assert.equal((await db.find(clients, id))?.status, 'active');
 
-    let secondProfile = await getHtml(profilePath, secondCookie);
+    let secondProfile = await getHtml(router, profilePath, secondCookie);
     assert.match(secondProfile, /<p role="status"[^>]*>Client restored<\/p>/);
 
-    let firstProfile = await getHtml(profilePath, firstCookie);
+    let firstProfile = await getHtml(router, profilePath, firstCookie);
     assert.match(firstProfile, /<dd[^>]*>Active<\/dd>/);
     assert.match(firstProfile, /Archive client/);
   });
 
   it('rejects lifecycle mutations without a CSRF token', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('No Token Lifecycle');
     let { id } = await createClient(sessionCookie, {
       type: 'individual',
@@ -302,7 +289,7 @@ describe('client lifecycle', () => {
   });
 
   it('protects the archived directory and lifecycle pages from anonymous visitors', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let { id, profilePath } = await createClient(sessionCookie, {
       type: 'individual',
       legal_name: uniqueName('Private Lifecycle'),
@@ -320,7 +307,7 @@ describe('client lifecycle', () => {
   });
 
   it('returns 404 for lifecycle actions on unknown Clients', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     let clientId = crypto.randomUUID();
     let csrf = await csrfFrom(routes.app.clients.index.href(), sessionCookie);
 
@@ -341,16 +328,17 @@ describe('client lifecycle', () => {
   });
 
   it('shows a useful empty state in both directory views', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
     await db.exec('DELETE FROM clients');
 
     let archivedDirectory = await getHtml(
+      router,
       routes.app.clients.index.href({}, { searchParams: { status: 'archived' } }),
       sessionCookie,
     );
     assert.match(archivedDirectory, /No archived clients\./);
 
-    let activeDirectory = await getHtml(routes.app.clients.index.href(), sessionCookie);
+    let activeDirectory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(activeDirectory, /No active clients yet\./);
   });
 });

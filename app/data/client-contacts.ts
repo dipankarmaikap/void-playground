@@ -97,11 +97,6 @@ export function parseClientContacts(input: ClientContactInput): ClientContactRes
   };
 }
 
-/** True when the Client has at least one recorded contact detail. */
-export function hasClientContacts(client: ClientContactFields): boolean {
-  return CLIENT_CONTACT_FIELDS.some((field) => Boolean(client[field]));
-}
-
 function clean(value: string | undefined): string {
   return value?.trim() ?? '';
 }

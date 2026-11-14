@@ -14,7 +14,6 @@ export interface ClientFormSectionProps {
 }
 
 export interface ClientFormSectionResult {
-  values: Partial<ClientFormValues>;
   changes: Partial<Client>;
   issues: Issue[];
   /** Non-blocking notice to flash after a successful save (for example a duplicate warning). */

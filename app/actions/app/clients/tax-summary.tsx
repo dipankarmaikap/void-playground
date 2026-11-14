@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
+import { INDIA_COUNTRY_CODE, clientTaxTypeLabel } from '../../../data/client-tax.ts';
 import type { Client } from '../../../data/db.ts';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
 
@@ -47,7 +47,8 @@ const detailStyle = css({
 export function ClientTaxSummary(handle: Handle<ClientTaxSummaryProps>) {
   return () => {
     let { client } = handle.props;
-    let country = client.tax_country === 'IN' ? 'India' : client.tax_country;
+    let country =
+      client.tax_country === INDIA_COUNTRY_CODE ? 'India' : client.tax_country;
 
     return (
       <section aria-labelledby="client-tax-heading" mix={cardStyle}>

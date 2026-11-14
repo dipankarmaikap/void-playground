@@ -2,8 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { APP_NAME } from '../../../config.ts';
-import { clientTypeLabel } from '../../../data/client-names.ts';
-import { clientDisplayName } from '../../../data/clients.ts';
+import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { Client } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -19,7 +18,7 @@ import {
 } from '../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
-import { ClientContactSummary } from './sections/contact-summary.tsx';
+import { ClientContactSummary } from './contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
 import { ClientTaxSummary } from './tax-summary.tsx';
 
@@ -85,7 +84,8 @@ const backLinkStyle = css({
 export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
   return () => {
     let { csrfToken, identity, client, error, message } = handle.props;
-    let label = clientDisplayName(client);
+    let label = clientDisplayLabel(client);
+    let isBusiness = client.type === 'business';
 
     return (
       <AppShell
@@ -122,19 +122,19 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
               <dt mix={termStyle}>Legal name</dt>
               <dd mix={detailStyle}>{client.legal_name}</dd>
             </div>
-            {client.preferred_name ? (
+            {!isBusiness && client.preferred_name ? (
               <div>
                 <dt mix={termStyle}>Preferred name</dt>
                 <dd mix={detailStyle}>{client.preferred_name}</dd>
               </div>
             ) : null}
-            {client.trading_name ? (
+            {isBusiness && client.trading_name ? (
               <div>
                 <dt mix={termStyle}>Trading name</dt>
                 <dd mix={detailStyle}>{client.trading_name}</dd>
               </div>
             ) : null}
-            {client.industry ? (
+            {isBusiness && client.industry ? (
               <div>
                 <dt mix={termStyle}>Industry</dt>
                 <dd mix={detailStyle}>{client.industry}</dd>

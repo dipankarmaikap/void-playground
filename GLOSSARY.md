@@ -1,6 +1,6 @@
-# Auth & Sessions
+# App Domain
 
-The domain language for this app's identity and sign-in features. Single context: the whole repo.
+The domain language for this app's identity, sign-in, and client-management features. Single context: the whole repo.
 
 ## Language
 
@@ -37,3 +37,29 @@ _Avoid_: sign out, terminate, kill
 **Revoke**:
 Ending another Session of the same User, from the current one.
 _Avoid_: delete, kill, terminate
+
+### Clients
+
+**Client**:
+A person or business managed in the shared client book, with an Individual or Business profile. A Client is not a User and cannot sign in.
+_Avoid_: customer, account, contact, lead
+
+**Individual**:
+A Client that is a person, identified by a legal name and optionally a preferred name.
+_Avoid_: person record, customer, sole trader
+
+**Business**:
+A Client that is an organization, identified by a legal name and optionally a trading name, industry, and one primary contact.
+_Avoid_: company, organization, vendor
+
+**Active**:
+A Client listed in the default directory and available for current work.
+_Avoid_: current, live, open
+
+**Archived**:
+A Client hidden from the default directory but preserved in full and restorable. Archiving never deletes.
+_Avoid_: deleted, inactive, disabled, removed
+
+**Tax identifier**:
+The single optional country-specific tax number recorded on a Client, such as an India GSTIN or UIN. Missing means not recorded, not unregistered.
+_Avoid_: tax ID, VAT number, GST number, tax registration

@@ -2,9 +2,8 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { APP_NAME } from '../../../config.ts';
-import { clientTypeLabel } from '../../../data/client-names.ts';
+import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { ClientStatus } from '../../../data/client-status.ts';
-import { clientDisplayName } from '../../../data/clients.ts';
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import type { Client } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
@@ -294,7 +293,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
         ) : (
           <ul mix={listStyle}>
             {clients.map((client) => {
-              let label = clientDisplayName(client);
+              let label = clientDisplayLabel(client);
               return (
                 <li key={client.id} mix={itemStyle}>
                   <a
@@ -306,7 +305,11 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                     {label === client.legal_name ? null : (
                       <span mix={metaStyle}>{client.legal_name}</span>
                     )}
-                    {client.industry ? <span mix={metaStyle}>{client.industry}</span> : null}
+                    {client.email ? <span mix={metaStyle}>{client.email}</span> : null}
+                    {client.phone ? <span mix={metaStyle}>{client.phone}</span> : null}
+                    {client.type === 'business' && client.industry ? (
+                      <span mix={metaStyle}>{client.industry}</span>
+                    ) : null}
                   </a>
                 </li>
               );

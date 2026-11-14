@@ -4,21 +4,7 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUser, login, origin, postForm } from '../../../../test/http.ts';
-
-async function loginNewUser() {
-  let email = `business-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
-}
+import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -47,7 +33,7 @@ async function createBusiness(sessionCookie: string, fields: Record<string, stri
 
 describe('business clients', () => {
   it('creates, views, and edits a Business profile with a trading name and industry', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Northwind Trading Private Limited');
     let tradingName = uniqueName('Northwind');
     let industry = uniqueName('Freight and logistics');
@@ -68,7 +54,7 @@ describe('business clients', () => {
     assert.equal(row.industry, industry);
     assert.equal(row.status, 'active');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
     assert.match(profile, new RegExp(`<p role="status"[^>]*>Client created<\\/p>`));
     assert.match(profile, /Business client profile/);
@@ -78,13 +64,13 @@ describe('business clients', () => {
     assert.match(profile, new RegExp(`>${industry}<`));
     assert.match(profile, /<meta name="robots" content="noindex"/);
 
-    let directory = await getHtml(routes.app.clients.index.href(), sessionCookie);
+    let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(directory, new RegExp(tradingName));
     assert.match(directory, new RegExp(legalName));
     assert.match(directory, new RegExp(industry));
 
     let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
-    let editPage = await getHtml(editPath, sessionCookie);
+    let editPage = await getHtml(router, editPath, sessionCookie);
     assert.match(editPage, new RegExp(`<title>Edit ${tradingName} \\| My Remix App<\\/title>`));
     assert.match(editPage, new RegExp(`name="legal_name"[^>]*value="${legalName}"`));
     assert.match(editPage, new RegExp(`name="trading_name"[^>]*value="${tradingName}"`));
@@ -111,14 +97,14 @@ describe('business clients', () => {
     assert.equal(stored?.trading_name, tradingName);
     assert.equal(stored?.industry, updatedIndustry);
 
-    let updatedProfile = await getHtml(location, sessionCookie);
+    let updatedProfile = await getHtml(router, location, sessionCookie);
     assert.match(updatedProfile, new RegExp(`<p role="status"[^>]*>Client updated<\\/p>`));
     assert.match(updatedProfile, new RegExp(updatedIndustry));
     assert.match(updatedProfile, new RegExp(updatedLegalName));
   });
 
   it('requires a Business legal name and preserves submitted business values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let tradingName = uniqueName('Nameless Trading');
     let industry = uniqueName('Hospitality');
 
@@ -147,7 +133,7 @@ describe('business clients', () => {
   });
 
   it('accepts a Business with only a legal name and falls back to it as the display label', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Sole Trader Proprietorship');
 
     let created = await createBusiness(sessionCookie, { legal_name: legalName });
@@ -159,14 +145,15 @@ describe('business clients', () => {
     assert.equal(row.trading_name, null);
     assert.equal(row.industry, null);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, new RegExp(`<title>${legalName} \\| My Remix App<\\/title>`));
     assert.doesNotMatch(profile, /<dt[^>]*>Industry<\/dt>/);
 
-    let directory = await getHtml(routes.app.clients.index.href(), sessionCookie);
+    let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(directory, new RegExp(legalName));
 
     let editPage = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -175,7 +162,7 @@ describe('business clients', () => {
   });
 
   it('uses the trading name as the display label when one is set', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Acme Manufacturing Limited');
     let tradingName = uniqueName('Acme Works');
 
@@ -186,17 +173,61 @@ describe('business clients', () => {
     let location = created.headers.get('Location');
     assert.ok(location);
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
     assert.match(profile, new RegExp(`<h1[^>]*>${tradingName}<\\/h1>`));
 
-    let directory = await getHtml(routes.app.clients.index.href(), sessionCookie);
+    let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(directory, new RegExp(tradingName));
     assert.match(directory, new RegExp(legalName));
   });
 
+  it('shows shared email and phone in the directory and industry only for Businesses', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'business');
+    let businessName = uniqueName('Directory Contact Business');
+    let businessEmail = `directory-${crypto.randomUUID()}@example.com`;
+    let businessPhone = '+44 20 7946 0958';
+    let industry = uniqueName('Logistics');
+
+    await createBusiness(sessionCookie, {
+      legal_name: businessName,
+      email: businessEmail,
+      phone: businessPhone,
+      industry,
+    });
+
+    let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
+    assert.ok(directory.includes(businessEmail));
+    assert.ok(directory.includes(businessPhone));
+    assert.match(directory, new RegExp(industry));
+
+    let individualName = uniqueName('Directory Contact Individual');
+    let individualEmail = `directory-${crypto.randomUUID()}@example.com`;
+    let individualPhone = '+61 2 9374 4000';
+    let created = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      {
+        type: 'individual',
+        legal_name: individualName,
+        email: individualEmail,
+        phone: individualPhone,
+      },
+      sessionCookie,
+    );
+    assert.equal(created.status, 302);
+
+    let updatedDirectory = await getHtml(
+      router,
+      routes.app.clients.index.href(),
+      sessionCookie,
+    );
+    assert.ok(updatedDirectory.includes(individualEmail));
+    assert.ok(updatedDirectory.includes(individualPhone));
+  });
+
   it('changes type in both directions and keeps hidden type-specific values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Ada Lovelace');
     let preferredName = uniqueName('Ada');
     let tradingName = uniqueName('Analytical Engines');
@@ -241,12 +272,18 @@ describe('business clients', () => {
     assert.equal(businessRow?.trading_name, tradingName);
     assert.equal(businessRow?.industry, industry);
 
-    let businessProfile = await getHtml(location, sessionCookie);
+    let businessProfile = await getHtml(router, location, sessionCookie);
     assert.match(businessProfile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
     assert.match(businessProfile, new RegExp(industry));
+    assert.match(businessProfile, /<dt[^>]*>Trading name<\/dt>/);
+    assert.doesNotMatch(businessProfile, /<dt[^>]*>Preferred name<\/dt>/);
+
+    let businessDirectory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
+    assert.match(businessDirectory, new RegExp(industry));
 
     // The hidden Individual group stays in the Business edit form, so its value survives.
     let businessEdit = await getHtml(
+      router,
       routes.app.clients.edit.index.href({ clientId: row.id }),
       sessionCookie,
     );
@@ -273,13 +310,24 @@ describe('business clients', () => {
     assert.equal(individualRow?.trading_name, tradingName, 'the hidden trading name should persist');
     assert.equal(individualRow?.industry, industry, 'the hidden industry should persist');
 
-    let individualProfile = await getHtml(location, sessionCookie);
+    let individualProfile = await getHtml(router, location, sessionCookie);
     assert.match(individualProfile, new RegExp(`<title>${preferredName} \\| My Remix App<\\/title>`));
-    assert.match(individualProfile, new RegExp(industry));
+    assert.match(individualProfile, /<dt[^>]*>Preferred name<\/dt>/);
+    assert.doesNotMatch(individualProfile, new RegExp(industry));
+    assert.doesNotMatch(individualProfile, new RegExp(tradingName));
+    assert.doesNotMatch(individualProfile, /<dt[^>]*>Industry<\/dt>/);
+    assert.doesNotMatch(individualProfile, /<dt[^>]*>Trading name<\/dt>/);
+
+    let individualDirectory = await getHtml(
+      router,
+      routes.app.clients.index.href(),
+      sessionCookie,
+    );
+    assert.doesNotMatch(individualDirectory, new RegExp(industry));
 
     // Switching back to Business restores the preserved values without re-entering them.
     let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
-    let individualEdit = await getHtml(editPath, sessionCookie);
+    let individualEdit = await getHtml(router, editPath, sessionCookie);
     assert.match(individualEdit, new RegExp(`name="trading_name"[^>]*value="${tradingName}"`));
     assert.match(individualEdit, new RegExp(`name="industry"[^>]*value="${industry}"`));
 
@@ -301,14 +349,14 @@ describe('business clients', () => {
     assert.equal(restored?.trading_name, tradingName);
     assert.equal(restored?.industry, industry);
 
-    let restoredProfile = await getHtml(location, sessionCookie);
+    let restoredProfile = await getHtml(router, location, sessionCookie);
     assert.match(restoredProfile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
     assert.match(restoredProfile, new RegExp(industry));
   });
 
   it('shares Business profiles with a second authenticated User', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'business');
+    let secondCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Shared Business Legal');
     let tradingName = uniqueName('Shared Business Trading');
     let industry = uniqueName('Consulting');
@@ -323,7 +371,7 @@ describe('business clients', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(location, secondCookie);
+    let secondProfile = await getHtml(router, location, secondCookie);
     assert.match(secondProfile, new RegExp(tradingName));
 
     let updatedIndustry = uniqueName('Management consulting');
@@ -348,7 +396,7 @@ describe('business clients', () => {
   });
 
   it('rejects Business mutations without a CSRF token', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('No Token Business');
 
     let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {
@@ -368,7 +416,7 @@ describe('business clients', () => {
   });
 
   it('trims Industry and stores a blank Industry as not recorded', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Trimmed Industry Limited');
 
     let created = await createBusiness(sessionCookie, {
@@ -393,7 +441,7 @@ describe('business clients', () => {
   });
 
   it('keeps the stored Business profile when an edit fails validation', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Stable Business');
     let tradingName = uniqueName('Stable Trading');
 
@@ -430,7 +478,7 @@ describe('business clients', () => {
     assert.equal(stored?.trading_name, tradingName);
     assert.equal(stored?.industry, 'Retail');
 
-    let profile = await getHtml(location, sessionCookie);
+    let profile = await getHtml(router, location, sessionCookie);
     assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
   });
 });

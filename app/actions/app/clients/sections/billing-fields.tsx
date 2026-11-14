@@ -4,13 +4,15 @@ import { css } from 'remix/component';
 import {
   COUNTRIES,
   CURRENCIES,
+  countryName,
+  currencyName,
+  findCountry,
   parseClientBilling,
+  suggestCurrencyForCountry,
 } from '../../../../data/client-billing.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
-import { Select } from '../../../../ui/select.tsx';
 import { issueFor, readText } from '../form-values.ts';
-import type { ClientFormValues } from '../form-values.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const addressGroupStyle = css({
@@ -28,10 +30,14 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
     let postalCodeIssue = issueFor(issues, 'billing_postal_code');
     let countryIssue = issueFor(issues, 'billing_country');
     let currencyIssue = issueFor(issues, 'billing_currency');
-    let countryValue = values.billing_country.trim().toUpperCase();
-    let currencyValue = values.billing_currency.trim().toUpperCase();
-    let hasKnownCountry = COUNTRIES.some((country) => country.code === countryValue);
-    let hasKnownCurrency = CURRENCIES.some((currency) => currency.code === currencyValue);
+    let country = findCountry(values.billing_country);
+    let suggestedCurrency = suggestCurrencyForCountry(values.billing_country);
+    let suggestedCurrencyName = suggestedCurrency ? currencyName(suggestedCurrency) : null;
+    let currencyHint =
+      'Optional. Enter a 3-letter code such as INR or USD, or pick a suggestion. No conversion is applied.';
+    if (suggestedCurrency) {
+      currencyHint += ` Suggested for ${country?.name ?? countryName(values.billing_country)}: ${suggestedCurrency}${suggestedCurrencyName ? ` — ${suggestedCurrencyName}` : ''}. Leave blank to record no currency.`;
+    }
 
     return (
       <>
@@ -86,59 +92,43 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           </Field>
           <Field
             label="Billing country"
-            hint="Required when you enter a billing address."
+            hint="Required when you enter a billing address. Type any country; known names and codes are suggestions."
             error={countryIssue?.message}
           >
-            <Select
+            <Input
               name="billing_country"
-              autoComplete="country"
+              list="billing-countries"
+              autoComplete="country-name"
+              defaultValue={countryName(values.billing_country)}
               aria-invalid={countryIssue ? true : undefined}
               variant={countryIssue ? 'error' : 'default'}
-            >
-              <option value="">Not set</option>
-              {countryValue && !hasKnownCountry ? (
-                <option value={countryValue} selected>
-                  {countryValue} — not recognized
-                </option>
-              ) : null}
-              {COUNTRIES.map((country) => (
-                <option
-                  key={country.code}
-                  value={country.code}
-                  selected={countryValue === country.code}
-                >
-                  {country.name}
-                </option>
+            />
+            <datalist id="billing-countries">
+              {COUNTRIES.map((option) => (
+                <option key={option.code} value={option.name} />
               ))}
-            </Select>
+            </datalist>
           </Field>
         </div>
         <Field
           label="Default billing currency"
-          hint="Optional. Leave blank to use the suggested currency for the billing country. You can also pick a currency without an address; no conversion is applied."
+          hint={currencyHint}
           error={currencyIssue?.message}
         >
-          <Select
+          <Input
             name="billing_currency"
+            list="billing-currencies"
+            defaultValue={values.billing_currency.trim().toUpperCase()}
             aria-invalid={currencyIssue ? true : undefined}
             variant={currencyIssue ? 'error' : 'default'}
-          >
-            <option value="">Suggested from country</option>
-            {currencyValue && !hasKnownCurrency ? (
-              <option value={currencyValue} selected>
-                {currencyValue} — not recognized
-              </option>
-            ) : null}
+          />
+          <datalist id="billing-currencies">
             {CURRENCIES.map((currency) => (
-              <option
-                key={currency.code}
-                value={currency.code}
-                selected={currencyValue === currency.code}
-              >
-                {currency.code} — {currency.name}
+              <option key={currency.code} value={currency.code}>
+                {currency.name}
               </option>
             ))}
-          </Select>
+          </datalist>
         </Field>
       </>
     );
@@ -150,19 +140,17 @@ export const billingSection: ClientFormSection = {
   render: (props) => <BillingFields values={props.values} issues={props.issues} />,
   parse(formData) {
     // Only the billing fields this section owns; other sections fill in the rest.
-    let values: Partial<ClientFormValues> = {
+    let parsed = parseClientBilling({
       billing_line1: readText(formData, 'billing_line1'),
       billing_locality: readText(formData, 'billing_locality'),
       billing_region: readText(formData, 'billing_region'),
       billing_postal_code: readText(formData, 'billing_postal_code'),
       billing_country: readText(formData, 'billing_country'),
       billing_currency: readText(formData, 'billing_currency'),
-    };
-    let parsed = parseClientBilling(values);
+    });
 
     if (!parsed.ok) {
       return {
-        values,
         changes: {},
         issues: parsed.issues.map((issue) => ({
           message: issue.message,
@@ -171,6 +159,6 @@ export const billingSection: ClientFormSection = {
       };
     }
 
-    return { values, changes: parsed.value, issues: [] };
+    return { changes: parsed.value, issues: [] };
   },
 };

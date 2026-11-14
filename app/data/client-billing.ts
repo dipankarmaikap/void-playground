@@ -160,7 +160,13 @@ export const CURRENCIES: readonly Currency[] = [
 ];
 
 const countriesByCode = new Map(COUNTRIES.map((country) => [country.code, country]));
+const countriesByName = new Map(
+  COUNTRIES.map((country) => [country.name.toLowerCase(), country]),
+);
 const currenciesByCode = new Map(CURRENCIES.map((currency) => [currency.code, currency]));
+
+/** Basic ISO 4217 shape. Unlisted codes are accepted because the picker is only a suggestion. */
+const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
 
 export type ClientBillingField =
   | 'billing_line1'
@@ -210,16 +216,32 @@ export type ClientBillingView = Pick<
 
 export function findCountry(code: string | null | undefined): Country | null {
   if (!code) return null;
-  return countriesByCode.get(code.trim().toUpperCase()) ?? null;
+  let value = code.trim();
+  return (
+    countriesByCode.get(value.toUpperCase()) ??
+    countriesByName.get(value.toLowerCase()) ??
+    null
+  );
 }
 
+/** The display name for a known country; unknown values render as they were entered. */
 export function countryName(code: string | null | undefined): string {
-  return findCountry(code)?.name ?? (code?.trim().toUpperCase() ?? '');
+  if (!code) return '';
+  return findCountry(code)?.name ?? code.trim();
 }
 
 export function currencyName(code: string | null | undefined): string | null {
   if (!code) return null;
   return currenciesByCode.get(code.trim().toUpperCase())?.name ?? null;
+}
+
+/**
+ * Canonicalizes a country to its ISO code when it matches a curated name or code.
+ * Any other non-blank text is kept as entered, so unlisted countries are still recordable.
+ */
+export function canonicalCountry(value: string): string {
+  let trimmed = value.trim();
+  return findCountry(trimmed)?.code ?? trimmed;
 }
 
 /**
@@ -235,14 +257,16 @@ export function suggestCurrencyForCountry(code: string | null | undefined): stri
  *
  * The address exists only when at least one of its fields is non-blank; a present address
  * requires line 1 and country, while locality, region, and postal code stay optional.
- * A blank currency adopts the country suggestion. An explicit currency always wins.
+ * Known countries canonicalize to their ISO code, but any other non-blank country text is
+ * accepted as entered. The currency is independently optional: a blank submission stores no
+ * currency, while any basic 3-letter code is accepted. Suggestions never fill it in for you.
  */
 export function parseClientBilling(input: ClientBillingInput): ClientBillingResult {
   let line1 = clean(input.billing_line1);
   let locality = clean(input.billing_locality);
   let region = clean(input.billing_region);
   let postalCode = clean(input.billing_postal_code);
-  let countryInput = clean(input.billing_country).toUpperCase();
+  let countryInput = clean(input.billing_country);
   let currencyInput = clean(input.billing_currency).toUpperCase();
 
   let issues: ClientBillingIssue[] = [];
@@ -250,11 +274,7 @@ export function parseClientBilling(input: ClientBillingInput): ClientBillingResu
 
   let country: string | null = null;
   if (countryInput) {
-    if (countriesByCode.has(countryInput)) {
-      country = countryInput;
-    } else {
-      issues.push({ field: 'billing_country', message: 'Choose a billing country.' });
-    }
+    country = canonicalCountry(countryInput);
   }
 
   if (hasAddress) {
@@ -262,13 +282,13 @@ export function parseClientBilling(input: ClientBillingInput): ClientBillingResu
       issues.push({ field: 'billing_line1', message: 'Enter billing address line 1.' });
     }
     if (!countryInput) {
-      issues.push({ field: 'billing_country', message: 'Choose a billing country.' });
+      issues.push({ field: 'billing_country', message: 'Enter a billing country.' });
     }
   }
 
   let currency: string | null = null;
   if (currencyInput) {
-    if (currenciesByCode.has(currencyInput)) {
+    if (CURRENCY_CODE_PATTERN.test(currencyInput)) {
       currency = currencyInput;
     } else {
       issues.push({
@@ -276,8 +296,6 @@ export function parseClientBilling(input: ClientBillingInput): ClientBillingResu
         message: 'Enter a 3-letter currency code, such as INR or USD.',
       });
     }
-  } else if (country) {
-    currency = suggestCurrencyForCountry(country);
   }
 
   if (issues.length > 0) return { ok: false, issues };

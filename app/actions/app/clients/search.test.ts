@@ -5,28 +5,14 @@ import { clients, db } from '../../../data/db.ts';
 import type { Client } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUser, login, origin, postForm } from '../../../../test/http.ts';
+import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
 
 type ClientFixture = Partial<Client> & Pick<Client, 'type' | 'legal_name'>;
-
-async function loginNewUser() {
-  let email = `search-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123');
-  return login(router, email, 'password123');
-}
 
 function indexHref(params: Record<string, string> = {}) {
   return Object.keys(params).length === 0
     ? routes.app.clients.index.href()
     : routes.app.clients.index.href({}, { searchParams: params });
-}
-
-async function getHtml(path: string, sessionCookie: string) {
-  let response = await router.fetch(new URL(path, origin), {
-    headers: { Cookie: sessionCookie },
-  });
-  assert.equal(response.status, 200, `${path} should render`);
-  return response.text();
 }
 
 async function createClient(fixture: ClientFixture): Promise<Client> {
@@ -59,7 +45,7 @@ beforeEach(async () => {
 
 describe('client directory search and filters', () => {
   it('searches individual legal and preferred names and business legal and trading names', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let legalToken = crypto.randomUUID();
     let preferredToken = crypto.randomUUID();
     let tradingToken = crypto.randomUUID();
@@ -76,7 +62,7 @@ describe('client directory search and filters', () => {
     });
 
     for (let token of [legalToken, preferredToken]) {
-      let html = await getHtml(indexHref({ q: token }), sessionCookie);
+      let html = await getHtml(router, indexHref({ q: token }), sessionCookie);
       includes(html, individual.legal_name);
       assert.ok(
         !html.includes(business.legal_name),
@@ -84,7 +70,7 @@ describe('client directory search and filters', () => {
       );
     }
 
-    let tradingHtml = await getHtml(indexHref({ q: tradingToken }), sessionCookie);
+    let tradingHtml = await getHtml(router, indexHref({ q: tradingToken }), sessionCookie);
     includes(tradingHtml, business.legal_name);
     assert.ok(
       !tradingHtml.includes(individual.legal_name),
@@ -93,7 +79,7 @@ describe('client directory search and filters', () => {
   });
 
   it('searches Client email and phone plus primary-contact email and phone', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let email = `client-${crypto.randomUUID()}@example.com`;
     let phone = `+1 555 ${Math.floor(1_000_000 + Math.random() * 8_999_999)}`;
     let contactEmail = `contact-${crypto.randomUUID()}@example.com`;
@@ -119,26 +105,26 @@ describe('client directory search and filters', () => {
       [contactEmail, business, individual],
       [contactPhone, business, individual],
     ] as const) {
-      let html = await getHtml(indexHref({ q: term }), sessionCookie);
+      let html = await getHtml(router, indexHref({ q: term }), sessionCookie);
       includes(html, expected.legal_name);
       assert.ok(!html.includes(unexpected.legal_name), `${term} should only match its Client`);
     }
   });
 
   it('matches search terms case-insensitively', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let token = `CaseMixed${crypto.randomUUID().replaceAll('-', '')}`;
     let client = await createClient({
       type: 'individual',
       legal_name: `Mixed ${token}`,
     });
 
-    let html = await getHtml(indexHref({ q: token.toUpperCase() }), sessionCookie);
+    let html = await getHtml(router, indexHref({ q: token.toUpperCase() }), sessionCookie);
     includes(html, client.legal_name);
   });
 
   it('filters by Individual and Business type', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let token = crypto.randomUUID();
     let individual = await createClient({
       type: 'individual',
@@ -149,21 +135,21 @@ describe('client directory search and filters', () => {
       legal_name: `Type Business ${token}`,
     });
 
-    let individuals = await getHtml(indexHref({ type: 'individual' }), sessionCookie);
+    let individuals = await getHtml(router, indexHref({ type: 'individual' }), sessionCookie);
     includes(individuals, individual.legal_name);
     assert.ok(!individuals.includes(business.legal_name));
 
-    let businesses = await getHtml(indexHref({ type: 'business' }), sessionCookie);
+    let businesses = await getHtml(router, indexHref({ type: 'business' }), sessionCookie);
     includes(businesses, business.legal_name);
     assert.ok(!businesses.includes(individual.legal_name));
 
-    let all = await getHtml(indexHref({ type: 'all' }), sessionCookie);
+    let all = await getHtml(router, indexHref({ type: 'all' }), sessionCookie);
     includes(all, individual.legal_name);
     includes(all, business.legal_name);
   });
 
   it('filters by Active and Archived status and keeps archived results searchable', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let token = crypto.randomUUID();
     let active = await createClient({
       type: 'individual',
@@ -176,19 +162,20 @@ describe('client directory search and filters', () => {
       archived_at: Date.now(),
     });
 
-    let activeView = await getHtml(indexHref(), sessionCookie);
+    let activeView = await getHtml(router, indexHref(), sessionCookie);
     includes(activeView, active.legal_name);
     assert.ok(!activeView.includes(archived.legal_name));
 
-    let archivedView = await getHtml(indexHref({ status: 'archived' }), sessionCookie);
+    let archivedView = await getHtml(router, indexHref({ status: 'archived' }), sessionCookie);
     includes(archivedView, archived.legal_name);
     assert.ok(!archivedView.includes(active.legal_name));
 
-    let explicitActive = await getHtml(indexHref({ status: 'active' }), sessionCookie);
+    let explicitActive = await getHtml(router, indexHref({ status: 'active' }), sessionCookie);
     includes(explicitActive, active.legal_name);
     assert.ok(!explicitActive.includes(archived.legal_name));
 
     let archivedSearch = await getHtml(
+      router,
       indexHref({ q: token, status: 'archived' }),
       sessionCookie,
     );
@@ -197,7 +184,7 @@ describe('client directory search and filters', () => {
   });
 
   it('combines search, type, and status filters', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let token = crypto.randomUUID();
     let fixtures = [
       await createClient({ type: 'individual', legal_name: `Combo Individual Active ${token}` }),
@@ -217,6 +204,7 @@ describe('client directory search and filters', () => {
     ];
 
     let html = await getHtml(
+      router,
       indexHref({ q: token, type: 'business', status: 'archived' }),
       sessionCookie,
     );
@@ -226,6 +214,7 @@ describe('client directory search and filters', () => {
     }
 
     let activeBusiness = await getHtml(
+      router,
       indexHref({ q: token, type: 'business', status: 'active' }),
       sessionCookie,
     );
@@ -234,7 +223,7 @@ describe('client directory search and filters', () => {
   });
 
   it('never searches tax identifiers, industry, or billing details', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let taxToken = `TAXVALUE${crypto.randomUUID().replaceAll('-', '')}`;
     let stateCodeToken = `STATECODE${crypto.randomUUID().replaceAll('-', '')}`;
     let industryToken = `Industry${crypto.randomUUID().replaceAll('-', '')}`;
@@ -256,15 +245,15 @@ describe('client directory search and filters', () => {
     });
 
     for (let term of [taxToken, stateCodeToken, industryToken, addressToken, postalToken]) {
-      let html = await getHtml(indexHref({ q: term }), sessionCookie);
+      let html = await getHtml(router, indexHref({ q: term }), sessionCookie);
       assert.match(html, /No clients match your search and filters\./);
       assert.ok(!html.includes(client.legal_name), `${term} should not match a Client`);
     }
   });
 
   it('searches the shared book for a second authenticated User', async () => {
-    let firstCookie = await loginNewUser();
-    let secondCookie = await loginNewUser();
+    let firstCookie = await createUserAndLogin(router, 'search');
+    let secondCookie = await createUserAndLogin(router, 'search');
     let legalName = unique('Shared Searchable');
 
     let created = await postForm(
@@ -275,34 +264,35 @@ describe('client directory search and filters', () => {
     );
     assert.equal(created.status, 302);
 
-    let html = await getHtml(indexHref({ q: legalName }), secondCookie);
+    let html = await getHtml(router, indexHref({ q: legalName }), secondCookie);
     includes(html, legalName);
   });
 
   it('distinguishes an empty Client book from an empty search result', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
 
-    let activeDirectory = await getHtml(indexHref(), sessionCookie);
+    let activeDirectory = await getHtml(router, indexHref(), sessionCookie);
     assert.match(activeDirectory, /No active clients yet\./);
 
-    let archivedDirectory = await getHtml(indexHref({ status: 'archived' }), sessionCookie);
+    let archivedDirectory = await getHtml(router, indexHref({ status: 'archived' }), sessionCookie);
     assert.match(archivedDirectory, /No archived clients\./);
 
     await createClient({ type: 'individual', legal_name: unique('Present Client') });
 
     let missingToken = `missing-${crypto.randomUUID()}`;
-    let noResults = await getHtml(indexHref({ q: missingToken }), sessionCookie);
+    let noResults = await getHtml(router, indexHref({ q: missingToken }), sessionCookie);
     assert.match(noResults, /No clients match your search and filters\./);
     assert.doesNotMatch(noResults, /No active clients yet\./);
 
-    let typeFiltered = await getHtml(indexHref({ type: 'business' }), sessionCookie);
+    let typeFiltered = await getHtml(router, indexHref({ type: 'business' }), sessionCookie);
     assert.match(typeFiltered, /No clients match your search and filters\./);
   });
 
   it('renders an accessible GET search/filter form and preserves submitted values', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
 
     let html = await getHtml(
+      router,
       indexHref({ q: 'Needle', type: 'business', status: 'archived' }),
       sessionCookie,
     );
@@ -321,20 +311,20 @@ describe('client directory search and filters', () => {
   });
 
   it('keeps the searchable directory authenticated and noindex', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let path = indexHref({ q: 'private' });
 
     let anonymous = await router.fetch(new URL(path, origin));
     assert.equal(anonymous.status, 302);
     assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
 
-    let html = await getHtml(path, sessionCookie);
+    let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<title>Clients \| My Remix App<\/title>/);
   });
 
   it('treats percent and underscore as literal search characters', async () => {
-    let sessionCookie = await loginNewUser();
+    let sessionCookie = await createUserAndLogin(router, 'search');
     let percentMatch = await createClient({
       type: 'business',
       legal_name: `${unique('Percent')} 100% Cotton`,
@@ -352,11 +342,11 @@ describe('client directory search and filters', () => {
       legal_name: `${unique('Underscore')} UnderXscore`,
     });
 
-    let percentHtml = await getHtml(indexHref({ q: '100%' }), sessionCookie);
+    let percentHtml = await getHtml(router, indexHref({ q: '100%' }), sessionCookie);
     includes(percentHtml, percentMatch.legal_name);
     assert.ok(!percentHtml.includes(percentOther.legal_name), '% should be literal');
 
-    let underscoreHtml = await getHtml(indexHref({ q: 'Under_score' }), sessionCookie);
+    let underscoreHtml = await getHtml(router, indexHref({ q: 'Under_score' }), sessionCookie);
     includes(underscoreHtml, underscoreMatch.legal_name);
     assert.ok(!underscoreHtml.includes(underscoreOther.legal_name), '_ should be literal');
   });

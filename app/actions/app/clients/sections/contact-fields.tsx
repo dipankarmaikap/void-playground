@@ -5,7 +5,6 @@ import { parseClientContacts } from '../../../../data/client-contacts.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { issueFor, readText } from '../form-values.ts';
-import type { ClientFormValues } from '../form-values.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const contactGroupStyle = css({
@@ -117,19 +116,17 @@ export const contactSection: ClientFormSection = {
   key: 'contacts',
   render: (props) => <ContactFields values={props.values} issues={props.issues} />,
   parse(formData) {
-    let values: Partial<ClientFormValues> = {
+    let parsed = parseClientContacts({
       email: readText(formData, 'email'),
       phone: readText(formData, 'phone'),
       contact_name: readText(formData, 'contact_name'),
       contact_role: readText(formData, 'contact_role'),
       contact_email: readText(formData, 'contact_email'),
       contact_phone: readText(formData, 'contact_phone'),
-    };
-    let parsed = parseClientContacts(values);
+    });
 
     if (!parsed.ok) {
       return {
-        values,
         changes: {},
         issues: parsed.issues.map((issue) => ({
           message: issue.message,
@@ -138,6 +135,6 @@ export const contactSection: ClientFormSection = {
       };
     }
 
-    return { values, changes: parsed.value, issues: [] };
+    return { changes: parsed.value, issues: [] };
   },
 };

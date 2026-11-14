@@ -10,7 +10,6 @@ import { INDIA_STATES } from '../../../../data/india-states.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { Select } from '../../../../ui/select.tsx';
-import type { ClientFormValues } from '../form-values.ts';
 import { issueFor, readText } from '../form-values.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
@@ -99,22 +98,15 @@ export const taxSection: ClientFormSection = {
   key: 'tax',
   render: (props) => <TaxFields values={props.values} issues={props.issues} />,
   async parse(formData, context) {
-    let values: Partial<ClientFormValues> = {
+    let parsed = parseClientTax({
       tax_country: readText(formData, 'tax_country'),
       tax_type: readText(formData, 'tax_type'),
       tax_value: readText(formData, 'tax_value'),
       tax_state_code: readText(formData, 'tax_state_code'),
-    };
-    let parsed = parseClientTax({
-      tax_country: values.tax_country ?? '',
-      tax_type: values.tax_type ?? '',
-      tax_value: values.tax_value ?? '',
-      tax_state_code: values.tax_state_code ?? '',
     });
 
     if (!parsed.ok) {
       return {
-        values,
         changes: {},
         issues: parsed.issues.map((issue) => ({
           message: issue.message,
@@ -134,6 +126,6 @@ export const taxSection: ClientFormSection = {
       }
     }
 
-    return { values, changes: parsed.value, issues: [], warning };
+    return { changes: parsed.value, issues: [], warning };
   },
 };
