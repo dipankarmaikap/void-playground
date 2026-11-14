@@ -54,12 +54,26 @@ export async function postForm(
   fields: Record<string, string>,
   cookie?: string,
 ): Promise<Response> {
-  let page = await app.fetch(new URL(url, origin), {
+  return submitForm(app, url, url, fields, cookie);
+}
+
+/**
+ * Loads `pageUrl` for a CSRF token, then submits `fields` to `actionUrl`.
+ * Use this when a form posts to a URL that has no GET page of its own.
+ */
+export async function submitForm(
+  app: TestApp,
+  pageUrl: string,
+  actionUrl: string,
+  fields: Record<string, string>,
+  cookie?: string,
+): Promise<Response> {
+  let page = await app.fetch(new URL(pageUrl, origin), {
     headers: cookie ? { Cookie: cookie } : undefined,
   });
   let csrf = extractCsrf(await page.text());
   let body = new URLSearchParams({ ...fields, _csrf: csrf });
-  return app.fetch(new URL(url, origin), {
+  return app.fetch(new URL(actionUrl, origin), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',

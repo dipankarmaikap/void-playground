@@ -10,6 +10,9 @@ import { auth } from 'remix/middleware/auth';
 
 import controller from './actions/controller.tsx';
 import appController from './actions/app/controller.tsx';
+import clientsController from './actions/app/clients/controller.tsx';
+import newClientController from './actions/app/clients/new/controller.tsx';
+import editClientController from './actions/app/clients/edit/controller.tsx';
 import authController from './actions/auth/controller.tsx';
 import loginController from './actions/auth/login/controller.tsx';
 import registerController from './actions/auth/register/controller.tsx';
@@ -65,5 +68,8 @@ router.map(routes.auth.login, loginController);
 router.map(routes.auth.register, registerController);
 router.map(routes.auth, authController);
 router.map(routes.app, appController);
+router.map(routes.app.clients, clientsController);
+router.map(routes.app.clients.new, newClientController);
+router.map(routes.app.clients.edit, editClientController);
 router.map(routes.app.settings.profile, settingsProfileController);
 router.map(routes.app.settings.sessions, settingsSessionsController);
