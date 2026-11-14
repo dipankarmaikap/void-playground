@@ -100,7 +100,12 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
 
 export const taxSection: ClientFormSection = {
   key: 'tax',
-  render: (props) => <TaxFields values={props.values} issues={props.issues} />,
+  render: (props) => (
+    <TaxFields
+      values={props.values}
+      issues={props.issues}
+    />
+  ),
   async parse(formData, context) {
     let parsed = parseClientTax({
       tax_country: readText(formData, 'tax_country'),

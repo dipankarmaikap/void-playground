@@ -36,6 +36,9 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
     let contactEmailIssue = issueFor(issues, 'contact_email');
     let contactPhoneIssue = issueFor(issues, 'contact_phone');
     let isBusiness = values.type === 'business';
+    let hasPrimaryContactIssues = Boolean(
+      contactNameIssue || contactRoleIssue || contactEmailIssue || contactPhoneIssue,
+    );
 
     return (
       <>
@@ -69,7 +72,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
         </Field>
         {/* The primary-contact group is business-only, but stays in the form while hidden
             so a type change preserves its values. */}
-        <fieldset hidden={!isBusiness} mix={contactGroupStyle}>
+        <fieldset hidden={!isBusiness && !hasPrimaryContactIssues} mix={contactGroupStyle}>
           <legend mix={legendStyle}>Primary contact</legend>
           <Field
             label="Contact name"
@@ -121,7 +124,12 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
 
 export const contactSection: ClientFormSection = {
   key: 'contacts',
-  render: (props) => <ContactFields values={props.values} issues={props.issues} />,
+  render: (props) => (
+    <ContactFields
+      values={props.values}
+      issues={props.issues}
+    />
+  ),
   parse(formData) {
     let parsed = parseClientContacts({
       email: readText(formData, 'email'),

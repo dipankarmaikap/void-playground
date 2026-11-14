@@ -113,6 +113,13 @@ describe('Client free-text length limits', () => {
         new RegExp(`name="${field}"[^>]*aria-invalid="true"`),
         `${field} should expose invalid state`,
       );
+      if (field === 'preferred_name') {
+        assert.doesNotMatch(
+          html,
+          /<div hidden[^>]*>[\s\S]*?name="preferred_name"/,
+          'a hidden Individual name error should be made visible on a Business form',
+        );
+      }
       assert.ok(html.includes(value), `${field} should retain the submitted value`);
       assert.match(
         html,
@@ -168,6 +175,34 @@ describe('Client free-text length limits', () => {
     }
   });
 
+  it('reveals invalid Business-only fields on an Individual form', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let fields = {
+      type: 'individual',
+      legal_name: uniqueName('Individual with hidden values'),
+      trading_name: 'T'.repeat(121),
+      industry: 'I'.repeat(121),
+      contact_name: 'C'.repeat(121),
+      contact_email: `${'a'.repeat(243)}@example.com`,
+    };
+
+    let response = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      fields,
+      sessionCookie,
+    );
+
+    assert.equal(response.status, 400);
+    let html = await response.text();
+    assert.match(html, /name="trading_name"[^>]*aria-invalid="true"/);
+    assert.match(html, /name="industry"[^>]*aria-invalid="true"/);
+    assert.match(html, /name="contact_name"[^>]*aria-invalid="true"/);
+    assert.match(html, /name="contact_email"[^>]*aria-invalid="true"/);
+    assert.doesNotMatch(html, /<div hidden[^>]*>[\s\S]*?name="trading_name"/);
+    assert.doesNotMatch(html, /<fieldset hidden[^>]*>[\s\S]*?name="contact_name"/);
+  });
+
   it('preserves stored Client data when edit fields exceed their limits', async () => {
     let sessionCookie = await createUserAndLogin(router, 'client-length');
     let values = maxLengthValues();
@@ -188,6 +223,8 @@ describe('Client free-text length limits', () => {
       contact_email: `${'a'.repeat(243)}@example.com`,
       tax_value: 'V'.repeat(129),
       billing_line1: 'B'.repeat(201),
+      billing_country: ` ${'Z'.repeat(100)}`,
+      billing_currency: 'usd ',
     };
     let response = await postForm(
       router,
@@ -198,18 +235,34 @@ describe('Client free-text length limits', () => {
 
     assert.equal(response.status, 400);
     let html = await response.text();
-    for (let field of ['industry', 'contact_email', 'tax_value', 'billing_line1']) {
+    for (let field of [
+      'industry',
+      'contact_email',
+      'tax_value',
+      'billing_line1',
+      'billing_country',
+      'billing_currency',
+    ]) {
       assert.match(html, new RegExp(`name="${field}"[^>]*aria-invalid="true"`));
-      assert.match(html, /characters or fewer/);
+      assert.match(
+        html,
+        field === 'billing_currency'
+          ? /3-letter currency code/
+          : /characters or fewer/,
+      );
     }
     assert.ok(html.includes(submitted.contact_email));
     assert.ok(html.includes(submitted.tax_value));
     assert.ok(html.includes(submitted.billing_line1));
+    assert.ok(html.includes(`value="${submitted.billing_country}"`));
+    assert.ok(html.includes(`value="${submitted.billing_currency}"`));
 
     let stored = await db.find(clients, client.id);
     assert.equal(stored?.industry, values.industry);
     assert.equal(stored?.contact_email, values.contact_email);
     assert.equal(stored?.tax_value, values.tax_value);
     assert.equal(stored?.billing_line1, values.billing_line1);
+    assert.equal(stored?.billing_country, values.billing_country);
+    assert.equal(stored?.billing_currency, values.billing_currency);
   });
 });

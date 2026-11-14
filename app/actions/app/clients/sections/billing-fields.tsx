@@ -105,7 +105,9 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
               maxLength={CLIENT_TEXT_LIMITS.billing_country}
               list="billing-countries"
               autoComplete="country-name"
-              defaultValue={countryName(values.billing_country)}
+              defaultValue={
+                countryIssue ? values.billing_country : countryName(values.billing_country)
+              }
               aria-invalid={countryIssue ? true : undefined}
               variant={countryIssue ? 'error' : 'default'}
             />
@@ -125,7 +127,11 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
             name="billing_currency"
             maxLength={CLIENT_TEXT_LIMITS.billing_currency}
             list="billing-currencies"
-            defaultValue={values.billing_currency.trim().toUpperCase()}
+            defaultValue={
+              currencyIssue
+                ? values.billing_currency
+                : values.billing_currency.trim().toUpperCase()
+            }
             aria-invalid={currencyIssue ? true : undefined}
             variant={currencyIssue ? 'error' : 'default'}
           />
@@ -144,7 +150,12 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
 
 export const billingSection: ClientFormSection = {
   key: 'billing',
-  render: (props) => <BillingFields values={props.values} issues={props.issues} />,
+  render: (props) => (
+    <BillingFields
+      values={props.values}
+      issues={props.issues}
+    />
+  ),
   parse(formData) {
     // Only the billing fields this section owns; other sections fill in the rest.
     let parsed = parseClientBilling({

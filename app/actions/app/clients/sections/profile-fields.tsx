@@ -29,6 +29,9 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
     let tradingNameIssue = issueFor(issues, 'trading_name');
     let industryIssue = issueFor(issues, 'industry');
     let isBusiness = values.type === 'business';
+    let showIndividualNameGroup = !isBusiness || Boolean(preferredNameIssue);
+    let showBusinessNameGroup =
+      isBusiness || Boolean(tradingNameIssue || industryIssue);
 
     return (
       <>
@@ -62,7 +65,7 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           />
         </Field>
         {/* Both type-specific groups stay in the form; hidden values still submit. */}
-        <div hidden={isBusiness} mix={nameGroupStyle}>
+        <div hidden={!showIndividualNameGroup} mix={nameGroupStyle}>
           <Field
             label="Preferred name"
             hint="Optional. Shown before the legal name in lists."
@@ -77,7 +80,7 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
             />
           </Field>
         </div>
-        <div hidden={!isBusiness} mix={nameGroupStyle}>
+        <div hidden={!showBusinessNameGroup} mix={nameGroupStyle}>
           <Field
             label="Trading name"
             hint="Optional. Shown before the legal name in lists."
@@ -112,7 +115,12 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
 
 export const profileSection: ClientFormSection = {
   key: 'profile',
-  render: (props) => <ProfileFields values={props.values} issues={props.issues} />,
+  render: (props) => (
+    <ProfileFields
+      values={props.values}
+      issues={props.issues}
+    />
+  ),
   parse(formData) {
     let type = readText(formData, 'type');
     let legalName = readText(formData, 'legal_name');
