@@ -21,8 +21,8 @@ async function seedSession(userId: string, ip: string, createdAt = Date.now()): 
   return id;
 }
 
-async function getSettingsPage(sessionCookie: string) {
-  let response = await router.fetch(new URL(routes.app.settings.index.href(), origin), {
+async function getSessionsPage(sessionCookie: string) {
+  let response = await router.fetch(new URL(routes.app.settings.sessions.index.href(), origin), {
     headers: { Cookie: sessionCookie },
   });
   assert.equal(response.status, 200);
@@ -30,18 +30,22 @@ async function getSettingsPage(sessionCookie: string) {
 }
 
 describe('session flow', () => {
-  it('login, view settings, revoke another session', async () => {
+  it('login, view sessions, revoke another session', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
     let userId = await createUser(email, 'password123');
     let otherSessionId = await seedSession(userId, '1.2.3.4');
 
     let sessionCookie = await login(router, email, 'password123');
-    let settingsHtml = await getSettingsPage(sessionCookie);
-    assert.match(settingsHtml, /Sessions/);
-    assert.match(settingsHtml, /1\.2\.3\.4/);
+    let sessionsHtml = await getSessionsPage(sessionCookie);
+    assert.match(sessionsHtml, /Sessions/);
+    assert.match(sessionsHtml, /1\.2\.3\.4/);
+    assert.match(sessionsHtml, /Chrome/);
+    assert.match(sessionsHtml, /Created/);
+    assert.match(sessionsHtml, /Last active/);
+    assert.match(sessionsHtml, /This session/);
 
     let revokeResponse = await router.fetch(
-      new URL(routes.app.settings.action.href(), origin),
+      new URL(routes.app.settings.sessions.action.href(), origin),
       {
         method: 'POST',
         headers: {
@@ -49,14 +53,17 @@ describe('session flow', () => {
           Cookie: sessionCookie,
         },
         body: new URLSearchParams({
-          _csrf: extractCsrf(settingsHtml),
+          _csrf: extractCsrf(sessionsHtml),
           action: 'revoke',
           session_id: otherSessionId,
         }).toString(),
       },
     );
     assert.equal(revokeResponse.status, 302);
-    assert.equal(revokeResponse.headers.get('Location'), routes.app.settings.index.href());
+    assert.equal(
+      revokeResponse.headers.get('Location'),
+      routes.app.settings.sessions.index.href(),
+    );
 
     let row = await db.find(sessions, otherSessionId);
     assert.equal(row, null);
@@ -68,15 +75,41 @@ describe('session flow', () => {
     assert.equal(followUp.status, 200);
   });
 
-  it('shows the current session first', async () => {
+  it('shows the current session first with a text marker', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
     let userId = await createUser(email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
     // Newer than the current session, so plain date order would put it first.
     await seedSession(userId, '9.9.9.9', Date.now() + 60_000);
 
-    let settingsHtml = await getSettingsPage(sessionCookie);
-    assert.ok(settingsHtml.indexOf('(this session)') < settingsHtml.indexOf('9.9.9.9'));
+    let sessionsHtml = await getSessionsPage(sessionCookie);
+    assert.ok(sessionsHtml.indexOf('This session') < sessionsHtml.indexOf('9.9.9.9'));
+  });
+
+  it('offers no row-level Revoke for the current session', async () => {
+    let email = `u-${crypto.randomUUID()}@example.com`;
+    await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
+
+    let sessionsHtml = await getSessionsPage(sessionCookie);
+    assert.match(sessionsHtml, /This session/);
+    assert.doesNotMatch(sessionsHtml, /name="action" value="revoke"/);
+    assert.doesNotMatch(sessionsHtml, /value="revoke_others"/);
+  });
+
+  it('guards revoking all other sessions with a no-JS confirmation', async () => {
+    let email = `u-${crypto.randomUUID()}@example.com`;
+    let userId = await createUser(email, 'password123');
+    await seedSession(userId, '1.1.1.1');
+
+    let sessionCookie = await login(router, email, 'password123');
+    let sessionsHtml = await getSessionsPage(sessionCookie);
+
+    assert.match(
+      sessionsHtml,
+      /<details[^>]*>[\s\S]*?Revoke all other sessions[\s\S]*?value="revoke_others"[\s\S]*?<\/details>/,
+    );
+    assert.match(sessionsHtml, /except this one/);
   });
 
   it('revokes all other sessions', async () => {
@@ -86,26 +119,29 @@ describe('session flow', () => {
     await seedSession(userId, '2.2.2.2');
 
     let sessionCookie = await login(router, email, 'password123');
-    let settingsHtml = await getSettingsPage(sessionCookie);
+    let sessionsHtml = await getSessionsPage(sessionCookie);
 
-    let response = await router.fetch(new URL(routes.app.settings.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.settings.sessions.action.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Cookie: sessionCookie,
       },
       body: new URLSearchParams({
-        _csrf: extractCsrf(settingsHtml),
+        _csrf: extractCsrf(sessionsHtml),
         action: 'revoke_others',
       }).toString(),
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get('Location'), routes.app.settings.index.href());
+    assert.equal(
+      response.headers.get('Location'),
+      routes.app.settings.sessions.index.href(),
+    );
 
     let remaining = await db.findMany(sessions, { where: { user_id: userId } });
     assert.equal(remaining.length, 1);
 
-    let followUp = await getSettingsPage(sessionCookie);
+    let followUp = await getSessionsPage(sessionCookie);
     assert.match(followUp, /Revoked all other sessions/);
   });
 
@@ -153,18 +189,21 @@ describe('session flow', () => {
     });
     let csrf = extractCsrf(await dashboard.text());
 
-    let response = await router.fetch(new URL(routes.app.settings.action.href(), origin), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: sessionCookie,
+    let response = await router.fetch(
+      new URL(routes.app.settings.sessions.action.href(), origin),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: sessionCookie,
+        },
+        body: new URLSearchParams({
+          _csrf: csrf,
+          action: 'revoke',
+          session_id: currentRows[0].id,
+        }).toString(),
       },
-      body: new URLSearchParams({
-        _csrf: csrf,
-        action: 'revoke',
-        session_id: currentRows[0].id,
-      }).toString(),
-    });
+    );
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
 

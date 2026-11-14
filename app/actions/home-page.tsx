@@ -112,7 +112,7 @@ export function HomePage(handle: Handle<HomePageProps>) {
                   Go to dashboard
                 </a>
                 <a
-                  href={routes.app.settings.index.href()}
+                  href={routes.app.settings.profile.index.href()}
                   data-variant="secondary"
                   mix={actionStyle}
                 >

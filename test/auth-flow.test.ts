@@ -65,7 +65,7 @@ describe('auth flow', () => {
       headers: { Cookie: sessionCookie },
     });
     assert.equal(dashboard.status, 200);
-    assert.match(await dashboard.text(), /Signed in as/);
+    assert.match(await dashboard.text(), /Welcome back/);
   });
 
   it('renders the register form with a validation error', async () => {

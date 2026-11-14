@@ -1,0 +1,269 @@
+import type { Handle } from 'remix/component';
+import { css } from 'remix/component';
+
+import { routes } from '../../../../routes.ts';
+import { AppShell } from '../../../../ui/app-shell.tsx';
+import { Button } from '../../../../ui/button.tsx';
+import { Icon } from '../../../../ui/icon.tsx';
+import { colors, radius, shadow } from '../../../../ui/theme.ts';
+
+export interface SessionView {
+  id: string;
+  current: boolean;
+  browser: string;
+  ip: string;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+export interface SessionsPageProps {
+  csrfToken: string;
+  email: string;
+  displayName?: string | null;
+  sessions: SessionView[];
+  error?: string;
+  message?: string;
+}
+
+const headerStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  marginBottom: '1.5rem',
+});
+
+const headingStyle = css({
+  margin: 0,
+  fontSize: '1.75rem',
+  lineHeight: 1.2,
+  letterSpacing: '-0.02em',
+});
+
+const introStyle = css({
+  margin: 0,
+  color: colors.muted,
+  fontSize: '0.9375rem',
+  lineHeight: 1.6,
+});
+
+const errorStyle = css({
+  margin: '0 0 1rem',
+  padding: '10px 12px',
+  border: `1px solid ${colors.danger}`,
+  borderRadius: radius.sm,
+  background: colors.dangerSoft,
+  color: colors.danger,
+  fontSize: '0.875rem',
+});
+
+const statusStyle = css({
+  margin: '0 0 1rem',
+  padding: '10px 12px',
+  border: `1px solid ${colors.success}`,
+  borderRadius: radius.sm,
+  background: colors.successSoft,
+  color: colors.success,
+  fontSize: '0.875rem',
+});
+
+const listStyle = css({
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+});
+
+const rowStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '1rem',
+  padding: '1rem 1.25rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.lg,
+  background: colors.surface,
+  boxShadow: shadow.card,
+  '&[data-current="true"]': {
+    borderColor: colors.accent,
+    background: colors.accentSoft,
+  },
+});
+
+const rowMainStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.375rem',
+  minWidth: 0,
+});
+
+const browserLineStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontSize: '0.9375rem',
+  fontWeight: 700,
+  overflowWrap: 'anywhere',
+});
+
+const currentBadgeStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0.125rem 0.5rem',
+  borderRadius: '999px',
+  background: colors.accent,
+  color: '#ffffff',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  letterSpacing: '0.02em',
+});
+
+const metaListStyle = css({
+  margin: 0,
+  display: 'grid',
+  gap: '0.125rem',
+  color: colors.muted,
+  fontSize: '0.8125rem',
+  lineHeight: 1.5,
+});
+
+const metaTermStyle = css({
+  fontWeight: 600,
+  marginRight: '0.25rem',
+  display: 'inline',
+});
+
+const metaDetailStyle = css({
+  margin: 0,
+  display: 'inline',
+});
+
+const revokeFormStyle = css({
+  display: 'inline-flex',
+});
+
+const dangerStyle = css({
+  marginTop: '1.75rem',
+  padding: '1rem 1.25rem',
+  border: `1px solid ${colors.danger}`,
+  borderRadius: radius.lg,
+  background: colors.surface,
+});
+
+const dangerSummaryStyle = css({
+  cursor: 'pointer',
+  color: colors.danger,
+  fontSize: '0.9375rem',
+  fontWeight: 700,
+  listStyle: 'none',
+  '&::-webkit-details-marker': {
+    display: 'none',
+  },
+});
+
+const dangerBodyStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  marginTop: '0.75rem',
+});
+
+const dangerCopyStyle = css({
+  margin: 0,
+  color: colors.muted,
+  fontSize: '0.875rem',
+  lineHeight: 1.5,
+});
+
+export function SessionsPage(handle: Handle<SessionsPageProps>) {
+  return () => {
+    let { csrfToken, email, displayName, sessions, error, message } = handle.props;
+    let action = routes.app.settings.sessions.action.href();
+    let hasOtherSessions = sessions.some((session) => !session.current);
+
+    return (
+      <AppShell
+        csrfToken={csrfToken}
+        displayName={displayName}
+        email={email}
+        section="sessions"
+        title="Sessions"
+        description="Review and revoke the browsers signed in to your account."
+      >
+        <header mix={headerStyle}>
+          <h1 mix={headingStyle}>Sessions</h1>
+          <p mix={introStyle}>
+            These are the browsers currently signed in to your account. Revoke one you no longer use.
+          </p>
+        </header>
+        {error ? (
+          <p role="alert" mix={errorStyle}>
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p role="status" mix={statusStyle}>
+            {message}
+          </p>
+        ) : null}
+        <ul mix={listStyle}>
+          {sessions.map((session) => (
+            <li
+              key={session.id}
+              data-current={session.current ? 'true' : undefined}
+              mix={rowStyle}
+            >
+              <div mix={rowMainStyle}>
+                <div mix={browserLineStyle}>
+                  <Icon name="monitor" />
+                  <span>{session.browser}</span>
+                  {session.current ? <span mix={currentBadgeStyle}>This session</span> : null}
+                </div>
+                <dl mix={metaListStyle}>
+                  <div>
+                    <dt mix={metaTermStyle}>IP</dt>
+                    <dd mix={metaDetailStyle}>{session.ip}</dd>
+                  </div>
+                  <div>
+                    <dt mix={metaTermStyle}>Created</dt>
+                    <dd mix={metaDetailStyle}>{session.createdAt}</dd>
+                  </div>
+                  <div>
+                    <dt mix={metaTermStyle}>Last active</dt>
+                    <dd mix={metaDetailStyle}>{session.lastActiveAt}</dd>
+                  </div>
+                </dl>
+              </div>
+              {session.current ? null : (
+                <form method="post" action={action} mix={revokeFormStyle}>
+                  <input type="hidden" name="_csrf" value={csrfToken} />
+                  <input type="hidden" name="action" value="revoke" />
+                  <input type="hidden" name="session_id" value={session.id} />
+                  <Button variant="danger">Revoke</Button>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+        {hasOtherSessions ? (
+          <details mix={dangerStyle}>
+            <summary mix={dangerSummaryStyle}>Revoke all other sessions</summary>
+            <div mix={dangerBodyStyle}>
+              <p mix={dangerCopyStyle}>
+                This ends every Session except this one. You will stay signed in in this browser.
+              </p>
+              <form method="post" action={action}>
+                <input type="hidden" name="_csrf" value={csrfToken} />
+                <input type="hidden" name="action" value="revoke_others" />
+                <Button variant="danger">Revoke all other sessions</Button>
+              </form>
+            </div>
+          </details>
+        ) : null}
+      </AppShell>
+    );
+  };
+}

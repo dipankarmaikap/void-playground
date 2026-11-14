@@ -25,9 +25,12 @@ describe('hybrid storage', () => {
     let userRows = await db.findMany(sessions, { where: { user_id: userId } });
     assert.equal(userRows.length, 1);
 
-    let settingsRes = await router.fetch(new URL(routes.app.settings.index.href(), origin), {
-      headers: { Cookie: sessionCookie },
-    });
+    let settingsRes = await router.fetch(
+      new URL(routes.app.settings.sessions.index.href(), origin),
+      {
+        headers: { Cookie: sessionCookie },
+      },
+    );
     assert.equal(settingsRes.status, 200);
   });
 });

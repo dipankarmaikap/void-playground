@@ -1,64 +1,159 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from '../document.tsx';
 import { routes } from '../../routes.ts';
+import { AppShell } from '../../ui/app-shell.tsx';
+import { Icon } from '../../ui/icon.tsx';
+import { identityOf } from '../../ui/identity.ts';
+import { colors, radius, shadow } from '../../ui/theme.ts';
 
 export interface DashboardPageProps {
   csrfToken: string;
-  email?: string;
-  error?: string;
+  email: string;
+  displayName?: string | null;
 }
+
+const headerStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  marginBottom: '2rem',
+});
+
+const headingStyle = css({
+  margin: 0,
+  fontSize: '2rem',
+  lineHeight: 1.2,
+  letterSpacing: '-0.02em',
+  overflowWrap: 'anywhere',
+});
+
+const introStyle = css({
+  margin: 0,
+  color: colors.muted,
+  fontSize: '1rem',
+  lineHeight: 1.6,
+});
+
+const sectionHeadingStyle = css({
+  margin: '0 0 0.75rem',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: colors.muted,
+});
+
+const shortcutListStyle = css({
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+  display: 'grid',
+  gap: '0.75rem',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  '@media (min-width: 36rem)': {
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  },
+});
+
+const shortcutStyle = css({
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '0.75rem',
+  padding: '1rem 1.25rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.lg,
+  background: colors.surface,
+  boxShadow: shadow.card,
+  color: colors.text,
+  textDecoration: 'none',
+  '&:hover': {
+    borderColor: colors.accent,
+    background: colors.accentSoft,
+  },
+});
+
+const shortcutIconStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '2.25rem',
+  height: '2.25rem',
+  borderRadius: radius.md,
+  background: colors.accentSoft,
+  color: colors.accent,
+  flexShrink: 0,
+});
+
+const shortcutBodyStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.125rem',
+});
+
+const shortcutTitleStyle = css({
+  fontSize: '0.9375rem',
+  fontWeight: 700,
+});
+
+const shortcutDescriptionStyle = css({
+  color: colors.muted,
+  fontSize: '0.875rem',
+  lineHeight: 1.5,
+});
 
 export function DashboardPage(handle: Handle<DashboardPageProps>) {
   return () => {
-    let { csrfToken, email, error } = handle.props;
+    let { csrfToken, email, displayName } = handle.props;
+    let identity = identityOf({ email, displayName });
 
     return (
-      <Document title="Dashboard">
-        <main
-          mix={css({
-            margin: 0,
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-            fontFamily: 'system-ui, sans-serif',
-          })}
-        >
-          <div
-            mix={css({
-              width: '100%',
-              maxWidth: '360px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            })}
-          >
-            <h1 mix={css({ margin: 0, fontSize: '24px' })}>Dashboard</h1>
-            {error ? (
-              <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
-                {error}
-              </p>
-            ) : null}
-            <p mix={css({ margin: 0 })}>Signed in as {email}</p>
-            <a href={routes.app.settings.index.href()} mix={css({ color: '#0066cc' })}>
-              Manage logged-in sessions
-            </a>
-            <form
-              method="post"
-              action={routes.auth.logout.href()}
-              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
-            >
-              <input type="hidden" name="_csrf" value={csrfToken} />
-              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
-                Log out
-              </button>
-            </form>
-          </div>
-        </main>
-      </Document>
+      <AppShell
+        csrfToken={csrfToken}
+        displayName={displayName}
+        email={email}
+        section="dashboard"
+        title="Dashboard"
+        description="Your My Remix App dashboard and shortcuts."
+      >
+        <header mix={headerStyle}>
+          <h1 mix={headingStyle}>Welcome back, {identity.name}</h1>
+          <p mix={introStyle}>You are signed in as {email}.</p>
+        </header>
+        <section aria-labelledby="shortcuts-heading">
+          <h2 id="shortcuts-heading" mix={sectionHeadingStyle}>
+            Shortcuts
+          </h2>
+          <ul mix={shortcutListStyle}>
+            <li>
+              <a href={routes.app.settings.profile.index.href()} mix={shortcutStyle}>
+                <span mix={shortcutIconStyle}>
+                  <Icon name="user" />
+                </span>
+                <span mix={shortcutBodyStyle}>
+                  <span mix={shortcutTitleStyle}>Profile settings</span>
+                  <span mix={shortcutDescriptionStyle}>
+                    Review your account identity and display name.
+                  </span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href={routes.app.settings.sessions.index.href()} mix={shortcutStyle}>
+                <span mix={shortcutIconStyle}>
+                  <Icon name="monitor" />
+                </span>
+                <span mix={shortcutBodyStyle}>
+                  <span mix={shortcutTitleStyle}>Sessions</span>
+                  <span mix={shortcutDescriptionStyle}>
+                    Review the browsers signed in to your account.
+                  </span>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </AppShell>
     );
   };
 }

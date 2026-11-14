@@ -7,20 +7,20 @@ import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { and, ne } from 'remix/data-table';
-import { db, sessions } from '../../../data/db.ts';
-import type { User } from '../../../data/db.ts';
-import { browserLabel } from '../../../data/user-agent.ts';
-import { routes } from '../../../routes.ts';
-import { SettingsPage } from './page.tsx';
+import { db, sessions, users } from '../../../../data/db.ts';
+import type { User } from '../../../../data/db.ts';
+import { browserLabel } from '../../../../data/user-agent.ts';
+import { routes } from '../../../../routes.ts';
+import { SessionsPage } from './page.tsx';
 import type { SessionView } from './page.tsx';
 
-export default createController(routes.app.settings, {
-  middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
-  ],
+export default createController(routes.app.settings.sessions, {
+  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
+      let user = await db.find(users, auth.identity.id);
+      let identity = user ?? auth.identity;
       let csrfToken = getCsrfToken(context);
       let rows = await db.findMany(sessions, {
         where: { user_id: auth.identity.id },
@@ -40,8 +40,9 @@ export default createController(routes.app.settings, {
       let error = context.session.get('error');
       let message = context.session.get('message');
       return context.render(
-        <SettingsPage
+        <SessionsPage
           csrfToken={csrfToken}
+          email={identity.email}
           sessions={views}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
@@ -58,7 +59,7 @@ export default createController(routes.app.settings, {
         let row = await db.find(sessions, sessionId);
         if (!row || row.user_id !== auth.identity.id) {
           context.session.flash('error', 'Session not found');
-          return redirect(routes.app.settings.index.href());
+          return redirect(routes.app.settings.sessions.index.href());
         }
         await db.delete(sessions, sessionId);
         if (sessionId === currentId) {
@@ -66,7 +67,7 @@ export default createController(routes.app.settings, {
           return redirect(routes.auth.login.index.href());
         }
         context.session.flash('message', 'Session revoked');
-        return redirect(routes.app.settings.index.href());
+        return redirect(routes.app.settings.sessions.index.href());
       }
 
       if (action === 'revoke_others') {
@@ -74,10 +75,10 @@ export default createController(routes.app.settings, {
           where: and({ user_id: auth.identity.id }, ne('id', currentId)),
         });
         context.session.flash('message', 'Revoked all other sessions');
-        return redirect(routes.app.settings.index.href());
+        return redirect(routes.app.settings.sessions.index.href());
       }
 
-      return redirect(routes.app.settings.index.href());
+      return redirect(routes.app.settings.sessions.index.href());
     },
   },
 });

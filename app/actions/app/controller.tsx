@@ -16,8 +16,11 @@ export default createController(routes.app, {
     async dashboard(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let user = await db.find(users, auth.identity.id);
+      let identity = user ?? auth.identity;
       let csrfToken = getCsrfToken(context);
-      return context.render(<DashboardPage csrfToken={csrfToken} email={user?.email} />);
+      return context.render(
+        <DashboardPage csrfToken={csrfToken} email={identity.email} />,
+      );
     },
   },
 });
