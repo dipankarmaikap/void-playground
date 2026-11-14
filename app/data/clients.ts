@@ -1,20 +1,80 @@
-import type { Client } from './db.ts';
+import { and, eq, ilike, or } from 'remix/data-table';
+import type { Predicate } from 'remix/data-table';
+
+import type { ClientType } from './client-names.ts';
 import { clientDisplayLabel } from './client-names.ts';
 import { clients, db } from './db.ts';
+import type { Client } from './db.ts';
 
 export type ClientStatus = Client['status'];
 
+export type ClientTypeFilter = ClientType | 'all';
+
 export interface ClientListFilter {
+  /** Case-insensitive substring matched against names and contact channels. */
+  q?: string;
+  /** `all` keeps both Individual and Business Clients. */
+  type?: ClientTypeFilter;
   /** Defaults to active Clients so archived records stay out of the directory. */
   status?: ClientStatus;
 }
 
-/** Returns the shared Client book, active Clients by default. */
+const SEARCH_FIELDS = [
+  'legal_name',
+  'preferred_name',
+  'trading_name',
+  'email',
+  'phone',
+  'contact_email',
+  'contact_phone',
+] as const;
+
+const SEARCH_COLUMNS = [
+  clients.legal_name,
+  clients.preferred_name,
+  clients.trading_name,
+  clients.email,
+  clients.phone,
+  clients.contact_email,
+  clients.contact_phone,
+] as const;
+
+const LIKE_WILDCARDS = /[%_]/;
+
+/**
+ * Returns the shared Client book, active Clients by default.
+ *
+ * Search never touches tax identifiers, lifecycle status, industry, or address columns.
+ * Percent and underscore are LIKE wildcards, and the SQLite data-table driver compiles
+ * `ilike` without an `ESCAPE` clause, so queries containing them fall back to a literal
+ * case-insensitive substring match after the status and type predicates run.
+ */
 export async function listClients(filter: ClientListFilter = {}): Promise<Client[]> {
-  return db.findMany(clients, {
-    where: { status: filter.status ?? 'active' },
+  let status = filter.status ?? 'active';
+  let type = filter.type ?? 'all';
+  let q = filter.q?.trim() ?? '';
+
+  let predicates: Predicate[] = [eq(clients.status, status)];
+  if (type !== 'all') predicates.push(eq(clients.type, type));
+
+  let literalSearch = q !== '' && LIKE_WILDCARDS.test(q);
+  if (q && !literalSearch) {
+    let pattern = `%${q}%`;
+    predicates.push(or(...SEARCH_COLUMNS.map((column) => ilike(column, pattern))));
+  }
+
+  let clientsInView = await db.findMany(clients, {
+    where: and(...predicates),
     orderBy: [['legal_name', 'asc']],
   });
+
+  if (!literalSearch) return clientsInView;
+  return clientsInView.filter((client) => matchesClientQuery(client, q));
+}
+
+function matchesClientQuery(client: Client, q: string): boolean {
+  let needle = q.toLowerCase();
+  return SEARCH_FIELDS.some((field) => client[field]?.toLowerCase().includes(needle));
 }
 
 export async function findClient(id: string): Promise<Client | null> {
