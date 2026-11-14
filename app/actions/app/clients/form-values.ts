@@ -28,6 +28,13 @@ export interface ClientFormValues {
   tax_type: string;
   tax_value: string;
   tax_state_code: string;
+  /** Billing address and currency fields were added in #11; all optional per Client. */
+  billing_line1: string;
+  billing_locality: string;
+  billing_region: string;
+  billing_postal_code: string;
+  billing_country: string;
+  billing_currency: string;
 }
 
 export function emptyClientFormValues(): ClientFormValues {
@@ -47,6 +54,12 @@ export function emptyClientFormValues(): ClientFormValues {
     tax_type: '',
     tax_value: '',
     tax_state_code: '',
+    billing_line1: '',
+    billing_locality: '',
+    billing_region: '',
+    billing_postal_code: '',
+    billing_country: '',
+    billing_currency: '',
   };
 }
 
@@ -67,6 +80,12 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
     tax_type: client.tax_type ?? '',
     tax_value: client.tax_value ?? '',
     tax_state_code: client.tax_state_code ?? '',
+    billing_line1: client.billing_line1 ?? '',
+    billing_locality: client.billing_locality ?? '',
+    billing_region: client.billing_region ?? '',
+    billing_postal_code: client.billing_postal_code ?? '',
+    billing_country: client.billing_country ?? '',
+    billing_currency: client.billing_currency ?? '',
   };
 }
 
@@ -87,6 +106,12 @@ export function readClientFormValues(formData: FormData): ClientFormValues {
     tax_type: readText(formData, 'tax_type'),
     tax_value: readText(formData, 'tax_value'),
     tax_state_code: readText(formData, 'tax_state_code'),
+    billing_line1: readText(formData, 'billing_line1'),
+    billing_locality: readText(formData, 'billing_locality'),
+    billing_region: readText(formData, 'billing_region'),
+    billing_postal_code: readText(formData, 'billing_postal_code'),
+    billing_country: readText(formData, 'billing_country'),
+    billing_currency: readText(formData, 'billing_currency'),
   };
 }
 

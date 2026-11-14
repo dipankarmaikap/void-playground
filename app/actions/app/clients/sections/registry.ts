@@ -3,6 +3,7 @@ import type { Issue } from 'remix/data-schema';
 
 import type { Client } from '../../../../data/db.ts';
 import type { ClientFormValues } from '../form-values.ts';
+import { billingSection } from './billing-fields.tsx';
 import { contactSection } from './contact-fields.tsx';
 import { profileSection } from './profile-fields.tsx';
 import { taxSection } from './tax-fields.tsx';
@@ -45,4 +46,5 @@ export const clientFormSections: ClientFormSection[] = [
   profileSection,
   contactSection,
   taxSection,
+  billingSection,
 ];
