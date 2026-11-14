@@ -129,6 +129,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                     {label === client.legal_name ? null : (
                       <span mix={metaStyle}>{client.legal_name}</span>
                     )}
+                    {client.industry ? <span mix={metaStyle}>{client.industry}</span> : null}
                   </a>
                 </li>
               );
