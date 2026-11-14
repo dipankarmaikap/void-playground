@@ -12,10 +12,24 @@ export interface ClientFormValues {
   preferred_name: string;
   trading_name: string;
   industry: string;
+  tax_country: string;
+  tax_type: string;
+  tax_value: string;
+  tax_state_code: string;
 }
 
 export function emptyClientFormValues(): ClientFormValues {
-  return { type: '', legal_name: '', preferred_name: '', trading_name: '', industry: '' };
+  return {
+    type: '',
+    legal_name: '',
+    preferred_name: '',
+    trading_name: '',
+    industry: '',
+    tax_country: '',
+    tax_type: '',
+    tax_value: '',
+    tax_state_code: '',
+  };
 }
 
 export function clientFormValuesOf(client: Client): ClientFormValues {
@@ -25,6 +39,10 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
     preferred_name: client.preferred_name ?? '',
     trading_name: client.trading_name ?? '',
     industry: client.industry ?? '',
+    tax_country: client.tax_country ?? '',
+    tax_type: client.tax_type ?? '',
+    tax_value: client.tax_value ?? '',
+    tax_state_code: client.tax_state_code ?? '',
   };
 }
 
@@ -35,6 +53,10 @@ export function readClientFormValues(formData: FormData): ClientFormValues {
     preferred_name: readText(formData, 'preferred_name'),
     trading_name: readText(formData, 'trading_name'),
     industry: readText(formData, 'industry'),
+    tax_country: readText(formData, 'tax_country'),
+    tax_type: readText(formData, 'tax_type'),
+    tax_value: readText(formData, 'tax_value'),
+    tax_state_code: readText(formData, 'tax_state_code'),
   };
 }
 
