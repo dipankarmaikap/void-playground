@@ -49,6 +49,12 @@ infrastructure.
 - Every free-text Client field has a documented server-side length limit.
   Over-limit values are rejected, never truncated, and remain available for
   accessible correction.
+- Client free-text limits are: legal/preferred/trading names 120; industry
+  120; email and contact email 254; phone and contact phone 40; contact name
+  120; contact role 100; tax country 100; tax type 40; tax value 128; billing
+  line 1 200; billing locality, region, and country 100 each; billing postal
+  code 32; and billing currency 3 characters. Type and State/UT code are
+  enumerated fields, not free text.
 - India GSTIN submissions must agree with the selected State/UT code.
 - Client directory results use a default page size of 20, stable ordering, and
   only list-required fields. Search, type, and status filters survive
