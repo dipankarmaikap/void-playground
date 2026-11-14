@@ -76,6 +76,9 @@ const menuStyle = css({
   fontWeight: 600,
   cursor: 'pointer',
   listStyle: 'none',
+  '&::marker': {
+    content: '""',
+  },
   '&::-webkit-details-marker': {
     display: 'none',
   },
@@ -100,7 +103,8 @@ const sidebarStyle = css({
   },
   '@media (max-width: 47.999rem)': {
     position: 'fixed',
-    inset: '0 auto 0 0',
+    // Start below the Menu summary row so the control stays visible and tappable.
+    inset: '4rem auto 0 0',
     zIndex: 20,
     width: '17rem',
     maxWidth: '85vw',
@@ -234,12 +238,17 @@ export function AppShell(handle: Handle<AppShellProps>) {
               <span>Menu</span>
             </summary>
             <aside mix={sidebarStyle}>
-              <a href={dashboardHref} mix={brandStyle}>
+              {/*
+                Full-document navigation resets the <details> drawer to closed on mobile.
+                Without data-rmx-document Remix reconciles in place and keeps the live open state.
+              */}
+              <a href={dashboardHref} data-rmx-document="" mix={brandStyle}>
                 {APP_NAME}
               </a>
               <nav aria-label="Main" mix={navStyle}>
                 <a
                   href={dashboardHref}
+                  data-rmx-document=""
                   aria-current={section === 'dashboard' ? 'page' : undefined}
                   data-active={section === 'dashboard' ? 'true' : undefined}
                   mix={navLinkStyle}
@@ -249,6 +258,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
                 </a>
                 <a
                   href={profileHref}
+                  data-rmx-document=""
                   aria-current={section === 'profile' ? 'page' : undefined}
                   data-active={settingsActive ? 'true' : undefined}
                   mix={navLinkStyle}
@@ -261,6 +271,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
                 <p mix={subnavHeadingStyle}>Settings</p>
                 <a
                   href={profileHref}
+                  data-rmx-document=""
                   aria-current={section === 'profile' ? 'page' : undefined}
                   data-active={section === 'profile' ? 'true' : undefined}
                   mix={navLinkStyle}
@@ -270,6 +281,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
                 </a>
                 <a
                   href={sessionsHref}
+                  data-rmx-document=""
                   aria-current={section === 'sessions' ? 'page' : undefined}
                   data-active={section === 'sessions' ? 'true' : undefined}
                   mix={navLinkStyle}
