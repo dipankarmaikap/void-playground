@@ -75,5 +75,17 @@ describe('root controller', () => {
     let html = await response.text();
     let escapedNonce = nonce.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     assert.match(html, new RegExp(`<script type="module"[^>]*nonce="${escapedNonce}"`));
+
+    let preloads = [...html.matchAll(/<link\b[^>]*rel="modulepreload"[^>]*>/g)].map(
+      ([tag]) => tag,
+    );
+    assert.ok(preloads.length > 0, 'the document should preload its client module graph');
+    for (let preload of preloads) {
+      assert.match(
+        preload,
+        new RegExp(`nonce="${escapedNonce}"`),
+        'every module preload should carry the response nonce',
+      );
+    }
   });
 });

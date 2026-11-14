@@ -47,7 +47,7 @@ export function Document(handle: Handle<DocumentProps>) {
           {head}
           <ImportMap value={importMap} />
           {preloads.map((preloadHref) => (
-            <link key={preloadHref} rel="modulepreload" href={preloadHref} />
+            <link key={preloadHref} rel="modulepreload" href={preloadHref} nonce={nonce} />
           ))}
           <script type="module" src={href} nonce={nonce}></script>
         </head>
