@@ -4,6 +4,9 @@ import { createFetchProxy } from 'remix/fetch-proxy';
 import { createHmrReadyFetch, run } from 'remix/node-hmr';
 import { createRequestListener } from 'remix/node-fetch-server';
 
+import { getShutdownGracePeriodMs } from './app/server-config.ts';
+import { createShutdownHandler } from './app/server-shutdown.ts';
+
 const hmrProxyPort = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100;
 const hmrEventPort = process.env.HMR_PORT
   ? Number.parseInt(process.env.HMR_PORT, 10)
@@ -33,17 +36,15 @@ const server = http.createServer(
 
 server.listen(hmrProxyPort, '127.0.0.1');
 
-let shuttingDown = false;
+const shutdown = createShutdownHandler(server, [() => hmrRunner.close()], {
+  gracePeriodMs: getShutdownGracePeriodMs(),
+  onError(error) {
+    console.error('HMR proxy shutdown failed', error);
+  },
+  setExitCode(code) {
+    process.exitCode = code;
+  },
+});
 
-function shutdown() {
-  if (shuttingDown) {
-    return;
-  }
-
-  shuttingDown = true;
-  server.close(() => hmrRunner.close().finally(() => process.exit(0)));
-  server.closeAllConnections();
-}
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());

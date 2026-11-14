@@ -1,4 +1,5 @@
 import type { Client } from './db.ts';
+import { validateClientTextFields } from './client-text.ts';
 
 export interface Country {
   /** ISO 3166-1 alpha-2 code. */
@@ -262,6 +263,16 @@ export function suggestCurrencyForCountry(code: string | null | undefined): stri
  * currency, while any basic 3-letter code is accepted. Suggestions never fill it in for you.
  */
 export function parseClientBilling(input: ClientBillingInput): ClientBillingResult {
+  let lengthIssues = validateClientTextFields({
+    billing_line1: input.billing_line1 ?? '',
+    billing_locality: input.billing_locality ?? '',
+    billing_region: input.billing_region ?? '',
+    billing_postal_code: input.billing_postal_code ?? '',
+    billing_country: input.billing_country ?? '',
+    billing_currency: input.billing_currency ?? '',
+  });
+  if (lengthIssues.length > 0) return { ok: false, issues: lengthIssues };
+
   let line1 = clean(input.billing_line1);
   let locality = clean(input.billing_locality);
   let region = clean(input.billing_region);

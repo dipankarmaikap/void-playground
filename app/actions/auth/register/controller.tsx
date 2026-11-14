@@ -116,7 +116,10 @@ export default createController(routes.auth.register, {
         throw error;
       }
 
-      let verifyUrl = new URL(routes.auth.verify.href(), new URL(context.request.url).origin);
+      let verifyUrl = new URL(
+        routes.auth.verify.index.href(),
+        new URL(context.request.url).origin,
+      );
       verifyUrl.searchParams.set('token', token);
       console.log(verifyUrl.href);
 

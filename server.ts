@@ -4,6 +4,11 @@ import { createRequestListener } from 'remix/node-fetch-server';
 import { assets } from './app/assets.ts';
 import { router } from './app/router.ts';
 import { db } from './app/data/db.ts';
+import {
+  getNodeRequestListenerOptions,
+  getShutdownGracePeriodMs,
+} from './app/server-config.ts';
+import { createShutdownHandler } from './app/server-shutdown.ts';
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100;
 const hmrProxyPort = process.env.HMR_PROXY_PORT
@@ -11,7 +16,7 @@ const hmrProxyPort = process.env.HMR_PROXY_PORT
   : null;
 const isHmr = process.env.REMIX_NODE_HMR === '1';
 
-const server = createServer(createRequestListener(router.fetch, { trustProxy: isHmr }));
+const server = createServer(createRequestListener(router.fetch, getNodeRequestListenerOptions()));
 
 server.listen(port, () => {
   if (isHmr) {
@@ -21,19 +26,19 @@ server.listen(port, () => {
   console.log(`Server listening on http://localhost:${hmrProxyPort ?? port}`);
 });
 
-let shuttingDown = false;
+const shutdown = createShutdownHandler(
+  server,
+  [() => assets.close(), () => db.close()],
+  {
+    gracePeriodMs: getShutdownGracePeriodMs(),
+    onError(error) {
+      console.error('Server shutdown failed', error);
+    },
+    setExitCode(code) {
+      process.exitCode = code;
+    },
+  },
+);
 
-function shutdown() {
-  if (shuttingDown) {
-    return;
-  }
-
-  shuttingDown = true;
-  server.close(() => {
-    Promise.all([assets.close(), db.close()]).finally(() => process.exit(0));
-  });
-  server.closeAllConnections();
-}
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());

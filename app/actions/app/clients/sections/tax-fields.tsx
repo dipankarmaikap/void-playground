@@ -6,6 +6,7 @@ import {
   findClientWithTaxValue,
   parseClientTax,
 } from '../../../../data/client-tax.ts';
+import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { INDIA_STATES } from '../../../../data/india-states.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
@@ -36,6 +37,7 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_country"
+            maxLength={CLIENT_TEXT_LIMITS.tax_country}
             defaultValue={values.tax_country}
             aria-invalid={countryIssue ? true : undefined}
             variant={countryIssue ? 'error' : 'default'}
@@ -48,6 +50,7 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_type"
+            maxLength={CLIENT_TEXT_LIMITS.tax_type}
             defaultValue={values.tax_type}
             aria-invalid={typeIssue ? true : undefined}
             variant={typeIssue ? 'error' : 'default'}
@@ -60,6 +63,7 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_value"
+            maxLength={CLIENT_TEXT_LIMITS.tax_value}
             defaultValue={values.tax_value}
             aria-invalid={valueIssue ? true : undefined}
             variant={valueIssue ? 'error' : 'default'}

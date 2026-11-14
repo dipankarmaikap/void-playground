@@ -6,7 +6,11 @@ import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
-import { findClient, listClients } from '../../../data/clients.ts';
+import {
+  findClient,
+  listClients,
+  parseClientDirectoryPage,
+} from '../../../data/clients.ts';
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
@@ -28,15 +32,19 @@ export default createController(routes.app.clients, {
       let type: ClientTypeFilter = 'all';
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
-      let clients = await listClients({ q: query, type, status });
+      let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
+      let directory = await listClients({ q: query, type, status, page });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
-          clients={clients}
+          clients={directory.clients}
           query={query}
           type={type}
           status={status}
+          page={directory.page}
+          hasPrevious={directory.hasPrevious}
+          hasNext={directory.hasNext}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,

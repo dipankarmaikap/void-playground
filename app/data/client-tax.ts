@@ -1,4 +1,5 @@
 import { clientDisplayLabel } from './client-names.ts';
+import { validateClientTextFields } from './client-text.ts';
 import { clients, db } from './db.ts';
 import type { Client } from './db.ts';
 import { findIndiaStateByCode } from './india-states.ts';
@@ -73,6 +74,13 @@ export function clientTaxTypeLabel(type: string | null): string {
  * Only basic format checks run; no government service is contacted.
  */
 export function parseClientTax(input: ClientTaxInput): ClientTaxResult {
+  let lengthIssues = validateClientTextFields({
+    tax_country: input.tax_country,
+    tax_type: input.tax_type,
+    tax_value: input.tax_value,
+  });
+  if (lengthIssues.length > 0) return { ok: false, issues: lengthIssues };
+
   let country = input.tax_country.trim();
   let type = input.tax_type.trim();
   let value = normalizeTaxValue(input.tax_value);
@@ -130,6 +138,18 @@ export function parseClientTax(input: ClientTaxInput): ClientTaxResult {
       issues.push({
         field: 'tax_value',
         message: 'Enter a 15-character GSTIN, for example 27AAPCS2319F1Z5.',
+      });
+    }
+    if (
+      isGstin &&
+      value &&
+      GSTIN_PATTERN.test(value) &&
+      state &&
+      value.slice(0, 2) !== state.code
+    ) {
+      issues.push({
+        field: 'tax_state_code',
+        message: 'State or UT code must match the first two digits of the GSTIN.',
       });
     }
     if (isUin && value && !UIN_PATTERN.test(value)) {

@@ -38,9 +38,25 @@ describe('auth flow', () => {
       /<p role="status"[^>]*>Check your email to verify your account<\/p>/,
     );
 
-    let verifyUrl = new URL(routes.auth.verify.href(), origin);
+    let verifyUrl = new URL(routes.auth.verify.index.href(), origin);
     verifyUrl.searchParams.set('token', user.verification_token);
-    let verifyResponse = await router.fetch(verifyUrl);
+    let verifyPage = await router.fetch(verifyUrl);
+    assert.equal(verifyPage.status, 200);
+    assert.equal((await db.find(users, user.id))?.email_verified, false);
+
+    let verifyHtml = await verifyPage.text();
+    let csrf = verifyHtml.match(/name="_csrf"[^>]*value="([^"]+)"/)?.[1] ?? '';
+    let verifyResponse = await router.fetch(
+      new URL(routes.auth.verify.action.href(), origin),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookieFromResponse(verifyPage),
+        },
+        body: new URLSearchParams({ token: user.verification_token, _csrf: csrf }).toString(),
+      },
+    );
     assert.equal(verifyResponse.status, 302);
     assert.equal(verifyResponse.headers.get('Location'), routes.auth.login.index.href());
 

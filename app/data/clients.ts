@@ -8,6 +8,30 @@ import type { Client } from './db.ts';
 
 export type ClientTypeFilter = ClientType | 'all';
 
+export const CLIENT_DIRECTORY_PAGE_SIZE = 20;
+const CLIENT_DIRECTORY_SCAN_BATCH_SIZE = 100;
+
+export type ClientDirectoryItem = Pick<
+  Client,
+  | 'id'
+  | 'type'
+  | 'legal_name'
+  | 'preferred_name'
+  | 'trading_name'
+  | 'industry'
+  | 'email'
+  | 'phone'
+  | 'contact_email'
+  | 'contact_phone'
+>;
+
+export interface ClientDirectoryPage {
+  clients: ClientDirectoryItem[];
+  page: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}
+
 export interface ClientListFilter {
   /** Case-insensitive substring matched against names and contact channels. */
   q?: string;
@@ -15,6 +39,8 @@ export interface ClientListFilter {
   type?: ClientTypeFilter;
   /** Defaults to active Clients so archived records stay out of the directory. */
   status?: ClientStatus;
+  /** One-based page number; invalid values fall back to page 1. */
+  page?: number;
 }
 
 const SEARCH_FIELDS = [
@@ -29,18 +55,35 @@ const SEARCH_FIELDS = [
 
 const LIKE_WILDCARDS = /[%_]/;
 
+const DIRECTORY_COLUMNS = {
+  id: clients.id,
+  type: clients.type,
+  legal_name: clients.legal_name,
+  preferred_name: clients.preferred_name,
+  trading_name: clients.trading_name,
+  industry: clients.industry,
+  email: clients.email,
+  phone: clients.phone,
+  contact_email: clients.contact_email,
+  contact_phone: clients.contact_phone,
+};
+
 /**
- * Returns the shared Client book, active Clients by default.
+ * Returns one stable page from the shared Client book, active Clients by default.
  *
  * Search never touches tax identifiers, lifecycle status, industry, or address columns.
  * Percent and underscore are LIKE wildcards, and the SQLite data-table driver compiles
- * `ilike` without an `ESCAPE` clause, so queries containing them fall back to a literal
- * case-insensitive substring match after the status and type predicates run.
+ * `ilike` without an `ESCAPE` clause. Queries containing those characters are therefore
+ * matched literally in bounded batches after status and type predicates run.
  */
-export async function listClients(filter: ClientListFilter = {}): Promise<Client[]> {
+export async function listClients(
+  filter: ClientListFilter = {},
+): Promise<ClientDirectoryPage> {
   let status = filter.status ?? 'active';
   let type = filter.type ?? 'all';
   let q = filter.q?.trim() ?? '';
+  let page = normalizePage(filter.page);
+  let offset = (page - 1) * CLIENT_DIRECTORY_PAGE_SIZE;
 
   let predicates: Predicate[] = [eq(clients.status, status)];
   if (type !== 'all') predicates.push(eq(clients.type, type));
@@ -51,16 +94,73 @@ export async function listClients(filter: ClientListFilter = {}): Promise<Client
     predicates.push(or(...SEARCH_FIELDS.map((field) => ilike(clients[field], pattern))));
   }
 
-  let clientsInView = await db.findMany(clients, {
-    where: and(...predicates),
-    orderBy: [['legal_name', 'asc']],
-  });
+  let query = db
+    .query(clients)
+    .where(and(...predicates))
+    .select(DIRECTORY_COLUMNS)
+    .orderBy('legal_name', 'asc')
+    .orderBy('id', 'asc');
 
-  if (!literalSearch) return clientsInView;
-  return clientsInView.filter((client) => matchesClientQuery(client, q));
+  if (!literalSearch) {
+    let rows = await query
+      .limit(CLIENT_DIRECTORY_PAGE_SIZE + 1)
+      .offset(offset)
+      .all();
+    return {
+      clients: rows.slice(0, CLIENT_DIRECTORY_PAGE_SIZE),
+      page,
+      hasPrevious: page > 1,
+      hasNext: rows.length > CLIENT_DIRECTORY_PAGE_SIZE,
+    };
+  }
+
+  let matches: ClientDirectoryItem[] = [];
+  let scanned = 0;
+  let matchingCount = 0;
+  while (matches.length < CLIENT_DIRECTORY_PAGE_SIZE + 1) {
+    let batch = await query
+      .limit(CLIENT_DIRECTORY_SCAN_BATCH_SIZE)
+      .offset(scanned)
+      .all();
+    if (batch.length === 0) break;
+
+    for (let client of batch) {
+      if (!matchesClientQuery(client, q)) continue;
+      if (matchingCount >= offset) matches.push(client);
+      matchingCount += 1;
+      if (matches.length >= CLIENT_DIRECTORY_PAGE_SIZE + 1) break;
+    }
+
+    scanned += batch.length;
+    if (batch.length < CLIENT_DIRECTORY_SCAN_BATCH_SIZE) break;
+  }
+
+  return {
+    clients: matches.slice(0, CLIENT_DIRECTORY_PAGE_SIZE),
+    page,
+    hasPrevious: page > 1,
+    hasNext: matches.length > CLIENT_DIRECTORY_PAGE_SIZE,
+  };
 }
 
-function matchesClientQuery(client: Client, q: string): boolean {
+export function parseClientDirectoryPage(value: string | null): number {
+  if (value == null || !/^\d+$/.test(value)) return 1;
+  return normalizePage(Number(value));
+}
+
+function normalizePage(page: number | undefined): number {
+  if (
+    page == null ||
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    page > Math.floor(Number.MAX_SAFE_INTEGER / CLIENT_DIRECTORY_PAGE_SIZE)
+  ) {
+    return 1;
+  }
+  return page;
+}
+
+function matchesClientQuery(client: ClientDirectoryItem, q: string): boolean {
   let needle = q.toLowerCase();
   return SEARCH_FIELDS.some((field) => client[field]?.toLowerCase().includes(needle));
 }

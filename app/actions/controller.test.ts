@@ -14,11 +14,24 @@ describe('root controller', () => {
     assert.match(await response.text(), /<html[\s>]/);
   });
 
+  it('returns Method Not Allowed for unsupported home-page methods', async () => {
+    let head = await router.fetch(new URL(routes.home.href(), origin), { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
+
+    for (let method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      let response = await router.fetch(new URL(routes.home.href(), origin), { method });
+      assert.equal(response.status, 405, `${method} / should not return a successful page`);
+      assert.equal(response.headers.get('Allow'), 'GET, HEAD');
+    }
+  });
+
   it('GET / gives anonymous visitors a titled, descriptive home page', async () => {
     let response = await router.fetch(new URL(routes.home.href(), origin));
     let html = await response.text();
 
     assert.equal(response.status, 200);
+    assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
     assert.match(html, /<title>Home \| My Remix App<\/title>/);
     assert.match(html, /<meta name="description" content="Welcome to My Remix App\./);
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
@@ -56,6 +69,7 @@ describe('root controller', () => {
     let html = await response.text();
 
     assert.equal(response.status, 200);
+    assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
     assert.match(html, /<title>Home \| My Remix App<\/title>/);
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*>Go to dashboard<\/a>/);
     assert.match(html, /<a[^>]*href="\/register"[^>]*>Create account<\/a>/);

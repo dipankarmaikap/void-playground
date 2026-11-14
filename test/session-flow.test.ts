@@ -176,6 +176,88 @@ describe('session flow', () => {
     assert.equal(followUp.headers.get('Location'), routes.auth.login.index.href());
   });
 
+  it('does not report successful Log out when Session deletion fails', async () => {
+    let email = `u-${crypto.randomUUID()}@example.com`;
+    let userId = await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
+    let currentRows = await db.findMany(sessions, { where: { user_id: userId } });
+    assert.equal(currentRows.length, 1);
+
+    let dashboard = await router.fetch(new URL(routes.app.dashboard.href(), origin), {
+      headers: { Cookie: sessionCookie },
+    });
+    let csrf = extractCsrf(await dashboard.text());
+
+    await db.executeScript(`
+      CREATE TRIGGER fail_session_delete
+      BEFORE DELETE ON sessions
+      BEGIN
+        SELECT RAISE(ABORT, 'session delete failed');
+      END;
+    `);
+
+    try {
+      let response: Response | undefined;
+      let failure: unknown;
+      try {
+        response = await router.fetch(new URL(routes.auth.logout.href(), origin), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Cookie: sessionCookie,
+          },
+          body: new URLSearchParams({ _csrf: csrf }).toString(),
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      assert.ok(
+        failure || (response && response.status >= 500),
+        'a failed server-side deletion must not return a successful Log out response',
+      );
+      assert.ok(await db.find(sessions, currentRows[0].id), 'the failed deletion leaves the row');
+    } finally {
+      await db.executeScript('DROP TRIGGER IF EXISTS fail_session_delete;');
+    }
+  });
+
+  it('does not list or Revoke a Session owned by another User', async () => {
+    let firstEmail = `u-${crypto.randomUUID()}@example.com`;
+    let secondEmail = `u-${crypto.randomUUID()}@example.com`;
+    let firstUserId = await createUser(firstEmail, 'password123');
+    let secondUserId = await createUser(secondEmail, 'password123');
+    let foreignSessionId = await seedSession(secondUserId, '8.8.8.8');
+    let sessionCookie = await login(router, firstEmail, 'password123');
+    let sessionsHtml = await getSessionsPage(sessionCookie);
+
+    assert.doesNotMatch(sessionsHtml, /8\.8\.8\.8/);
+
+    let response = await router.fetch(
+      new URL(routes.app.settings.sessions.action.href(), origin),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: sessionCookie,
+        },
+        body: new URLSearchParams({
+          _csrf: extractCsrf(sessionsHtml),
+          action: 'revoke',
+          session_id: foreignSessionId,
+        }).toString(),
+      },
+    );
+
+    assert.equal(response.status, 302);
+    assert.equal(
+      response.headers.get('Location'),
+      routes.app.settings.sessions.index.href(),
+    );
+    assert.equal(await db.find(sessions, foreignSessionId) == null, false);
+    assert.ok(firstUserId !== secondUserId);
+  });
+
   it('revoking the current session logs out', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
     let userId = await createUser(email, 'password123');

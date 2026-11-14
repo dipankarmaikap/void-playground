@@ -12,17 +12,12 @@ export interface ClientFormValues {
   preferred_name: string;
   trading_name: string;
   industry: string;
-  /**
-   * Contact fields were added in #8. They stay optional on this shared interface so existing
-   * sections that only produce identity values keep compiling; every page-level helper below
-   * fills them in, and `readClientFormValues` always returns them.
-   */
-  email?: string;
-  phone?: string;
-  contact_name?: string;
-  contact_role?: string;
-  contact_email?: string;
-  contact_phone?: string;
+  email: string;
+  phone: string;
+  contact_name: string;
+  contact_role: string;
+  contact_email: string;
+  contact_phone: string;
   /** Tax identifier fields were added in #9; one optional identifier per Client. */
   tax_country: string;
   tax_type: string;

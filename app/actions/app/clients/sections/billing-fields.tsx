@@ -10,6 +10,7 @@ import {
   parseClientBilling,
   suggestCurrencyForCountry,
 } from '../../../../data/client-billing.ts';
+import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { issueFor, readText } from '../form-values.ts';
@@ -49,6 +50,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_line1"
+              maxLength={CLIENT_TEXT_LIMITS.billing_line1}
               autoComplete="address-line1"
               defaultValue={values.billing_line1}
               aria-invalid={line1Issue ? true : undefined}
@@ -62,6 +64,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_locality"
+              maxLength={CLIENT_TEXT_LIMITS.billing_locality}
               autoComplete="address-level2"
               defaultValue={values.billing_locality}
               aria-invalid={localityIssue ? true : undefined}
@@ -75,6 +78,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_region"
+              maxLength={CLIENT_TEXT_LIMITS.billing_region}
               autoComplete="address-level1"
               defaultValue={values.billing_region}
               aria-invalid={regionIssue ? true : undefined}
@@ -84,6 +88,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           <Field label="Postal code" hint="Optional." error={postalCodeIssue?.message}>
             <Input
               name="billing_postal_code"
+              maxLength={CLIENT_TEXT_LIMITS.billing_postal_code}
               autoComplete="postal-code"
               defaultValue={values.billing_postal_code}
               aria-invalid={postalCodeIssue ? true : undefined}
@@ -97,6 +102,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_country"
+              maxLength={CLIENT_TEXT_LIMITS.billing_country}
               list="billing-countries"
               autoComplete="country-name"
               defaultValue={countryName(values.billing_country)}
@@ -117,6 +123,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="billing_currency"
+            maxLength={CLIENT_TEXT_LIMITS.billing_currency}
             list="billing-currencies"
             defaultValue={values.billing_currency.trim().toUpperCase()}
             aria-invalid={currencyIssue ? true : undefined}

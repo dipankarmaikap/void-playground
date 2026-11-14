@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { parseClientContacts } from '../../../../data/client-contacts.ts';
+import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { issueFor, readText } from '../form-values.ts';
@@ -46,6 +47,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
           <Input
             name="email"
             type="email"
+            maxLength={CLIENT_TEXT_LIMITS.email}
             defaultValue={values.email}
             aria-invalid={emailIssue ? true : undefined}
             variant={errorVariant(emailIssue)}
@@ -59,6 +61,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
           <Input
             name="phone"
             type="tel"
+            maxLength={CLIENT_TEXT_LIMITS.phone}
             defaultValue={values.phone}
             aria-invalid={phoneIssue ? true : undefined}
             variant={errorVariant(phoneIssue)}
@@ -75,6 +78,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="contact_name"
+              maxLength={CLIENT_TEXT_LIMITS.contact_name}
               defaultValue={values.contact_name}
               aria-invalid={contactNameIssue ? true : undefined}
               variant={errorVariant(contactNameIssue)}
@@ -83,6 +87,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
           <Field label="Role" hint="Optional." error={contactRoleIssue?.message}>
             <Input
               name="contact_role"
+              maxLength={CLIENT_TEXT_LIMITS.contact_role}
               defaultValue={values.contact_role}
               aria-invalid={contactRoleIssue ? true : undefined}
               variant={errorVariant(contactRoleIssue)}
@@ -92,6 +97,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
             <Input
               name="contact_email"
               type="email"
+              maxLength={CLIENT_TEXT_LIMITS.contact_email}
               defaultValue={values.contact_email}
               aria-invalid={contactEmailIssue ? true : undefined}
               variant={errorVariant(contactEmailIssue)}
@@ -101,6 +107,7 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
             <Input
               name="contact_phone"
               type="tel"
+              maxLength={CLIENT_TEXT_LIMITS.contact_phone}
               defaultValue={values.contact_phone}
               aria-invalid={contactPhoneIssue ? true : undefined}
               variant={errorVariant(contactPhoneIssue)}

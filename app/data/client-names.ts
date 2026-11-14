@@ -1,3 +1,5 @@
+import { CLIENT_TEXT_LIMITS } from './client-text.ts';
+
 export type ClientType = 'individual' | 'business';
 
 export const CLIENT_TYPES: readonly ClientType[] = ['individual', 'business'];
@@ -8,7 +10,7 @@ export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
 };
 
 /** Longest legal, preferred, or trading name the form accepts. */
-export const CLIENT_NAME_MAX_LENGTH = 120;
+export const CLIENT_NAME_MAX_LENGTH = CLIENT_TEXT_LIMITS.legal_name;
 
 export interface ClientNameFields {
   type: ClientType;

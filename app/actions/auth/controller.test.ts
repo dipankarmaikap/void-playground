@@ -4,7 +4,14 @@ import { describe, it } from 'remix/test';
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
 import { db, users } from '../../data/db.ts';
-import { cookieFromResponse, createUser, extractCsrf, login, origin } from '../../../test/http.ts';
+import {
+  cookieFromResponse,
+  createUser,
+  extractCsrf,
+  login,
+  origin,
+  submitForm,
+} from '../../../test/http.ts';
 
 const base = origin;
 
@@ -145,7 +152,7 @@ describe('auth controller', () => {
       verification_expires_at: Date.now() - 1000,
     });
 
-    let verifyUrl = new URL(routes.auth.verify.href(), base);
+    let verifyUrl = new URL(routes.auth.verify.index.href(), base);
     verifyUrl.searchParams.set('token', token);
     let response = await router.fetch(verifyUrl);
     assert.equal(response.status, 302);
@@ -153,6 +160,148 @@ describe('auth controller', () => {
 
     let user = await db.find(users, userId);
     assert.equal(user?.email_verified, false);
+  });
+
+  it('renders a confirmation form for a valid verification link without changing the User', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() + 60_000,
+    });
+
+    let verifyUrl = new URL(routes.auth.verify.index.href(), base);
+    verifyUrl.searchParams.set('token', token);
+    let response = await router.fetch(verifyUrl);
+    let html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /<form[^>]*method="post"[^>]*action="\/verify"/);
+    assert.match(html, new RegExp(`name="token"[^>]*value="${token}"`));
+    assert.match(html, /name="_csrf"/);
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, false);
+    assert.equal(user?.verification_token, token);
+  });
+
+  it('verifies a User only after a valid confirmation POST', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() + 60_000,
+    });
+
+    let verifyUrl = new URL(routes.auth.verify.index.href(), base);
+    verifyUrl.searchParams.set('token', token);
+    let response = await submitForm(
+      router,
+      verifyUrl.href,
+      routes.auth.verify.action.href(),
+      { token },
+    );
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, true);
+    assert.equal(user?.verification_token, null);
+    assert.equal(user?.verification_expires_at, null);
+  });
+
+  it('rejects invalid and expired verification POSTs with accessible feedback', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() - 1000,
+    });
+
+    for (let invalidToken of ['not-a-token', token]) {
+      let response = await submitForm(
+        router,
+        routes.auth.login.index.href(),
+        routes.auth.verify.action.href(),
+        { token: invalidToken },
+      );
+      assert.equal(response.status, 302);
+      assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+
+      let followUp = await router.fetch(
+        new URL(routes.auth.login.index.href(), base),
+        { headers: { Cookie: cookieFromResponse(response) } },
+      );
+      assert.match(await followUp.text(), /<p role="alert"[^>]*>Invalid or expired verification link<\/p>/);
+    }
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, false);
+    assert.equal(user?.verification_token, token);
+  });
+
+  it('rejects a reused verification token without changing the verified User', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() + 60_000,
+    });
+
+    let verifyUrl = new URL(routes.auth.verify.index.href(), base);
+    verifyUrl.searchParams.set('token', token);
+    let first = await submitForm(
+      router,
+      verifyUrl.href,
+      routes.auth.verify.action.href(),
+      { token },
+    );
+    assert.equal(first.status, 302);
+
+    let reused = await submitForm(
+      router,
+      routes.auth.login.index.href(),
+      routes.auth.verify.action.href(),
+      { token },
+    );
+    assert.equal(reused.status, 302);
+    let followUp = await router.fetch(
+      new URL(routes.auth.login.index.href(), base),
+      { headers: { Cookie: cookieFromResponse(reused) } },
+    );
+    assert.match(await followUp.text(), /<p role="alert"[^>]*>Invalid or expired verification link<\/p>/);
+
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, true);
+    assert.equal(user?.verification_token, null);
+  });
+
+  it('rejects Email Verification without a CSRF token', async () => {
+    let email = `auth-${crypto.randomUUID()}@example.com`;
+    let token = crypto.randomUUID();
+    let userId = await createUser(email, 'password123', false);
+    await db.update(users, userId, {
+      verification_token: token,
+      verification_expires_at: Date.now() + 60_000,
+    });
+
+    let response = await router.fetch(
+      new URL(routes.auth.verify.action.href(), base),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token }).toString(),
+      },
+    );
+
+    assert.equal(response.status, 403);
+    let user = await db.find(users, userId);
+    assert.equal(user?.email_verified, false);
+    assert.equal(user?.verification_token, token);
   });
 
   it('rejects a duplicate email without creating another user', async () => {

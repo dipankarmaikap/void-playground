@@ -262,4 +262,41 @@ describe('app controller', () => {
     assert.match(html, /This session/);
     assert.match(html, /action="\/logout"/);
   });
+
+  it('marks dashboard, Profile, Sessions, and Client HTML as private and non-storing', async () => {
+    let { sessionCookie } = await loginNewUser();
+    let created = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      { type: 'individual', legal_name: `Cache Client ${crypto.randomUUID()}` },
+      sessionCookie,
+    );
+    assert.equal(created.status, 302);
+    let clientPath = created.headers.get('Location');
+    assert.ok(clientPath);
+    let clientId = new URL(clientPath, origin).pathname.split('/').at(-1);
+    assert.ok(clientId);
+
+    let paths = [
+      routes.app.dashboard.href(),
+      routes.app.settings.profile.index.href(),
+      routes.app.settings.sessions.index.href(),
+      routes.app.clients.index.href(),
+      clientPath,
+      routes.app.clients.new.index.href(),
+      routes.app.clients.edit.index.href({ clientId }),
+    ];
+
+    for (let path of paths) {
+      let response = await router.fetch(new URL(path, origin), {
+        headers: { Cookie: sessionCookie },
+      });
+      assert.equal(response.status, 200, `${path} should render`);
+      assert.equal(
+        response.headers.get('Cache-Control'),
+        'private, no-store',
+        `${path} should not be stored by browser or shared caches`,
+      );
+    }
+  });
 });

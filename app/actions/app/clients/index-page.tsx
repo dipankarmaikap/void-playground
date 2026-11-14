@@ -4,8 +4,7 @@ import { css } from 'remix/component';
 import { APP_NAME } from '../../../config.ts';
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { ClientStatus } from '../../../data/client-status.ts';
-import type { ClientTypeFilter } from '../../../data/clients.ts';
-import type { Client } from '../../../data/db.ts';
+import type { ClientDirectoryItem, ClientTypeFilter } from '../../../data/clients.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';
@@ -27,10 +26,13 @@ import { colors, radius, shadow } from '../../../ui/theme.ts';
 export interface ClientsIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  clients: Client[];
+  clients: ClientDirectoryItem[];
   query: string;
   type: ClientTypeFilter;
   status: ClientStatus;
+  page: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
   error?: string;
   message?: string;
 }
@@ -39,14 +41,16 @@ interface DirectoryFilters {
   q: string;
   type: ClientTypeFilter;
   status: ClientStatus;
+  page?: number;
 }
 
 /** Builds a directory URL that keeps the current search and type while switching status. */
-function directoryHref({ q, type, status }: DirectoryFilters): string {
+function directoryHref({ q, type, status, page }: DirectoryFilters): string {
   let searchParams: Record<string, string> = {};
   if (q) searchParams.q = q;
   if (type !== 'all') searchParams.type = type;
   if (status === 'archived') searchParams.status = 'archived';
+  if (page && page > 1) searchParams.page = String(page);
 
   return Object.keys(searchParams).length === 0
     ? routes.app.clients.index.href()
@@ -85,6 +89,21 @@ const statusNavStyle = css({
   flexWrap: 'wrap',
   alignItems: 'center',
   gap: '0.5rem',
+});
+
+const paginationStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.75rem',
+  marginTop: '1.5rem',
+});
+
+const pageNumberStyle = css({
+  color: colors.muted,
+  fontSize: '0.875rem',
+  fontWeight: 600,
 });
 
 const statusLinkStyle = css({
@@ -169,11 +188,25 @@ const emptyHintStyle = css({
 
 export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
   return () => {
-    let { csrfToken, identity, clients, query, type, status, error, message } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      clients,
+      query,
+      type,
+      status,
+      page,
+      hasPrevious,
+      hasNext,
+      error,
+      message,
+    } = handle.props;
     let archived = status === 'archived';
     let hasFilters = query !== '' || type !== 'all';
     let activeHref = directoryHref({ q: query, type, status: 'active' });
     let archivedHref = directoryHref({ q: query, type, status: 'archived' });
+    let previousHref = directoryHref({ q: query, type, status, page: page - 1 });
+    let nextHref = directoryHref({ q: query, type, status, page: page + 1 });
 
     return (
       <AppShell
@@ -316,6 +349,19 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
             })}
           </ul>
         )}
+        {hasPrevious || hasNext ? (
+          <nav aria-label="Client pages" mix={paginationStyle}>
+            {hasPrevious ? (
+              <a href={previousHref} data-variant="secondary" mix={linkButtonStyle}>
+                Previous
+              </a>
+            ) : null}
+            <span aria-current="page" mix={pageNumberStyle}>
+              Page {page}
+            </span>
+            {hasNext ? <a href={nextHref} mix={linkButtonStyle}>Next</a> : null}
+          </nav>
+        ) : null}
       </AppShell>
     );
   };

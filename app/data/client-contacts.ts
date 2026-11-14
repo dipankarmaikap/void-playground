@@ -1,3 +1,5 @@
+import { validateClientTextFields } from './client-text.ts';
+
 export const CLIENT_CONTACT_FIELDS = [
   'email',
   'phone',
@@ -45,6 +47,16 @@ const PHONE_PATTERN = /^\+?[\d\s()-]+$/;
  * If any primary-contact field is present, the contact name is required.
  */
 export function parseClientContacts(input: ClientContactInput): ClientContactResult {
+  let lengthIssues = validateClientTextFields({
+    email: input.email ?? '',
+    phone: input.phone ?? '',
+    contact_name: input.contact_name ?? '',
+    contact_role: input.contact_role ?? '',
+    contact_email: input.contact_email ?? '',
+    contact_phone: input.contact_phone ?? '',
+  });
+  if (lengthIssues.length > 0) return { ok: false, issues: lengthIssues };
+
   let issues: ClientContactIssue[] = [];
 
   let email = clean(input.email);

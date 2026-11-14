@@ -4,7 +4,7 @@ import { ImportMap } from 'remix/component/server';
 import { getContext } from 'remix/middleware/async-context';
 import { getCspNonce } from 'remix/middleware/csp';
 
-import { scriptEntry } from '../assets.ts';
+import { documentScriptEntry } from '../assets.ts';
 import { APP_NAME } from '../config.ts';
 
 export interface DocumentProps {
@@ -19,7 +19,7 @@ export interface DocumentProps {
 export function Document(handle: Handle<DocumentProps>) {
   return () => {
     let { children, head, title, description, noindex = false, social = false } = handle.props;
-    let { href, importMap, preloads } = scriptEntry;
+    let { href, importMap, preloads } = getContext().get(documentScriptEntry);
     let nonce = getCspNonce(getContext());
     let pageTitle = title ? `${title} | ${APP_NAME}` : APP_NAME;
 

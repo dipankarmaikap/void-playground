@@ -9,7 +9,7 @@ import { findClient, updateClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
 import { routes } from '../../../../routes.ts';
 import { clientFormValuesOf, readClientFormValues } from '../form-values.ts';
-import { clientFormSections } from '../sections/registry.ts';
+import { parseClientForm } from '../parse-client-form.ts';
 import { EditClientPage } from './page.tsx';
 
 export default createController(routes.app.clients.edit, {
@@ -35,14 +35,9 @@ export default createController(routes.app.clients.edit, {
       let client = await findClient(context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
-      let parsed = await Promise.all(
-        clientFormSections.map((section) =>
-          section.parse(context.formData, { clientId: client.id }),
-        ),
-      );
-      let issues = parsed.flatMap((result) => result.issues);
-      let changes = Object.assign({}, ...parsed.map((result) => result.changes));
-      let warning = parsed.find((result) => result.warning)?.warning;
+      let { issues, changes, warning } = await parseClientForm(context.formData, {
+        clientId: client.id,
+      });
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;
 

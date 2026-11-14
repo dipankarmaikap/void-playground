@@ -7,6 +7,7 @@ import {
   clientTypeLabel,
   parseClientNames,
 } from '../../../../data/client-names.ts';
+import { validateClientTextFields, CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
 import { Select } from '../../../../ui/select.tsx';
@@ -26,6 +27,7 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
     let legalNameIssue = issueFor(issues, 'legal_name');
     let preferredNameIssue = issueFor(issues, 'preferred_name');
     let tradingNameIssue = issueFor(issues, 'trading_name');
+    let industryIssue = issueFor(issues, 'industry');
     let isBusiness = values.type === 'business';
 
     return (
@@ -92,8 +94,15 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           <Field
             label="Industry"
             hint="Optional. Describe the line of work in your own words."
+            error={industryIssue?.message}
           >
-            <Input name="industry" defaultValue={values.industry} />
+            <Input
+              name="industry"
+              maxLength={CLIENT_TEXT_LIMITS.industry}
+              defaultValue={values.industry}
+              aria-invalid={industryIssue ? true : undefined}
+              variant={industryIssue ? 'error' : 'default'}
+            />
           </Field>
         </div>
       </>
@@ -108,6 +117,7 @@ export const profileSection: ClientFormSection = {
     let type = readText(formData, 'type');
     let legalName = readText(formData, 'legal_name');
     let industry = readText(formData, 'industry');
+    let industryIssues = validateClientTextFields({ industry });
     let parsed = parseClientNames({
       type,
       legal_name: legalName,
@@ -115,13 +125,21 @@ export const profileSection: ClientFormSection = {
       trading_name: readText(formData, 'trading_name'),
     });
 
-    if (!parsed.ok) {
+    if (!parsed.ok || industryIssues.length > 0) {
       return {
         changes: {},
-        issues: parsed.issues.map((issue) => ({
-          message: issue.message,
-          path: [issue.field],
-        })),
+        issues: [
+          ...(parsed.ok
+            ? []
+            : parsed.issues.map((issue) => ({
+                message: issue.message,
+                path: [issue.field],
+              }))),
+          ...industryIssues.map((issue) => ({
+            message: issue.message,
+            path: [issue.field],
+          })),
+        ],
       };
     }
 

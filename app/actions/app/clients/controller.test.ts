@@ -192,6 +192,79 @@ describe('clients controller', () => {
     assert.equal(stored?.preferred_name, null);
   });
 
+  it('aggregates section errors consistently on create and edit', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let invalidValues = {
+      type: 'individual',
+      legal_name: '',
+      email: 'not-an-email',
+      phone: 'not-a-phone',
+      tax_country: 'IN',
+      tax_type: 'gstin',
+      tax_value: '123',
+      tax_state_code: '27',
+      billing_line1: '',
+      billing_country: 'US',
+    };
+
+    let created = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      invalidValues,
+      sessionCookie,
+    );
+    assert.equal(created.status, 400);
+    let createHtml = await created.text();
+    for (let message of [
+      'Enter the legal name.',
+      'Enter a valid email address.',
+      'valid international phone number',
+      '15-character GSTIN',
+      'Enter billing address line 1.',
+    ]) {
+      assert.ok(createHtml.includes(message), `create should report: ${message}`);
+    }
+    assert.match(createHtml, /name="email"[^>]*value="not-an-email"/);
+    assert.match(createHtml, /name="tax_value"[^>]*value="123"/);
+
+    let legalName = uniqueName('Unchanged client');
+    let seed = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      { type: 'individual', legal_name: legalName },
+      sessionCookie,
+    );
+    assert.equal(seed.status, 302);
+    let client = await db.findOne(clients, { where: { legal_name: legalName } });
+    assert.ok(client);
+
+    let edited = await postForm(
+      router,
+      routes.app.clients.edit.action.href({ clientId: client.id }),
+      invalidValues,
+      sessionCookie,
+    );
+    assert.equal(edited.status, 400);
+    let editHtml = await edited.text();
+    for (let message of [
+      'Enter the legal name.',
+      'Enter a valid email address.',
+      'valid international phone number',
+      '15-character GSTIN',
+      'Enter billing address line 1.',
+    ]) {
+      assert.ok(editHtml.includes(message), `edit should report: ${message}`);
+    }
+    assert.match(editHtml, /name="email"[^>]*value="not-an-email"/);
+    assert.match(editHtml, /name="tax_value"[^>]*value="123"/);
+
+    let stored = await db.find(clients, client.id);
+    assert.equal(stored?.legal_name, legalName);
+    assert.equal(stored?.email, null);
+    assert.equal(stored?.tax_value, null);
+    assert.equal(stored?.billing_line1, null);
+  });
+
   it('rejects Client mutations without a CSRF token', async () => {
     let sessionCookie = await createUserAndLogin(router, 'clients');
     let legalName = uniqueName('No Token');

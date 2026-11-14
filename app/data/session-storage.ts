@@ -49,11 +49,11 @@ export function createHybridSessionStorage(): SessionStorage {
     async save(session: Session) {
       // always attempt to clean up a previous DB row (harmless if none)
       if (session.deleteId) {
-        db.delete(sessions, session.deleteId).catch(() => {});
+        await db.delete(sessions, session.deleteId);
       }
 
       if (session.destroyed) {
-        db.delete(sessions, session.id).catch(() => {});
+        await db.delete(sessions, session.id);
         return '';
       }
 

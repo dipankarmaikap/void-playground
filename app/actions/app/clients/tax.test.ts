@@ -109,6 +109,62 @@ describe('client tax identifiers', () => {
     assert.match(editPage, /<option[^>]*value="27"[^>]*selected/);
   });
 
+  it('rejects a GSTIN whose State code differs from the selected State/UT', async () => {
+    let sessionCookie = await createUserAndLogin(router, 'tax');
+    let legalName = uniqueName('Mismatched GSTIN Client');
+
+    let created = await postForm(
+      router,
+      routes.app.clients.new.action.href(),
+      clientFields({
+        legal_name: legalName,
+        tax_country: 'IN',
+        tax_type: 'gstin',
+        tax_value: VALID_GSTIN,
+        tax_state_code: '29',
+      }),
+      sessionCookie,
+    );
+
+    assert.equal(created.status, 400);
+    let createHtml = await created.text();
+    assert.match(createHtml, /State or UT code must match the first two digits of the GSTIN/);
+    assert.match(createHtml, /name="tax_value"[^>]*value="27AAPCS2319F1Z5"/);
+    assert.match(createHtml, /name="tax_state_code"[^>]*aria-invalid="true"/);
+    assert.match(createHtml, /<option[^>]*value="29"[^>]*selected/);
+    assert.equal(await db.findOne(clients, { where: { legal_name: legalName } }), null);
+
+    let existingName = uniqueName('Matching GSTIN Client');
+    await createProfile(sessionCookie, {
+      legal_name: existingName,
+      tax_country: 'IN',
+      tax_type: 'gstin',
+      tax_value: VALID_GSTIN,
+      tax_state_code: '27',
+    });
+    let client = await db.findOne(clients, { where: { legal_name: existingName } });
+    assert.ok(client);
+
+    let edited = await postForm(
+      router,
+      routes.app.clients.edit.action.href({ clientId: client.id }),
+      clientFields({
+        legal_name: existingName,
+        tax_country: 'IN',
+        tax_type: 'gstin',
+        tax_value: VALID_GSTIN,
+        tax_state_code: '29',
+      }),
+      sessionCookie,
+    );
+    assert.equal(edited.status, 400);
+    assert.match(await edited.text(), /State or UT code must match the first two digits of the GSTIN/);
+
+    let stored = await db.find(clients, client.id);
+    assert.equal(stored?.tax_state_code, '27');
+    assert.equal(stored?.tax_value, VALID_GSTIN);
+  });
+
   it('records an India UIN with its State or UT name and code', async () => {
     let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('UIN Client');

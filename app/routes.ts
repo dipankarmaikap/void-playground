@@ -4,11 +4,11 @@ import { appRoutes } from './actions/app/routes.ts';
 
 export const routes = route({
   assets: get('/assets/*path'),
-  home: '/',
+  home: get('/'),
   auth: {
     login: form('/login'),
     register: form('/register'),
-    verify: get('/verify'),
+    verify: form('/verify'),
     logout: post('/logout'),
   },
   app: route('/app', appRoutes),
