@@ -1,41 +1,141 @@
+import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from './document.tsx';
+import { APP_NAME } from '../config.ts';
 import { routes } from '../routes.ts';
+import { colors, fontFamily, radius } from '../ui/theme.ts';
+import { Document } from './document.tsx';
 
-export function HomePage() {
-  return () => (
-    <Document title="Home">
-      <main
-        mix={css({
-          margin: 0,
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          fontFamily: 'system-ui, sans-serif',
-        })}
+export interface HomePageProps {
+  authenticated: boolean;
+}
+
+const pageStyle = css({
+  margin: 0,
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '24px',
+  boxSizing: 'border-box',
+  background: colors.background,
+  color: colors.text,
+  fontFamily,
+});
+
+const welcomeStyle = css({
+  width: '100%',
+  maxWidth: '40rem',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1rem',
+  textAlign: 'center',
+});
+
+const brandStyle = css({
+  margin: 0,
+  color: colors.accent,
+  fontSize: '0.875rem',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+});
+
+const headingStyle = css({
+  margin: 0,
+  fontSize: '2.5rem',
+  lineHeight: 1.1,
+  letterSpacing: '-0.02em',
+});
+
+const introStyle = css({
+  margin: 0,
+  maxWidth: '32rem',
+  color: colors.muted,
+  fontSize: '1.125rem',
+  lineHeight: 1.6,
+});
+
+const actionsStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'center',
+  gap: '0.75rem',
+  marginTop: '0.5rem',
+});
+
+const actionStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '10px 18px',
+  border: '1px solid transparent',
+  borderRadius: radius.md,
+  background: colors.accent,
+  color: '#ffffff',
+  fontSize: '0.9375rem',
+  fontWeight: 600,
+  textDecoration: 'none',
+  '&:hover': {
+    background: colors.accentHover,
+  },
+  '&[data-variant="secondary"]': {
+    background: colors.surface,
+    color: colors.text,
+    borderColor: colors.border,
+  },
+  '&[data-variant="secondary"]:hover': {
+    background: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+});
+
+export function HomePage(handle: Handle<HomePageProps>) {
+  return () => {
+    let { authenticated } = handle.props;
+
+    return (
+      <Document
+        title="Home"
+        description={`Welcome to ${APP_NAME}. Create an account or log in to get started.`}
+        social
       >
-        <div
-          mix={css({
-            width: '100%',
-            maxWidth: '360px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            alignItems: 'center',
-            textAlign: 'center',
-          })}
-        >
-          <h1 mix={css({ margin: 0, fontSize: '24px' })}>Welcome</h1>
-          <p mix={css({ margin: 0 })}>Sign in to continue.</p>
-          <nav mix={css({ display: 'flex', gap: '12px' })}>
-            <a href={routes.auth.login.index.href()}>Log in</a>
-            <a href={routes.auth.register.index.href()}>Register</a>
-          </nav>
-        </div>
-      </main>
-    </Document>
-  );
+        <main mix={pageStyle}>
+          <div mix={welcomeStyle}>
+            <p mix={brandStyle}>{APP_NAME}</p>
+            <h1 mix={headingStyle}>Welcome to {APP_NAME}</h1>
+            <p mix={introStyle}>Create an account or log in to get started.</p>
+            {authenticated ? (
+              <nav aria-label="Your account" mix={actionsStyle}>
+                <a href={routes.app.dashboard.href()} mix={actionStyle}>
+                  Go to dashboard
+                </a>
+                <a
+                  href={routes.app.settings.index.href()}
+                  data-variant="secondary"
+                  mix={actionStyle}
+                >
+                  Account settings
+                </a>
+              </nav>
+            ) : (
+              <nav aria-label="Get started" mix={actionsStyle}>
+                <a href={routes.auth.register.index.href()} mix={actionStyle}>
+                  Create account
+                </a>
+                <a
+                  href={routes.auth.login.index.href()}
+                  data-variant="secondary"
+                  mix={actionStyle}
+                >
+                  Log in
+                </a>
+              </nav>
+            )}
+          </div>
+        </main>
+      </Document>
+    );
+  };
 }

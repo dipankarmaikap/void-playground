@@ -1,5 +1,4 @@
 import { createController } from 'remix/router';
-import { redirect } from 'remix/response/redirect';
 
 import { Auth } from 'remix/middleware/auth';
 import type { AuthState } from 'remix/middleware/auth';
@@ -16,10 +15,7 @@ export default createController(routes, {
     },
     home(context) {
       let auth = context.get(Auth) as AuthState<User>;
-      if (auth?.ok) {
-        return redirect('/app/dashboard');
-      }
-      return context.render(<HomePage />);
+      return context.render(<HomePage authenticated={Boolean(auth?.ok)} />);
     },
   },
 });

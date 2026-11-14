@@ -1,10 +1,14 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Document } from '../../document.tsx';
+import { APP_NAME } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
-import { Input } from '../../../ui/input.tsx';
+import { AuthLayout } from '../../../ui/auth-layout.tsx';
+import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
+import { Input } from '../../../ui/input.tsx';
+import { colors, radius } from '../../../ui/theme.ts';
+import { Document } from '../../document.tsx';
 
 export interface LoginPageProps {
   csrfToken: string;
@@ -13,64 +17,111 @@ export interface LoginPageProps {
   email?: string;
 }
 
+const headerStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.375rem',
+});
+
+const headingStyle = css({
+  margin: 0,
+  fontSize: '1.5rem',
+  lineHeight: 1.2,
+});
+
+const subtitleStyle = css({
+  margin: 0,
+  color: colors.muted,
+  fontSize: '0.9375rem',
+  lineHeight: 1.5,
+});
+
+const errorStyle = css({
+  margin: 0,
+  padding: '10px 12px',
+  border: `1px solid ${colors.danger}`,
+  borderRadius: radius.sm,
+  background: colors.dangerSoft,
+  color: colors.danger,
+  fontSize: '0.875rem',
+});
+
+const statusStyle = css({
+  margin: 0,
+  padding: '10px 12px',
+  border: `1px solid ${colors.success}`,
+  borderRadius: radius.sm,
+  background: colors.successSoft,
+  color: colors.success,
+  fontSize: '0.875rem',
+});
+
+const formStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+});
+
+const footerStyle = css({
+  margin: 0,
+  color: colors.muted,
+  fontSize: '0.875rem',
+});
+
+const linkStyle = css({
+  color: colors.accent,
+  fontWeight: 600,
+  textDecoration: 'none',
+  '&:hover': {
+    color: colors.accentHover,
+    textDecoration: 'underline',
+  },
+});
+
 export function LoginPage(handle: Handle<LoginPageProps>) {
   return () => {
     let { csrfToken, error, message, email } = handle.props;
 
     return (
-      <Document title="Login">
-        <main
-          mix={css({
-            margin: 0,
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-            fontFamily: 'system-ui, sans-serif',
-          })}
-        >
-          <div
-            mix={css({
-              width: '100%',
-              maxWidth: '360px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            })}
-          >
-            <h1 mix={css({ margin: 0, fontSize: '24px' })}>Login</h1>
-            {error ? (
-              <p mix={css({ margin: 0, color: '#b00020' })} role="alert">
-                {error}
-              </p>
-            ) : null}
-            {message ? (
-              <p mix={css({ margin: 0, color: '#0a7d2b' })} role="status">
-                {message}
-              </p>
-            ) : null}
-            <form
-              method="post"
-              action={routes.auth.login.action.href()}
-              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
-            >
-              <input type="hidden" name="_csrf" value={csrfToken} />
-              <Field label="Email">
-                <Input name="email" type="email" defaultValue={email ?? ''} required />
-              </Field>
-              <Field label="Password">
-                <Input name="password" type="password" required />
-              </Field>
-              <button type="submit" mix={css({ padding: '10px', cursor: 'pointer' })}>
-                Log in
-              </button>
-            </form>
-            <p mix={css({ margin: 0 })}>
-              No account? <a href={routes.auth.register.index.href()}>Register</a>
+      <Document title="Log in" description={`Log in to ${APP_NAME} to open your dashboard.`}>
+        <AuthLayout>
+          <header mix={headerStyle}>
+            <h1 mix={headingStyle}>Log in</h1>
+            <p mix={subtitleStyle}>Enter your email and password to open your dashboard.</p>
+          </header>
+          {error ? (
+            <p role="alert" mix={errorStyle}>
+              {error}
             </p>
-          </div>
-        </main>
+          ) : null}
+          {message ? (
+            <p role="status" mix={statusStyle}>
+              {message}
+            </p>
+          ) : null}
+          <form method="post" action={routes.auth.login.action.href()} mix={formStyle}>
+            <input type="hidden" name="_csrf" value={csrfToken} />
+            <Field label="Email">
+              <Input
+                name="email"
+                type="email"
+                autoComplete="email"
+                defaultValue={email ?? ''}
+                required
+              />
+            </Field>
+            <Field label="Password">
+              <Input name="password" type="password" autoComplete="current-password" required />
+            </Field>
+            <Button type="submit">Log in</Button>
+          </form>
+          <p mix={footerStyle}>
+            No account?{' '}
+            <a href={routes.auth.register.index.href()} mix={linkStyle}>
+              Register
+            </a>
+          </p>
+        </AuthLayout>
       </Document>
     );
   };

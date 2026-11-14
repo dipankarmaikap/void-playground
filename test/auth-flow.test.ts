@@ -34,6 +34,14 @@ describe('auth flow', () => {
     assert.ok(user.verification_token);
     assert.equal(user.email_verified, false);
 
+    let afterRegister = await router.fetch(new URL(routes.auth.login.index.href(), origin), {
+      headers: { Cookie: cookieFromResponse(registerResponse) },
+    });
+    assert.match(
+      await afterRegister.text(),
+      /<p role="status"[^>]*>Check your email to verify your account<\/p>/,
+    );
+
     let verifyUrl = new URL(routes.auth.verify.href(), origin);
     verifyUrl.searchParams.set('token', user.verification_token);
     let verifyResponse = await router.fetch(verifyUrl);
@@ -43,6 +51,14 @@ describe('auth flow', () => {
     let verified = await db.find(users, user.id);
     assert.equal(verified?.email_verified, true);
     assert.equal(verified?.verification_token, null);
+
+    let afterVerify = await router.fetch(new URL(routes.auth.login.index.href(), origin), {
+      headers: { Cookie: cookieFromResponse(verifyResponse) },
+    });
+    assert.match(
+      await afterVerify.text(),
+      /<p role="status"[^>]*>Email verified\. You can now log in\.<\/p>/,
+    );
 
     let sessionCookie = await login(router, normalizedEmail, password);
     let dashboard = await router.fetch(new URL(routes.app.dashboard.href(), origin), {

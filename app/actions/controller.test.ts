@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { createUser, login, origin } from '../../test/http.ts';
 import { router } from '../router.ts';
 import { routes } from '../routes.ts';
 
@@ -13,6 +14,55 @@ describe('root controller', () => {
     assert.match(await response.text(), /<html[\s>]/);
   });
 
+  it('GET / gives anonymous visitors a titled, descriptive home page', async () => {
+    let response = await router.fetch(new URL(routes.home.href(), origin));
+    let html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>Home \| My Remix App<\/title>/);
+    assert.match(html, /<meta name="description" content="Welcome to My Remix App\./);
+    assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
+  });
+
+  it('GET / offers anonymous visitors registration and login actions', async () => {
+    let response = await router.fetch(new URL(routes.home.href(), origin));
+    let html = await response.text();
+
+    assert.match(html, /<a[^>]*href="\/register"[^>]*>Create account<\/a>/);
+    assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);
+  });
+
+  it('GET / exposes social-preview metadata', async () => {
+    let response = await router.fetch(new URL(routes.home.href(), origin));
+    let html = await response.text();
+
+    assert.match(html, /<meta property="og:type" content="website"/);
+    assert.match(html, /<meta property="og:site_name" content="My Remix App"/);
+    assert.match(html, /<meta property="og:title" content="Home \| My Remix App"/);
+    assert.match(html, /<meta property="og:description" content="[^"]*My Remix App/);
+    assert.match(html, /<meta name="twitter:card" content="summary"/);
+    assert.match(html, /<meta name="twitter:title" content="Home \| My Remix App"/);
+    assert.match(html, /<meta name="twitter:description" content="[^"]*My Remix App/);
+  });
+
+  it('GET / remains public for an authenticated user and links to the app', async () => {
+    let email = `home-${crypto.randomUUID()}@example.com`;
+    await createUser(email, 'password123');
+    let sessionCookie = await login(router, email, 'password123');
+
+    let response = await router.fetch(new URL(routes.home.href(), origin), {
+      headers: { Cookie: sessionCookie },
+    });
+    let html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>Home \| My Remix App<\/title>/);
+    assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*>Go to dashboard<\/a>/);
+    assert.match(html, /<a[^>]*href="\/app\/settings"[^>]*>Account settings<\/a>/);
+    assert.doesNotMatch(html, /href="\/register"/);
+    assert.doesNotMatch(html, /href="\/login"/);
+  });
+
   it('GET / applies a nonce-based content security policy', async () => {
     let response = await router.fetch(new URL(routes.home.href(), 'http://localhost'));
     let policy = response.headers.get('Content-Security-Policy') ?? '';
@@ -23,6 +73,7 @@ describe('root controller', () => {
     assert.match(policy, /style-src 'nonce-/);
 
     let html = await response.text();
-    assert.match(html, new RegExp(`<script type="module"[^>]*nonce="${nonce}"`));
+    let escapedNonce = nonce.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(html, new RegExp(`<script type="module"[^>]*nonce="${escapedNonce}"`));
   });
 });

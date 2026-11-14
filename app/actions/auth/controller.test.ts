@@ -23,6 +23,60 @@ describe('auth controller', () => {
     assert.match(response.headers.get('Content-Type') ?? '', /text\/html/);
   });
 
+  it('GET /login renders a branded card with metadata and a link to registration', async () => {
+    let response = await router.fetch(new URL(routes.auth.login.index.href(), base));
+    let html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>Log in \| My Remix App<\/title>/);
+    assert.match(
+      html,
+      /<meta name="description" content="Log in to My Remix App to open your dashboard\."/,
+    );
+    assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
+    assert.match(html, /<a[^>]*href="\/"[^>]*>My Remix App<\/a>/);
+    assert.match(html, /<form[^>]*method="post"[^>]*action="\/login"/);
+    assert.match(html, /name="_csrf"/);
+    assert.match(html, /<a[^>]*href="\/register"[^>]*>Register<\/a>/);
+  });
+
+  it('GET /register renders a branded card with metadata and a link to login', async () => {
+    let response = await router.fetch(new URL(routes.auth.register.index.href(), base));
+    let html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>Register \| My Remix App<\/title>/);
+    assert.match(
+      html,
+      /<meta name="description" content="Create a My Remix App account with your email address\."/,
+    );
+    assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
+    assert.match(html, /<a[^>]*href="\/"[^>]*>My Remix App<\/a>/);
+    assert.match(html, /<form[^>]*method="post"[^>]*action="\/register"/);
+    assert.match(html, /name="_csrf"/);
+    assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);
+  });
+
+  it('gives login and registration distinct titles and descriptions', async () => {
+    let loginHtml = await (
+      await router.fetch(new URL(routes.auth.login.index.href(), base))
+    ).text();
+    let registerHtml = await (
+      await router.fetch(new URL(routes.auth.register.index.href(), base))
+    ).text();
+
+    let readTitle = (html: string) => /<title>([^<]+)<\/title>/.exec(html)?.[1];
+    let readDescription = (html: string) =>
+      /<meta name="description" content="([^"]+)"/.exec(html)?.[1];
+
+    assert.ok(readTitle(loginHtml));
+    assert.ok(readTitle(registerHtml));
+    assert.notEqual(readTitle(loginHtml), readTitle(registerHtml));
+    assert.ok(readDescription(loginHtml));
+    assert.ok(readDescription(registerHtml));
+    assert.notEqual(readDescription(loginHtml), readDescription(registerHtml));
+  });
+
   it('GET /login redirects authenticated users to the dashboard', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     await createUser(email, 'password123');
@@ -67,7 +121,10 @@ describe('auth controller', () => {
     let followUp = await router.fetch(new URL(routes.auth.login.index.href(), base), {
       headers: { Cookie: cookieFromResponse(response) },
     });
-    assert.match(await followUp.text(), /Invalid email or password/);
+    assert.match(
+      await followUp.text(),
+      /<p role="alert"[^>]*>Invalid email or password<\/p>/,
+    );
   });
 
   it('rejects a login POST without a CSRF token', async () => {

@@ -1,6 +1,8 @@
 import type { Handle, Props } from 'remix/component';
 import { css } from 'remix/component';
 
+import { colors, fontFamily, radius } from './theme.ts';
+
 export type InputVariant = 'default' | 'error';
 
 export type InputProps = Props<'input'> & {
@@ -9,16 +11,24 @@ export type InputProps = Props<'input'> & {
 };
 
 const baseStyle = css({
-  padding: '8px',
+  padding: '10px 12px',
   width: '100%',
   boxSizing: 'border-box',
-  border: '1px solid #ccc',
-  borderRadius: '4px',
-  font: 'inherit',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.sm,
+  background: colors.surface,
+  color: colors.text,
+  fontFamily,
+  fontSize: '0.9375rem',
+  '&:focus': {
+    outline: `2px solid ${colors.accent}`,
+    outlineOffset: '1px',
+    borderColor: colors.accent,
+  },
 });
 
 const errorStyle = css({
-  borderColor: '#b00020',
+  borderColor: colors.danger,
 });
 
 export function Input(handle: Handle<InputProps>) {
@@ -26,10 +36,7 @@ export function Input(handle: Handle<InputProps>) {
     let { variant = 'default', ...inputProps } = handle.props;
 
     return (
-      <input
-        {...inputProps}
-        mix={variant === 'error' ? [baseStyle, errorStyle] : baseStyle}
-      />
+      <input {...inputProps} mix={variant === 'error' ? [baseStyle, errorStyle] : baseStyle} />
     );
   };
 }
