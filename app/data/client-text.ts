@@ -61,7 +61,10 @@ export function validateClientTextFields<const Field extends ClientTextField>(
     if (value != null && value.length > maxLength) {
       issues.push({
         field,
-        message: `${CLIENT_TEXT_LABELS[field]} must be ${maxLength} characters or fewer.`,
+        message:
+          field === 'billing_currency'
+            ? 'Enter a 3-letter currency code, such as INR or USD.'
+            : `${CLIENT_TEXT_LABELS[field]} must be ${maxLength} characters or fewer.`,
       });
     }
   }

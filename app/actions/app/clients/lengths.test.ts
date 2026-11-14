@@ -114,7 +114,12 @@ describe('Client free-text length limits', () => {
         `${field} should expose invalid state`,
       );
       assert.ok(html.includes(value), `${field} should retain the submitted value`);
-      assert.match(html, /characters or fewer/);
+      assert.match(
+        html,
+        field === 'billing_currency'
+          ? /3-letter currency code/
+          : /characters or fewer/,
+      );
 
       let persisted = await db.findOne(clients, { where: { legal_name: fields.legal_name } });
       assert.equal(persisted, null, `${field} must not create a Client`);
