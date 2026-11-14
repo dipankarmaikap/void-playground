@@ -55,14 +55,16 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 
 - `app/routes.ts` defines the shared route contract used by server and browser modules for type-safe hrefs. Use `routes.*.href()` in links, forms, and redirects instead of string literals.
 - `app/router.ts` wires routes to controllers and installs the middleware stack: request context, async context, static files, session, form data, CSRF, auth, CSP, render.
+- `app/config.ts` owns `APP_NAME` (the single product name used for branding and metadata) and `DISPLAY_NAME_MAX_LENGTH`.
 - `hmr.ts` supervises the development server for `npm run hmr`, proxying requests while server and browser modules reload.
 - Authored `<script>` and `<style>` tags need the request nonce from `getCspNonce(getContext())`; import maps, module preloads, and `css()` styles get it from `render()` automatically.
 - Put top-level route actions in `app/actions/controller.tsx`; give every nested route map its own directory with `controller.tsx` (and `page.tsx` for route-local UI). `app/actions/controller.test.ts` is the root controller's router smoke test.
-- `app/actions/auth/` owns login, register, verify, and logout. `app/actions/app/` owns the protected dashboard and settings pages.
-- `app/data/` owns SQLite tables, password hashing, the hybrid session storage, and session cookie/scheme setup (`session.ts`).
+- `app/actions/document.tsx` renders the `<html>` shell: the `APP_NAME` title suffix, description, `noindex`, and optional social metadata. Pages pass `title`/`description` rather than writing `<head>` tags.
+- `app/actions/home-page.tsx` renders the public welcome screen; the auth pages live in `app/actions/auth/` (login, register, verify, logout), and `app/actions/app/` owns the protected dashboard and settings pages.
+- `app/actions/app/settings/profile/` owns `/app/settings` (identity summary and display-name form); `app/actions/app/settings/sessions/` owns `/app/settings/sessions` (Session list and revoke actions). Both render inside `AppShell`.
+- `app/data/` owns SQLite tables, password hashing, display-name parsing (`display-name.ts`), the hybrid session storage, and session cookie/scheme setup (`session.ts`).
 - `app/middleware/` holds custom middleware (e.g. request context).
-- `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller.
-- `app/actions/home-page.tsx` and `app/actions/document.tsx` render the route-owned starter UI.
+- `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller. `app-shell.tsx` renders the authenticated document (sidebar, drawer, settings subnavigation, identity, Log out) around page content; `auth-layout.tsx` renders the standalone public/auth card; `button`, `icon`, `field`, `input`, and `theme` are shared primitives; `identity.ts` bundles a User's email and display name and derives the display name-or-email label; `page-styles.ts` holds the shared page header, notice, form, footer, and text-link styles.
 - `app/actions/public/` contains the browser runtime entry.
 - `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware.
 - Root `public/` contains static files served unchanged from the app root.

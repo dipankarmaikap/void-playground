@@ -10,6 +10,10 @@ The domain language for this app's identity and sign-in features. Single context
 A person who can authenticate, identified by their email address.
 _Avoid_: account, member, customer
 
+**Display name**:
+An optional, non-unique name a User chooses to be addressed by. Blank means unset, and the app falls back to the email address.
+_Avoid_: username, nickname, handle
+
 **Email Verification**:
 A User's proof of control over their email address, granted once via a token.
 _Avoid_: confirmation, activation
