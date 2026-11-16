@@ -106,6 +106,7 @@ export default createController(routes.app.settings.invoicing, {
             presets={presets}
             presetRate={rate}
             presetError={result.message}
+            presetErrorId={form === 'preset_update' ? presetId : undefined}
             submitted
           />,
           { status: 400 },

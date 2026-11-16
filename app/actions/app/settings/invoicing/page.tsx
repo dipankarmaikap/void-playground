@@ -41,6 +41,8 @@ export interface InvoicingPageProps {
   /** A rejected preset submission is echoed back so the User can fix it without retyping. */
   presetRate?: string;
   presetError?: string;
+  /** The inline preset row that was submitted, so only that row shows the attempted rate. */
+  presetErrorId?: string;
 }
 
 const cardStyle = css({
@@ -141,6 +143,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
       presets,
       presetRate = '',
       presetError,
+      presetErrorId,
     } = handle.props;
     let legalNameIssue = issueFor(issues, 'legal_name');
     let line1Issue = issueFor(issues, 'address_line1');
@@ -422,7 +425,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             Editable rate presets available on this Organization&rsquo;s invoice service lines.
           </p>
           {presetError ? (
-            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p id="preset-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
               {presetError}
             </p>
           ) : null}
@@ -440,8 +443,11 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
                   <Input
                     name="rate"
                     aria-label={`GST rate preset ${preset.rate}%`}
+                    aria-invalid={presetErrorId === preset.id ? true : undefined}
+                    aria-describedby={presetErrorId === preset.id ? 'preset-error' : undefined}
                     mix={presetRateInputStyle}
-                    defaultValue={preset.rate}
+                    variant={presetErrorId === preset.id ? 'error' : 'default'}
+                    defaultValue={presetErrorId === preset.id ? presetRate : preset.rate}
                   />
                   <Button type="submit" variant="secondary">
                     Save

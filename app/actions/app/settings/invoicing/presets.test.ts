@@ -20,6 +20,14 @@ async function presetsFor(organizationId: string) {
 
 const SEED_RATES = ['0', '12', '18', '28', '5'];
 
+/** The inline update form belongs to exactly one preset and ends at its first `</form>`. */
+function inlineUpdateForm(html: string, presetId: string): string {
+  let marker = `name="preset_id" value="${presetId}"`;
+  let start = html.indexOf(marker);
+  assert.ok(start >= 0, 'the inline update row should be rendered');
+  return html.slice(start, html.indexOf('</form>', start));
+}
+
 describe('organization GST rate presets', () => {
   it('seeds the standard editable presets for a new Organization', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
@@ -159,6 +167,68 @@ describe('organization GST rate presets', () => {
     );
     assert.equal(foreignRemove.status, 404);
     assert.ok(await db.find(organizationGstRatePresets, custom.id));
+  });
+
+  it('keeps the attempted value on the inline row when a duplicate preset update is rejected', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'preset-update-duplicate',
+    );
+    await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
+    let rows = await db.findMany(organizationGstRatePresets, {
+      where: { organization_id: organizationId },
+    });
+    let five = rows.find((row) => row.rate === '5');
+    let eighteen = rows.find((row) => row.rate === '18');
+    assert.ok(five);
+    assert.ok(eighteen);
+
+    let response = await postForm(
+      router,
+      routes.app.settings.invoicing.action.href(),
+      { _form: 'preset_update', preset_id: five.id, rate: '18' },
+      sessionCookie,
+    );
+
+    assert.equal(response.status, 400);
+    let html = await response.text();
+    assert.match(html, /<p[^>]*role="alert"[^>]*>A GST rate preset of 18% already exists\.<\/p>/);
+
+    let editedRow = inlineUpdateForm(html, five.id);
+    assert.match(editedRow, /name="rate"[^>]*aria-invalid="true"/);
+    assert.match(editedRow, /name="rate"[^>]*value="18"/);
+    assert.doesNotMatch(inlineUpdateForm(html, eighteen.id), /aria-invalid="true"/);
+
+    assert.equal((await db.find(organizationGstRatePresets, five.id))?.rate, '5');
+  });
+
+  it('keeps an out-of-range rate on the inline row when a preset update is rejected', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'preset-update-invalid',
+    );
+    await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
+    let rows = await db.findMany(organizationGstRatePresets, {
+      where: { organization_id: organizationId },
+    });
+    let five = rows.find((row) => row.rate === '5');
+    assert.ok(five);
+
+    let response = await postForm(
+      router,
+      routes.app.settings.invoicing.action.href(),
+      { _form: 'preset_update', preset_id: five.id, rate: '101' },
+      sessionCookie,
+    );
+
+    assert.equal(response.status, 400);
+    let html = await response.text();
+    assert.match(html, /<p[^>]*role="alert"[^>]*>Enter a percentage from 0 to 100\.<\/p>/);
+
+    let editedRow = inlineUpdateForm(html, five.id);
+    assert.match(editedRow, /name="rate"[^>]*aria-invalid="true"/);
+    assert.match(editedRow, /name="rate"[^>]*value="101"/);
+    assert.equal((await db.find(organizationGstRatePresets, five.id))?.rate, '5');
   });
 
   it('rejects preset mutations without a CSRF token', async () => {
