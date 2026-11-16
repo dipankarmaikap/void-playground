@@ -7,6 +7,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { createClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
+import { findOrganizationForUser } from '../../../../data/organizations.ts';
 import { routes } from '../../../../routes.ts';
 import { readClientFormValues } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
@@ -17,18 +18,21 @@ export default createController(routes.app.clients.new, {
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = await findOrganizationForUser(auth.identity);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       return context.render(
         <NewClientPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization?.name}
         />,
       );
     },
     async action(context) {
       let { issues, changes, warning } = await parseClientForm(context.formData);
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = await findOrganizationForUser(auth.identity);
       let identity = auth.identity;
 
       if (issues.length > 0) {
@@ -37,6 +41,7 @@ export default createController(routes.app.clients.new, {
           <NewClientPage
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
+            organizationName={organization?.name}
             values={readClientFormValues(context.formData)}
             issues={issues}
           />,

@@ -16,6 +16,7 @@ export type AppSection = 'dashboard' | 'clients' | 'profile' | 'sessions';
 export interface AppShellProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   section: AppSection;
   title: string;
   description: string;
@@ -33,6 +34,7 @@ interface NavItem {
 interface SidebarProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   mainNav: NavItem[];
   settingsNav: NavItem[];
   settingsActive: boolean;
@@ -148,6 +150,33 @@ const brandStyle = css({
   },
 });
 
+const organizationStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.125rem',
+  minWidth: 0,
+  padding: '0.75rem',
+  borderRadius: radius.md,
+  background: colors.accentSoft,
+});
+
+const organizationLabelStyle = css({
+  color: colors.muted,
+  fontSize: '0.6875rem',
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+});
+
+const organizationNameStyle = css({
+  color: colors.text,
+  fontSize: '0.875rem',
+  fontWeight: 700,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+});
+
 const navStyle = css({
   display: 'flex',
   flexDirection: 'column',
@@ -242,8 +271,15 @@ const mainStyle = css({
 
 function AppSidebar(handle: Handle<SidebarProps>) {
   return () => {
-    let { csrfToken, identity: userIdentity, mainNav, settingsNav, settingsActive, variant } =
-      handle.props;
+    let {
+      csrfToken,
+      identity: userIdentity,
+      organizationName,
+      mainNav,
+      settingsNav,
+      settingsActive,
+      variant,
+    } = handle.props;
     let identity = identityOf(userIdentity);
 
     return (
@@ -251,6 +287,12 @@ function AppSidebar(handle: Handle<SidebarProps>) {
         <a href={routes.app.dashboard.href()} data-rmx-document="" mix={brandStyle}>
           {APP_NAME}
         </a>
+        {organizationName ? (
+          <div role="group" aria-label="Current Organization" mix={organizationStyle}>
+            <span mix={organizationLabelStyle}>Organization</span>
+            <span mix={organizationNameStyle}>{organizationName}</span>
+          </div>
+        ) : null}
         <nav aria-label="Main" mix={navStyle}>
           {mainNav.map((item) => (
             <a
@@ -304,8 +346,15 @@ function AppSidebar(handle: Handle<SidebarProps>) {
 
 export function AppShell(handle: Handle<AppShellProps>) {
   return () => {
-    let { csrfToken, identity: userIdentity, section, title, description, children } =
-      handle.props;
+    let {
+      csrfToken,
+      identity: userIdentity,
+      organizationName,
+      section,
+      title,
+      description,
+      children,
+    } = handle.props;
     let settingsActive = section === 'profile' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
     let clientsHref = routes.app.clients.index.href();
@@ -366,6 +415,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
             <AppSidebar
               csrfToken={csrfToken}
               identity={userIdentity}
+              organizationName={organizationName}
               mainNav={mainNav}
               settingsNav={settingsNav}
               settingsActive={settingsActive}
@@ -375,6 +425,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
           <AppSidebar
             csrfToken={csrfToken}
             identity={userIdentity}
+            organizationName={organizationName}
             mainNav={mainNav}
             settingsNav={settingsNav}
             settingsActive={settingsActive}

@@ -13,18 +13,26 @@ import type { ClientFormValues } from '../form-values.ts';
 export interface NewClientPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   values?: ClientFormValues;
   issues?: readonly Issue[];
 }
 
 export function NewClientPage(handle: Handle<NewClientPageProps>) {
   return () => {
-    let { csrfToken, identity, values = emptyClientFormValues(), issues } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      values = emptyClientFormValues(),
+      issues,
+    } = handle.props;
 
     return (
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title="New client"
         description={`Add a profile to the shared ${APP_NAME} client book.`}

@@ -26,6 +26,7 @@ import { colors, radius, shadow } from '../../../ui/theme.ts';
 export interface ClientsIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   clients: ClientDirectoryItem[];
   query: string;
   type: ClientTypeFilter;
@@ -191,6 +192,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
     let {
       csrfToken,
       identity,
+      organizationName,
       clients,
       query,
       type,
@@ -212,6 +214,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title="Clients"
         description={`Manage the people and businesses in the shared ${APP_NAME} client book.`}

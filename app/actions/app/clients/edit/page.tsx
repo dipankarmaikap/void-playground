@@ -15,6 +15,7 @@ import type { ClientFormValues } from '../form-values.ts';
 export interface EditClientPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   client: Client;
   values?: ClientFormValues;
   issues?: readonly Issue[];
@@ -22,13 +23,14 @@ export interface EditClientPageProps {
 
 export function EditClientPage(handle: Handle<EditClientPageProps>) {
   return () => {
-    let { csrfToken, identity, client, values, issues } = handle.props;
+    let { csrfToken, identity, organizationName, client, values, issues } = handle.props;
     let label = clientDisplayLabel(client);
 
     return (
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title={`Edit ${label}`}
         description={`Update the client profile for ${label} in the shared ${APP_NAME} client book.`}
