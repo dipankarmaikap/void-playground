@@ -28,6 +28,7 @@ export interface SessionView {
 export interface SessionsPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   sessions: SessionView[];
   error?: string;
   message?: string;
@@ -147,7 +148,7 @@ const dangerCopyStyle = css({
 
 export function SessionsPage(handle: Handle<SessionsPageProps>) {
   return () => {
-    let { csrfToken, identity, sessions, error, message } = handle.props;
+    let { csrfToken, identity, organizationName, sessions, error, message } = handle.props;
     let action = routes.app.settings.sessions.action.href();
     let hasOtherSessions = sessions.some((session) => !session.current);
 
@@ -155,6 +156,7 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="sessions"
         title="Sessions"
         description="Review and revoke the browsers signed in to your account."

@@ -7,6 +7,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { findClient, updateClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
+import { findOrganizationForUser } from '../../../../data/organizations.ts';
 import { routes } from '../../../../routes.ts';
 import { clientFormValuesOf, readClientFormValues } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
@@ -20,12 +21,14 @@ export default createController(routes.app.clients.edit, {
       if (!client) return new Response('Client not found', { status: 404 });
 
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = await findOrganizationForUser(auth.identity);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       return context.render(
         <EditClientPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization?.name}
           client={client}
           values={clientFormValuesOf(client)}
         />,
@@ -39,6 +42,7 @@ export default createController(routes.app.clients.edit, {
         clientId: client.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = await findOrganizationForUser(auth.identity);
       let identity = auth.identity;
 
       if (issues.length > 0) {
@@ -47,6 +51,7 @@ export default createController(routes.app.clients.edit, {
           <EditClientPage
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
+            organizationName={organization?.name}
             client={client}
             values={readClientFormValues(context.formData)}
             issues={issues}

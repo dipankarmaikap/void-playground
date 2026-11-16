@@ -25,6 +25,7 @@ import { ClientTaxSummary } from './tax-summary.tsx';
 export interface ClientProfilePageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   client: Client;
   error?: string;
   message?: string;
@@ -83,7 +84,7 @@ const backLinkStyle = css({
 
 export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
   return () => {
-    let { csrfToken, identity, client, error, message } = handle.props;
+    let { csrfToken, identity, organizationName, client, error, message } = handle.props;
     let label = clientDisplayLabel(client);
     let isBusiness = client.type === 'business';
 
@@ -91,6 +92,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title={label}
         description={`View the ${clientTypeLabel(client.type)} client profile for ${label} in the shared ${APP_NAME} client book.`}

@@ -22,6 +22,10 @@ import { routes } from '../../../../routes.ts';
 export interface ProfilePageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName: string;
+  organizationNameValue?: string;
+  organizationError?: string;
+  organizationMessage?: string;
   displayNameValue?: string;
   error?: string;
   message?: string;
@@ -67,7 +71,17 @@ const detailStyle = css({
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    let { csrfToken, identity, displayNameValue, error, message } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      organizationNameValue,
+      organizationError,
+      organizationMessage,
+      displayNameValue,
+      error,
+      message,
+    } = handle.props;
     let trimmedDisplayName = identity.displayName?.trim() || null;
     let formValue = displayNameValue ?? trimmedDisplayName ?? '';
 
@@ -75,14 +89,56 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="profile"
         title="Profile"
-        description={`Manage your ${APP_NAME} display name and account identity.`}
+        description={`Manage your ${APP_NAME} Organization and personal display name.`}
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Profile</h1>
-          <p mix={pageIntroStyle}>This is the identity the app uses to greet you.</p>
+          <p mix={pageIntroStyle}>
+            Manage your Organization identity separately from your personal display name.
+          </p>
         </header>
+        <section aria-labelledby="organization-heading" mix={cardStyle}>
+          <h2 id="organization-heading" mix={cardHeadingStyle}>
+            Organization
+          </h2>
+          <dl mix={listStyle}>
+            <div>
+              <dt mix={termStyle}>Organization name</dt>
+              <dd mix={detailStyle}>{organizationName}</dd>
+            </div>
+          </dl>
+          {organizationError ? (
+            <p id="organization-name-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+              {organizationError}
+            </p>
+          ) : null}
+          {organizationMessage ? (
+            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+              {organizationMessage}
+            </p>
+          ) : null}
+          <form
+            method="post"
+            action={routes.app.settings.profile.action.href()}
+            mix={formStackStartStyle}
+          >
+            <input type="hidden" name="_csrf" value={csrfToken} />
+            <Field label="Organization name">
+              <Input
+                name="organization_name"
+                autoComplete="organization"
+                required
+                aria-invalid={organizationError ? 'true' : undefined}
+                aria-describedby={organizationError ? 'organization-name-error' : undefined}
+                defaultValue={organizationNameValue ?? organizationName}
+              />
+            </Field>
+            <Button type="submit">Save Organization name</Button>
+          </form>
+        </section>
         {error ? (
           <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
             {error}
