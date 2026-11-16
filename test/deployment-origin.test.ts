@@ -70,6 +70,7 @@ async function exerciseRegistrationOrigin(
       },
       body: new URLSearchParams({
         email: `origin-${crypto.randomUUID()}@example.com`,
+        organization_name: 'Origin Test Studio',
         password: 'password123',
         _csrf: csrf,
       }).toString(),

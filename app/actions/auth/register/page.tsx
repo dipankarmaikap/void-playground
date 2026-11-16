@@ -22,21 +22,22 @@ export interface RegisterPageProps {
   error?: string;
   email?: string;
   displayName?: string;
+  organizationName?: string;
 }
 
 export function RegisterPage(handle: Handle<RegisterPageProps>) {
   return () => {
-    let { csrfToken, error, email, displayName } = handle.props;
+    let { csrfToken, error, email, displayName, organizationName } = handle.props;
 
     return (
       <Document
         title="Register"
-        description={`Create a ${APP_NAME} account with your email address.`}
+        description={`Register with ${APP_NAME} and create your Organization.`}
       >
         <AuthLayout>
           <header mix={authHeaderStyle}>
             <h1 mix={authHeadingStyle}>Register</h1>
-            <p mix={authIntroStyle}>Create your account with your email address.</p>
+            <p mix={authIntroStyle}>Create your Organization and verify your email address.</p>
           </header>
           {error ? (
             <p role="alert" mix={noticeErrorStyle}>
@@ -51,6 +52,14 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
                 type="email"
                 autoComplete="email"
                 defaultValue={email ?? ''}
+                required
+              />
+            </Field>
+            <Field label="Organization name">
+              <Input
+                name="organization_name"
+                autoComplete="organization"
+                defaultValue={organizationName ?? ''}
                 required
               />
             </Field>
@@ -74,7 +83,7 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
                 required
               />
             </Field>
-            <Button type="submit">Create account</Button>
+            <Button type="submit">Create Organization</Button>
           </form>
           <p mix={pageFooterStyle}>
             Already have an account?{' '}

@@ -3,7 +3,12 @@ import { describe, it } from 'remix/test';
 
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
-import { db, users } from '../../data/db.ts';
+import {
+  db,
+  organizationMemberships,
+  organizations,
+  users,
+} from '../../data/db.ts';
 import {
   cookieFromResponse,
   createUser,
@@ -55,12 +60,13 @@ describe('auth controller', () => {
     assert.match(html, /<title>Register \| My Remix App<\/title>/);
     assert.match(
       html,
-      /<meta name="description" content="Create a My Remix App account with your email address\."/,
+      /<meta name="description" content="Register with My Remix App and create your Organization\."/,
     );
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<a[^>]*href="\/"[^>]*>My Remix App<\/a>/);
     assert.match(html, /<form[^>]*method="post"[^>]*action="\/register"/);
     assert.match(html, /name="_csrf"/);
+    assert.match(html, /name="organization_name"[^>]*required/);
     assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);
   });
 
@@ -306,6 +312,7 @@ describe('auth controller', () => {
 
   it('rejects a duplicate email without creating another user', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
+    let organizationName = `Duplicate Test Studio ${crypto.randomUUID()}`;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       let page = await router.fetch(new URL(routes.auth.register.index.href(), base));
@@ -316,7 +323,12 @@ describe('auth controller', () => {
           'Content-Type': 'application/x-www-form-urlencoded',
           Cookie: cookieFromResponse(page),
         },
-        body: new URLSearchParams({ email, password: 'password123', _csrf: csrf }).toString(),
+        body: new URLSearchParams({
+          email,
+          organization_name: organizationName,
+          password: 'password123',
+          _csrf: csrf,
+        }).toString(),
       });
       assert.equal(response.status, 302);
       assert.equal(
@@ -329,5 +341,13 @@ describe('auth controller', () => {
 
     let rows = await db.findMany(users, { where: { email } });
     assert.equal(rows.length, 1);
+    let memberships = await db.findMany(organizationMemberships, {
+      where: { user_id: rows[0].id },
+    });
+    assert.equal(memberships.length, 1);
+    assert.equal(
+      (await db.findMany(organizations, { where: { name: organizationName } })).length,
+      1,
+    );
   });
 });

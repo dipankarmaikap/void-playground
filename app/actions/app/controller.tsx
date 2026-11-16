@@ -7,10 +7,14 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import type { User } from '../../data/db.ts';
 import { routes } from '../../routes.ts';
+import { requireOrganizationContext } from '../../middleware/organization-context.ts';
 import { DashboardPage } from './dashboard-page.tsx';
 
 export default createController(routes.app, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [
+    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireOrganizationContext,
+  ],
   actions: {
     async dashboard(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
