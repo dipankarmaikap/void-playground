@@ -26,12 +26,7 @@ Refer to ./.agents/skills/remix/SKILL.md for the Remix mental model and how to f
 
 ## Docs
 
-Designs and plans live under `docs/`:
-
-- `docs/specs/YYYY-MM-DD-<topic>-design.md` — the validated design, written before any code
-- `docs/plans/YYYY-MM-DD-<feature-name>.md` — the implementation plan
-
-One feature is one spec plus one plan; specs and plans are committed before implementation starts.
+GitHub Issues are the canonical home for feature specs, acceptance criteria, and implementation plans. Use `docs/agents/issue-tracker.md` for the `gh` workflow. Keep durable architectural decisions in `docs/adr/`, project agent guidance in `docs/agents/`, and repeatable browser-only checks in `docs/manual-checks/`.
 
 ## Agent skills
 

@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live in GitHub Issues at `dipankarmaikap/void-playground`. Use the `gh` CLI for all operations.
+Issues, feature specs, and implementation plans for this repo live in GitHub Issues at `dipankarmaikap/void-playground`. Use the `gh` CLI for all operations.
 
 ## Conventions
 

@@ -2,7 +2,7 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This is a **single-context** repo: one glossary and one ADR directory, both at the root.
+This is a **single-context** repo: one glossary and one ADR directory.
 
 ## Before exploring, read these
 
@@ -19,8 +19,8 @@ If either doesn't exist, **proceed silently**. Don't flag their absence; don't s
 ├── docs/
 │   ├── adr/
 │   │   └── 0001-hybrid-session-storage.md
-│   ├── specs/
-│   └── plans/
+│   ├── agents/
+│   └── manual-checks/
 └── app/
 ```
 
