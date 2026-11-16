@@ -24,12 +24,14 @@ export default createController(routes.app.clients.new, {
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = context.get(CurrentOrganization);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       return context.render(
         <NewClientPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization.name}
         />,
       );
     },
@@ -47,6 +49,7 @@ export default createController(routes.app.clients.new, {
           <NewClientPage
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
+            organizationName={organization.name}
             values={readClientFormValues(context.formData)}
             issues={issues}
           />,

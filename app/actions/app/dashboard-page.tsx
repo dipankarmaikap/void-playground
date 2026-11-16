@@ -12,6 +12,7 @@ import { colors, radius, shadow } from '../../ui/theme.ts';
 export interface DashboardPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName: string;
 }
 
 const headerStyle = css({
@@ -105,13 +106,14 @@ const shortcutDescriptionStyle = css({
 
 export function DashboardPage(handle: Handle<DashboardPageProps>) {
   return () => {
-    let { csrfToken, identity: userIdentity } = handle.props;
+    let { csrfToken, identity: userIdentity, organizationName } = handle.props;
     let identity = identityOf(userIdentity);
 
     return (
       <AppShell
         csrfToken={csrfToken}
         identity={userIdentity}
+        organizationName={organizationName}
         section="dashboard"
         title="Dashboard"
         description={`Your ${APP_NAME} dashboard and shortcuts.`}

@@ -46,6 +46,7 @@ export default createController(routes.app.clients, {
         <ClientsIndexPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization.name}
           clients={directory.clients}
           query={query}
           type={type}
@@ -72,6 +73,7 @@ export default createController(routes.app.clients, {
         <ClientProfilePage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization.name}
           client={client}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}

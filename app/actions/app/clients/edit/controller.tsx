@@ -34,6 +34,7 @@ export default createController(routes.app.clients.edit, {
         <EditClientPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
+          organizationName={organization.name}
           client={client}
           values={clientFormValuesOf(client)}
         />,
@@ -57,6 +58,7 @@ export default createController(routes.app.clients.edit, {
           <EditClientPage
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
+            organizationName={organization.name}
             client={client}
             values={readClientFormValues(context.formData)}
             issues={issues}

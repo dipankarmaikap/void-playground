@@ -1,7 +1,6 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { APP_NAME } from '../../../config.ts';
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { Client } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
@@ -25,6 +24,7 @@ import { ClientTaxSummary } from './tax-summary.tsx';
 export interface ClientProfilePageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   client: Client;
   error?: string;
   message?: string;
@@ -83,7 +83,7 @@ const backLinkStyle = css({
 
 export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
   return () => {
-    let { csrfToken, identity, client, error, message } = handle.props;
+    let { csrfToken, identity, organizationName, client, error, message } = handle.props;
     let label = clientDisplayLabel(client);
     let isBusiness = client.type === 'business';
 
@@ -91,9 +91,10 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title={label}
-        description={`View the ${clientTypeLabel(client.type)} client profile for ${label} in the shared ${APP_NAME} client book.`}
+        description={`View the ${clientTypeLabel(client.type)} client profile for ${label} in your Organization's client book.`}
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>{label}</h1>

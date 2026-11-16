@@ -1,7 +1,6 @@
 import type { Handle } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
-import { APP_NAME } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
@@ -13,21 +12,29 @@ import type { ClientFormValues } from '../form-values.ts';
 export interface NewClientPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   values?: ClientFormValues;
   issues?: readonly Issue[];
 }
 
 export function NewClientPage(handle: Handle<NewClientPageProps>) {
   return () => {
-    let { csrfToken, identity, values = emptyClientFormValues(), issues } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      values = emptyClientFormValues(),
+      issues,
+    } = handle.props;
 
     return (
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title="New client"
-        description={`Add a profile to the shared ${APP_NAME} client book.`}
+        description="Add a client profile to your Organization's client book."
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>New client</h1>

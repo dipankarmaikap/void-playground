@@ -3,7 +3,8 @@ import { describe, it } from 'remix/test';
 
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
-import { db, users } from '../../data/db.ts';
+import { db, organizationMemberships, users } from '../../data/db.ts';
+import { findOrganizationForUser } from '../../data/organizations.ts';
 import { createUser, login, origin, postForm } from '../../../test/http.ts';
 
 async function loginNewUser(displayName: string | null = null) {
@@ -99,6 +100,20 @@ describe('app controller', () => {
     assert.match(html, /<main id="main"/);
   });
 
+  it('identifies the current Organization without replacing product or User identity', async () => {
+    let { email, userId, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let organization = await findOrganizationForUser({ id: userId });
+    assert.ok(organization);
+
+    let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
+    let sidebar = beforeLogout(html);
+
+    assert.ok(sidebar.includes(organization.name));
+    assert.ok(sidebar.includes('My Remix App'));
+    assert.ok(sidebar.includes('Ada Lovelace'));
+    assert.ok(sidebar.includes(email));
+  });
+
   it('gives the dashboard shortcuts to Profile and Sessions', async () => {
     let { sessionCookie } = await loginNewUser();
     let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
@@ -127,6 +142,139 @@ describe('app controller', () => {
     assert.match(html, new RegExp(email));
     assert.match(html, /action="\/logout"/);
     assert.match(html, /<main id="main"[\s\S]*?<h1[^>]*>Profile<\/h1>/);
+  });
+
+  it('shows the current Organization and an accessible name form in Settings', async () => {
+    let { email, userId, sessionCookie } = await loginNewUser('Ada Lovelace');
+    let organization = await findOrganizationForUser({ id: userId });
+    assert.ok(organization);
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+
+    assert.match(html, /<h2[^>]*id="organization-heading"[^>]*>Organization<\/h2>/);
+    assert.ok(html.includes(organization.name));
+    assert.match(
+      html,
+      /<label[^>]*>Organization name[\s\S]*?<input[^>]*name="organization_name"[^>]*autocomplete="organization"[^>]*required/,
+    );
+    assert.ok(html.includes('Ada Lovelace'));
+    assert.ok(html.includes(email));
+  });
+
+  it('renames only the owner Organization and keeps the User display name unchanged', async () => {
+    let owner = await loginNewUser('Ada Lovelace');
+    let other = await loginNewUser('Grace Hopper');
+    let organization = await findOrganizationForUser({ id: owner.userId });
+    let otherOrganization = await findOrganizationForUser({ id: other.userId });
+    assert.ok(organization);
+    assert.ok(otherOrganization);
+    let renamed = `Renamed Studio ${crypto.randomUUID()}`;
+
+    let response = await postProfile(owner.sessionCookie, {
+      organization_name: `  ${renamed}  `,
+      organization_id: otherOrganization.id,
+    });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Location'), routes.app.settings.profile.index.href());
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      owner.sessionCookie,
+    );
+    assert.match(html, /<p role="status"[^>]*>Organization name updated<\/p>/);
+    assert.match(html, new RegExp(`name="organization_name"[^>]*value="${renamed}"`));
+    assert.ok(html.includes('Ada Lovelace'));
+    assert.equal((await findOrganizationForUser({ id: owner.userId }))?.name, renamed);
+    assert.equal((await findOrganizationForUser({ id: other.userId }))?.name, otherOrganization.name);
+
+    let user = await db.find(users, owner.userId);
+    assert.equal(user?.display_name, 'Ada Lovelace');
+  });
+
+  it('does not let a non-owner rename their Organization', async () => {
+    let owner = await loginNewUser();
+    let member = await loginNewUser();
+    let organization = await findOrganizationForUser({ id: owner.userId });
+    assert.ok(organization);
+
+    await db.deleteMany(organizationMemberships, { where: { user_id: member.userId } });
+    await db.create(organizationMemberships, {
+      id: crypto.randomUUID(),
+      organization_id: organization.id,
+      user_id: member.userId,
+      is_owner: false,
+      created_at: Date.now(),
+    });
+
+    let response = await postProfile(member.sessionCookie, {
+      organization_name: 'Unauthorized rename',
+    });
+
+    assert.equal(response.status, 403);
+    assert.equal((await findOrganizationForUser({ id: owner.userId }))?.name, organization.name);
+  });
+
+  it('rejects a blank Organization name with accessible feedback and keeps the saved name', async () => {
+    let { userId, sessionCookie } = await loginNewUser();
+    let organization = await findOrganizationForUser({ id: userId });
+    assert.ok(organization);
+
+    let response = await postProfile(sessionCookie, { organization_name: '   ' });
+    assert.equal(response.status, 302);
+
+    let html = await getAuthenticatedHtml(
+      routes.app.settings.profile.index.href(),
+      sessionCookie,
+    );
+    assert.match(
+      html,
+      /<p id="organization-name-error" role="alert"[^>]*>Organization name is required<\/p>/,
+    );
+    assert.match(html, /name="organization_name"[^>]*aria-invalid="true"/);
+    assert.match(html, /name="organization_name"[^>]*value=" {3}"/);
+    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
+  });
+
+  it('rejects an Organization rename without a CSRF token', async () => {
+    let { userId, sessionCookie } = await loginNewUser();
+    let organization = await findOrganizationForUser({ id: userId });
+    assert.ok(organization);
+
+    let response = await postProfile(
+      sessionCookie,
+      { organization_name: 'No token rename' },
+      { includeCsrf: false },
+    );
+
+    assert.equal(response.status, 403);
+    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
+  });
+
+  it('allows different Organizations to use the same name through Settings', async () => {
+    let first = await loginNewUser();
+    let second = await loginNewUser();
+    let firstOrganization = await findOrganizationForUser({ id: first.userId });
+    let secondOrganization = await findOrganizationForUser({ id: second.userId });
+    assert.ok(firstOrganization);
+    assert.ok(secondOrganization);
+
+    let response = await postProfile(first.sessionCookie, {
+      organization_name: secondOrganization.name,
+    });
+    assert.equal(response.status, 302);
+
+    assert.equal(
+      (await findOrganizationForUser({ id: first.userId }))?.name,
+      secondOrganization.name,
+    );
+    assert.equal(
+      (await findOrganizationForUser({ id: second.userId }))?.name,
+      secondOrganization.name,
+    );
   });
 
   it('renders the profile form with the current display name', async () => {

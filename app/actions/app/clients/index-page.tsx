@@ -1,7 +1,6 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { APP_NAME } from '../../../config.ts';
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { ClientStatus } from '../../../data/client-status.ts';
 import type { ClientDirectoryItem, ClientTypeFilter } from '../../../data/clients.ts';
@@ -26,6 +25,7 @@ import { colors, radius, shadow } from '../../../ui/theme.ts';
 export interface ClientsIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
+  organizationName?: string;
   clients: ClientDirectoryItem[];
   query: string;
   type: ClientTypeFilter;
@@ -191,6 +191,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
     let {
       csrfToken,
       identity,
+      organizationName,
       clients,
       query,
       type,
@@ -212,9 +213,10 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
       <AppShell
         csrfToken={csrfToken}
         identity={identity}
+        organizationName={organizationName}
         section="clients"
         title="Clients"
-        description={`Manage the people and businesses in the shared ${APP_NAME} client book.`}
+        description="Manage the clients your Organization works with."
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Clients</h1>
