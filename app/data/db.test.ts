@@ -5,6 +5,7 @@ import { createSqliteDatabase } from 'remix/data-table/sqlite';
 import {
   clients,
   db,
+  organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
   users,
@@ -210,6 +211,83 @@ describe('db', () => {
       updated_at: now,
     });
     assert.equal((await db.find(clients, validClientId))?.organization_id, organizationId);
+  });
+
+  it('requires a valid Organization and one invoicing profile per Organization', async () => {
+    let organizationId = await createOrganization('Invoicing Profile Ownership Test');
+    let now = Date.now();
+    let orphanId = crypto.randomUUID();
+    let orphanRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, {
+        organization_id: orphanId,
+        created_at: now,
+        updated_at: now,
+      });
+    } catch {
+      orphanRejected = true;
+    }
+    assert.equal(orphanRejected, true, 'a profile must belong to an existing Organization');
+    assert.equal(await db.find(organizationInvoicingProfiles, orphanId), null);
+
+    let values = { organization_id: organizationId, created_at: now, updated_at: now };
+    await db.create(organizationInvoicingProfiles, values);
+    let duplicateRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, values);
+    } catch {
+      duplicateRejected = true;
+    }
+    assert.equal(duplicateRejected, true, 'an Organization can have only one invoicing profile');
+    assert.equal(
+      await db.count(organizationInvoicingProfiles, { where: { organization_id: organizationId } }),
+      1,
+    );
+    assert.equal((await db.find(organizationInvoicingProfiles, organizationId))?.legal_name, null);
+  });
+
+  it('rejects a partial business address at the database seam', async () => {
+    let organizationId = await createOrganization('Partial Address Database Test');
+    let partialAddressRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, {
+        organization_id: organizationId,
+        address_locality: 'Bengaluru',
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      });
+    } catch {
+      partialAddressRejected = true;
+    }
+    assert.equal(partialAddressRejected, true);
+    assert.equal(await db.find(organizationInvoicingProfiles, organizationId), null);
+
+    let blankLine1Rejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, {
+        organization_id: organizationId,
+        address_line1: '   ',
+        address_country: 'IN',
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      });
+    } catch {
+      blankLine1Rejected = true;
+    }
+    assert.equal(blankLine1Rejected, true);
+    assert.equal(await db.find(organizationInvoicingProfiles, organizationId), null);
+
+    await db.create(organizationInvoicingProfiles, {
+      organization_id: organizationId,
+      address_line1: '1 Complete Street',
+      address_country: 'IN',
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+    assert.equal(
+      (await db.find(organizationInvoicingProfiles, organizationId))?.address_country,
+      'IN',
+    );
   });
 
   it('rejects an incompatible old Client schema without serving or erasing it', async () => {

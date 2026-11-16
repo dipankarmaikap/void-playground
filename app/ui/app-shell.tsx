@@ -11,7 +11,7 @@ import { identityOf } from './identity.ts';
 import type { UserIdentity } from './identity.ts';
 import { colors, fontFamily, radius, shadow } from './theme.ts';
 
-export type AppSection = 'dashboard' | 'clients' | 'profile' | 'sessions';
+export type AppSection = 'dashboard' | 'clients' | 'profile' | 'invoicing' | 'sessions';
 
 export interface AppShellProps {
   csrfToken: string;
@@ -355,10 +355,12 @@ export function AppShell(handle: Handle<AppShellProps>) {
       description,
       children,
     } = handle.props;
-    let settingsActive = section === 'profile' || section === 'sessions';
+    let settingsActive =
+      section === 'profile' || section === 'invoicing' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
     let clientsHref = routes.app.clients.index.href();
     let profileHref = routes.app.settings.profile.index.href();
+    let invoicingHref = routes.app.settings.invoicing.index.href();
     let sessionsHref = routes.app.settings.sessions.index.href();
     let mainNav: NavItem[] = [
       {
@@ -391,6 +393,13 @@ export function AppShell(handle: Handle<AppShellProps>) {
         icon: 'user',
         current: section === 'profile',
         active: section === 'profile',
+      },
+      {
+        href: invoicingHref,
+        label: 'Invoicing',
+        icon: 'receipt',
+        current: section === 'invoicing',
+        active: section === 'invoicing',
       },
       {
         href: sessionsHref,

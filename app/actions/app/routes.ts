@@ -7,6 +7,7 @@ export const appRoutes = route({
   clients: route('/clients', clientRoutes),
   settings: route('/settings', {
     profile: form('/'),
+    invoicing: form('/invoicing'),
     sessions: form('/sessions'),
   }),
 });

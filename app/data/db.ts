@@ -43,6 +43,28 @@ export const organizations = table({
   primaryKey: 'id',
 });
 
+/**
+ * Organization-owned seller profile used by invoices. One row per Organization; the effective
+ * legal seller name falls back to `organizations.name` when `legal_name` is null.
+ */
+export const organizationInvoicingProfiles = table({
+  name: 'organization_invoicing_profiles',
+  columns: {
+    organization_id: c.text().notNull(),
+    legal_name: c.text().nullable(),
+    address_line1: c.text().nullable(),
+    address_locality: c.text().nullable(),
+    address_region: c.text().nullable(),
+    address_postal_code: c.text().nullable(),
+    address_country: c.text().nullable(),
+    billing_email: c.text().nullable(),
+    billing_phone: c.text().nullable(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'organization_id',
+});
+
 export const organizationMemberships = table({
   name: 'organization_memberships',
   columns: {
@@ -164,6 +186,31 @@ CREATE TABLE IF NOT EXISTS organizations (
     ),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_invoicing_profiles (
+  organization_id TEXT PRIMARY KEY NOT NULL,
+  legal_name TEXT CHECK (legal_name IS NULL OR length(trim(legal_name)) > 0),
+  address_line1 TEXT,
+  address_locality TEXT,
+  address_region TEXT,
+  address_postal_code TEXT,
+  address_country TEXT,
+  billing_email TEXT CHECK (billing_email IS NULL OR length(trim(billing_email)) > 0),
+  billing_phone TEXT CHECK (billing_phone IS NULL OR length(trim(billing_phone)) > 0),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  CHECK (
+    (
+      address_line1 IS NULL AND address_locality IS NULL AND address_region IS NULL
+      AND address_postal_code IS NULL AND address_country IS NULL
+    )
+    OR (
+      address_line1 IS NOT NULL AND length(trim(address_line1)) > 0
+      AND address_country IS NOT NULL AND length(trim(address_country)) > 0
+    )
+  ),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS organization_memberships (
@@ -299,6 +346,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_organization_status
 
 export type User = TableRow<typeof users>;
 export type Organization = TableRow<typeof organizations>;
+export type OrganizationInvoicingProfile = TableRow<typeof organizationInvoicingProfiles>;
 export type OrganizationMembership = TableRow<typeof organizationMemberships>;
 export type UserPassword = TableRow<typeof userPasswords>;
 export type SessionRow = TableRow<typeof sessions>;
