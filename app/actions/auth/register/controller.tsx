@@ -58,50 +58,31 @@ export default createController(routes.auth.register, {
       let organizationNameValue = context.formData.get('organization_name');
       let submittedOrganizationName =
         typeof organizationNameValue === 'string' ? organizationNameValue : undefined;
-
-      let parsed = s.parseSafe(registerForm, context.formData);
-      if (!parsed.success) {
-        let csrfToken = getCsrfToken(context);
-        return context.render(
+      let renderInvalidRegistration = (error: string) =>
+        context.render(
           <RegisterPage
-            csrfToken={csrfToken}
-            error={parsed.issues[0]?.message ?? 'Invalid input'}
+            csrfToken={getCsrfToken(context)}
+            error={error}
             email={submittedEmail}
             displayName={submittedDisplayName}
             organizationName={submittedOrganizationName}
           />,
           { status: 400 },
         );
+
+      let parsed = s.parseSafe(registerForm, context.formData);
+      if (!parsed.success) {
+        return renderInvalidRegistration(parsed.issues[0]?.message ?? 'Invalid input');
       }
 
       let displayName = parseDisplayName(parsed.value.display_name);
       if (!displayName.ok) {
-        let csrfToken = getCsrfToken(context);
-        return context.render(
-          <RegisterPage
-            csrfToken={csrfToken}
-            error={displayName.error}
-            email={submittedEmail}
-            displayName={submittedDisplayName}
-            organizationName={submittedOrganizationName}
-          />,
-          { status: 400 },
-        );
+        return renderInvalidRegistration(displayName.error);
       }
 
       let organizationName = parsed.value.organization_name.trim();
       if (!organizationName) {
-        let csrfToken = getCsrfToken(context);
-        return context.render(
-          <RegisterPage
-            csrfToken={csrfToken}
-            error="Organization name is required"
-            email={submittedEmail}
-            displayName={submittedDisplayName}
-            organizationName={submittedOrganizationName}
-          />,
-          { status: 400 },
-        );
+        return renderInvalidRegistration('Organization name is required');
       }
 
       let email = parsed.value.email.trim().toLowerCase();

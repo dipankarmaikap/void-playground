@@ -57,7 +57,7 @@ describe('db', () => {
     assert.equal((await db.find(organizations, second))?.name, 'Same Name Studio');
   });
 
-  it('enforces Organization names and membership integrity in SQLite', async () => {
+  it('rejects a blank Organization name', async () => {
     let invalidOrganizationId = crypto.randomUUID();
     let blankNameRejected = false;
     try {
@@ -72,7 +72,9 @@ describe('db', () => {
     }
     assert.equal(blankNameRejected, true);
     assert.equal(await db.find(organizations, invalidOrganizationId), null);
+  });
 
+  it('rejects a whitespace-only Organization name', async () => {
     let whitespaceOrganizationId = crypto.randomUUID();
     let whitespaceNameRejected = false;
     try {
@@ -87,14 +89,15 @@ describe('db', () => {
     }
     assert.equal(whitespaceNameRejected, true);
     assert.equal(await db.find(organizations, whitespaceOrganizationId), null);
+  });
 
+  it('rejects duplicate OrganizationMemberships for the same User and Organization', async () => {
     let userId = await createUser();
-    let otherUserId = await createUser();
     let organizationId = await createOrganization('Membership Test Studio');
     let membership = {
       organization_id: organizationId,
       user_id: userId,
-      is_owner: true,
+      is_owner: false,
       created_at: Date.now(),
     };
     await db.create(organizationMemberships, {
@@ -112,25 +115,43 @@ describe('db', () => {
       duplicateMembershipRejected = true;
     }
     assert.equal(duplicateMembershipRejected, true);
+  });
+
+  it('rejects a second owner membership for an Organization', async () => {
+    let userId = await createUser();
+    let otherUserId = await createUser();
+    let organizationId = await createOrganization('Single Owner Studio');
+    await db.create(organizationMemberships, {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      user_id: userId,
+      is_owner: true,
+      created_at: Date.now(),
+    });
 
     let secondOwnerRejected = false;
     try {
       await db.create(organizationMemberships, {
         id: crypto.randomUUID(),
-        ...membership,
+        organization_id: organizationId,
         user_id: otherUserId,
+        is_owner: true,
+        created_at: Date.now(),
       });
     } catch {
       secondOwnerRejected = true;
     }
     assert.equal(secondOwnerRejected, true);
+  });
 
+  it('rejects an OrganizationMembership for a missing Organization', async () => {
+    let userId = await createUser();
     let invalidOrganizationMembershipRejected = false;
     try {
       await db.create(organizationMemberships, {
         id: crypto.randomUUID(),
         organization_id: crypto.randomUUID(),
-        user_id: otherUserId,
+        user_id: userId,
         is_owner: false,
         created_at: Date.now(),
       });

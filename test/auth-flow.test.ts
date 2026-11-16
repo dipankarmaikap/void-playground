@@ -7,12 +7,18 @@ import {
   db,
   organizationMemberships,
   organizations,
-  sessions,
   users,
 } from '../app/data/db.ts';
 import { findOrganizationForUser } from '../app/data/organizations.ts';
 
-import { cookieFromResponse, createUser, login, origin, postForm } from './http.ts';
+import {
+  cookieFromResponse,
+  createUser,
+  extractCsrf,
+  login,
+  origin,
+  postForm,
+} from './http.ts';
 
 async function register(body: Record<string, string>) {
   let response = await postForm(router, routes.auth.register.action.href(), body);
@@ -113,27 +119,17 @@ describe('auth flow', () => {
     );
 
     let sessionCookie = await login(router, normalizedEmail, password);
+    let forgedOrganizationId = crypto.randomUUID();
     let dashboardUrl = new URL(routes.app.dashboard.href(), origin);
-    dashboardUrl.searchParams.set('organization_id', crypto.randomUUID());
+    dashboardUrl.searchParams.set('organization_id', forgedOrganizationId);
     let dashboard = await router.fetch(dashboardUrl, {
       headers: { Cookie: sessionCookie },
     });
     assert.equal(dashboard.status, 200);
-    assert.match(await dashboard.text(), /Welcome back/);
-
-    let session = await db.findOne(sessions, { where: { user_id: user.id } });
-    assert.ok(session);
-    assert.equal(session.user_id, user.id);
-    let [sessionData] = JSON.parse(session.data) as [
-      {
-        auth?: { userId?: string; organizationId?: string };
-        organizationId?: string;
-      },
-      unknown,
-    ];
-    assert.equal(sessionData.auth?.userId, user.id);
-    assert.equal(sessionData.auth?.organizationId, undefined);
-    assert.equal(sessionData.organizationId, undefined);
+    let dashboardHtml = await dashboard.text();
+    assert.match(dashboardHtml, /Welcome back/);
+    assert.ok(dashboardHtml.includes('Lovelace Analytics'));
+    assert.equal(dashboardHtml.includes(forgedOrganizationId), false);
   });
 
   it('registers with a trimmed display name', async () => {
@@ -223,6 +219,50 @@ describe('auth flow', () => {
     assert.match(html, /Expected valid email/);
   });
 
+  it('keeps an invalid registration retry CSRF-protected', async () => {
+    let page = await router.fetch(new URL(routes.auth.register.index.href(), origin));
+    let cookie = cookieFromResponse(page);
+    let csrfToken = extractCsrf(await page.text());
+    assert.ok(cookie);
+    assert.ok(csrfToken);
+
+    let actionUrl = new URL(routes.auth.register.action.href(), origin);
+    let invalidResponse = await router.fetch(actionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: cookie,
+      },
+      body: new URLSearchParams({
+        email: 'not-an-email',
+        organization_name: 'Retry Studio',
+        password: 'password123',
+        _csrf: csrfToken,
+      }).toString(),
+    });
+    assert.equal(invalidResponse.status, 400);
+    let invalidHtml = await invalidResponse.text();
+    assert.match(invalidHtml, /<p role="alert"[^>]*>Expected valid email<\/p>/);
+    let retryCsrfToken = extractCsrf(invalidHtml);
+    assert.ok(retryCsrfToken);
+
+    let retry = await router.fetch(actionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: cookie,
+      },
+      body: new URLSearchParams({
+        email: `retry-${crypto.randomUUID()}@example.com`,
+        organization_name: 'Retry Studio',
+        password: 'password123',
+        _csrf: retryCsrfToken,
+      }).toString(),
+    });
+    assert.equal(retry.status, 302);
+    assert.equal(retry.headers.get('Location'), routes.auth.login.index.href());
+  });
+
   it('rejects a whitespace-only Organization name with accessible feedback', async () => {
     let email = `blank-organization-${crypto.randomUUID()}@example.com`;
     let { response, html } = await register({
@@ -276,6 +316,9 @@ describe('auth flow', () => {
       { headers: { Cookie: sessionCookie } },
     );
     assert.equal(sessionsResponse.status, 200);
+    let sessionsHtml = await sessionsResponse.text();
+    assert.match(sessionsHtml, /This session/);
+    assert.ok(sessionsHtml.includes(email));
   });
 
   it('fails closed when an Organization selector would be needed', async () => {

@@ -61,7 +61,8 @@ export default createController(routes.app.settings.profile, {
     },
     async action(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
-      if (context.formData.has('organization_name')) {
+
+      async function renameOrganization() {
         let value = context.formData.get('organization_name');
         let submitted = typeof value === 'string' ? value : '';
         let parsed = parseOrganizationName(submitted);
@@ -81,19 +82,27 @@ export default createController(routes.app.settings.profile, {
         return redirect(routes.app.settings.profile.index.href());
       }
 
-      let value = context.formData.get('display_name');
-      let submitted = typeof value === 'string' ? value : '';
-      let parsed = parseDisplayName(submitted);
+      async function updateDisplayName() {
+        let value = context.formData.get('display_name');
+        let submitted = typeof value === 'string' ? value : '';
+        let parsed = parseDisplayName(submitted);
 
-      if (!parsed.ok) {
-        context.session.flash('error', parsed.error);
-        context.session.flash(DISPLAY_NAME_DRAFT_FLASH_KEY, submitted);
+        if (!parsed.ok) {
+          context.session.flash('error', parsed.error);
+          context.session.flash(DISPLAY_NAME_DRAFT_FLASH_KEY, submitted);
+          return redirect(routes.app.settings.profile.index.href());
+        }
+
+        await db.update(users, auth.identity.id, { display_name: parsed.value });
+        context.session.flash('message', 'Profile updated');
         return redirect(routes.app.settings.profile.index.href());
       }
 
-      await db.update(users, auth.identity.id, { display_name: parsed.value });
-      context.session.flash('message', 'Profile updated');
-      return redirect(routes.app.settings.profile.index.href());
+      if (context.formData.has('organization_name')) {
+        return renameOrganization();
+      }
+
+      return updateDisplayName();
     },
   },
 });

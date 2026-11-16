@@ -296,6 +296,8 @@ describe('app controller', () => {
 
   it('updates the display name through the CSRF-protected profile form', async () => {
     let { userId, sessionCookie } = await loginNewUser();
+    let organization = await findOrganizationForUser({ id: userId });
+    assert.ok(organization);
     let response = await postProfile(sessionCookie, { display_name: '  Grace Hopper  ' });
 
     assert.equal(response.status, 302);
@@ -310,6 +312,7 @@ describe('app controller', () => {
 
     let user = await db.find(users, userId);
     assert.equal(user?.display_name, 'Grace Hopper');
+    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
   });
 
   it('clears the display name with a blank submission', async () => {
