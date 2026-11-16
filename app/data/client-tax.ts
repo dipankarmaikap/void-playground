@@ -205,13 +205,16 @@ export function parseClientTax(input: ClientTaxInput): ClientTaxResult {
  * Duplicates are allowed; callers use this only to surface a non-blocking warning.
  */
 export async function findClientWithTaxValue(
+  organizationId: string,
   value: string,
   excludeClientId?: string,
 ): Promise<Client | null> {
   let normalized = normalizeTaxValue(value);
   if (!normalized) return null;
 
-  let matches = await db.findMany(clients, { where: { tax_value: normalized } });
+  let matches = await db.findMany(clients, {
+    where: { organization_id: organizationId, tax_value: normalized },
+  });
   return matches.find((client) => client.id !== excludeClientId) ?? null;
 }
 

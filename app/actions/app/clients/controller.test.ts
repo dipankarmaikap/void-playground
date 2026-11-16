@@ -4,7 +4,14 @@ import { describe, it } from 'remix/test';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { db, clients } from '../../../data/db.ts';
-import { createUserAndLogin, extractCsrf, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLogin,
+  createUserAndLoginWithOrganization,
+  extractCsrf,
+  getHtml,
+  origin,
+  postForm,
+} from '../../../../test/http.ts';
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -283,43 +290,6 @@ describe('clients controller', () => {
     assert.equal(persisted, null);
   });
 
-  it('shares one client book between authenticated users', async () => {
-    let firstCookie = await createUserAndLogin(router, 'clients');
-    let secondCookie = await createUserAndLogin(router, 'clients');
-    let legalName = uniqueName('Shared Client');
-
-    let created = await postForm(
-      router,
-      routes.app.clients.new.action.href(),
-      { type: 'individual', legal_name: legalName },
-      firstCookie,
-    );
-    assert.equal(created.status, 302);
-    let location = created.headers.get('Location');
-    assert.ok(location);
-    let row = await db.findOne(clients, { where: { legal_name: legalName } });
-    assert.ok(row);
-
-    let secondProfile = await getHtml(router, location, secondCookie);
-    assert.match(secondProfile, new RegExp(legalName));
-
-    let updatedName = uniqueName('Shared Client Updated');
-    let edited = await postForm(
-      router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: updatedName },
-      secondCookie,
-    );
-    assert.equal(edited.status, 302);
-
-    let stored = await db.find(clients, row.id);
-    assert.equal(stored?.legal_name, updatedName);
-
-    let anonymous = await router.fetch(new URL(location, origin));
-    assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
-  });
-
   it('uses the preferred name as the display label and falls back to the legal name', async () => {
     let sessionCookie = await createUserAndLogin(router, 'clients');
     let legalName = uniqueName('Katherine Johnson');
@@ -357,7 +327,8 @@ describe('clients controller', () => {
   });
 
   it('shows only active clients in the directory', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let tenant = await createUserAndLoginWithOrganization(router, 'clients');
+    let sessionCookie = tenant.sessionCookie;
     let activeName = uniqueName('Active Client');
     let archivedName = uniqueName('Archived Client');
 
@@ -369,6 +340,7 @@ describe('clients controller', () => {
     );
     await db.create(clients, {
       id: crypto.randomUUID(),
+      organization_id: tenant.organizationId,
       type: 'individual',
       legal_name: archivedName,
       status: 'archived',

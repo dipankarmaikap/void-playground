@@ -123,9 +123,28 @@ export async function createUserAndLogin(
   emailPrefix: string,
   displayName: string | null = null,
 ): Promise<string> {
+  let { sessionCookie } = await createUserAndLoginWithOrganization(
+    app,
+    emailPrefix,
+    displayName,
+  );
+  return sessionCookie;
+}
+
+/** Creates a verified User and signs in, returning its server-provisioned Organization ID. */
+export async function createUserAndLoginWithOrganization(
+  app: TestApp,
+  emailPrefix: string,
+  displayName: string | null = null,
+): Promise<{ sessionCookie: string; organizationId: string }> {
   let email = `${emailPrefix}-${crypto.randomUUID()}@example.com`;
-  await createUser(email, 'password123', true, displayName);
-  return login(app, email, 'password123');
+  let userId = await createUser(email, 'password123', true, displayName);
+  let membership = await db.findOne(organizationMemberships, { where: { user_id: userId } });
+  assert.ok(membership, 'the test User should have an OrganizationMembership');
+  return {
+    sessionCookie: await login(app, email, 'password123'),
+    organizationId: membership.organization_id,
+  };
 }
 
 /** Fetches `path` as the signed-in User and asserts the page rendered. */

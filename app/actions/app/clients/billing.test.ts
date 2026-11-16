@@ -4,7 +4,13 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLogin,
+  getHtml,
+  origin,
+  postForm,
+  submitForm,
+} from '../../../../test/http.ts';
 
 const blankBilling = {
   billing_line1: '',
@@ -444,7 +450,7 @@ describe('client billing details', () => {
     assert.doesNotMatch(profile, /2 Invalid Street/);
   });
 
-  it('shares billing details with a second authenticated User', async () => {
+  it('does not disclose or edit another Organization’s billing details', async () => {
     let firstCookie = await createUserAndLogin(router, 'billing');
     let secondCookie = await createUserAndLogin(router, 'billing');
     let legalName = uniqueName('Shared Billing');
@@ -460,12 +466,17 @@ describe('client billing details', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(router, location, secondCookie);
-    assert.match(secondProfile, /8 Shared Lane/);
-    assert.match(secondProfile, /Pune/);
+    let secondProfile = await router.fetch(new URL(location, origin), {
+      headers: { Cookie: secondCookie },
+    });
+    assert.equal(secondProfile.status, 404);
+    let secondBody = await secondProfile.text();
+    assert.doesNotMatch(secondBody, /8 Shared Lane/);
+    assert.doesNotMatch(secondBody, /Pune/);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
+      routes.app.clients.index.href(),
       routes.app.clients.edit.action.href({ clientId: row.id }),
       clientFields({
         legal_name: legalName,
@@ -476,14 +487,10 @@ describe('client billing details', () => {
       }),
       secondCookie,
     );
-    assert.equal(edited.status, 302);
+    assert.equal(edited.status, 404);
 
     let stored = await db.find(clients, row.id);
-    assert.equal(stored?.billing_line1, '9 Shared Lane');
-
-    let anonymous = await router.fetch(new URL(location, origin));
-    assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    assert.equal(stored?.billing_line1, '8 Shared Lane');
   });
 
   it('rejects billing mutations without a CSRF token', async () => {

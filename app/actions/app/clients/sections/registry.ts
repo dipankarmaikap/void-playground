@@ -21,6 +21,8 @@ export interface ClientFormSectionResult {
 }
 
 export interface ClientFormSectionContext {
+  /** Server-verified Organization that will own the Client. */
+  organizationId: string;
   /** The Client being edited; absent when creating a Client. */
   clientId?: string;
 }
@@ -37,7 +39,7 @@ export interface ClientFormSection {
   render: (props: ClientFormSectionProps) => RemixNode;
   parse: (
     formData: FormData,
-    context?: ClientFormSectionContext,
+    context: ClientFormSectionContext,
   ) => ClientFormSectionResult | Promise<ClientFormSectionResult>;
 }
 

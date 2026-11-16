@@ -14,15 +14,23 @@ import {
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
+import {
+  CurrentOrganization,
+  requireOrganizationContext,
+} from '../../../middleware/organization-context.ts';
 import { routes } from '../../../routes.ts';
 import { ClientsIndexPage } from './index-page.tsx';
 import { ClientProfilePage } from './show-page.tsx';
 
 export default createController(routes.app.clients, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [
+    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireOrganizationContext,
+  ],
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
+      let organization = context.get(CurrentOrganization);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
@@ -33,7 +41,7 @@ export default createController(routes.app.clients, {
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
       let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
-      let directory = await listClients({ q: query, type, status, page });
+      let directory = await listClients(organization.id, { q: query, type, status, page });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
@@ -51,7 +59,8 @@ export default createController(routes.app.clients, {
       );
     },
     async show(context) {
-      let client = await findClient(context.params.clientId);
+      let organization = context.get(CurrentOrganization);
+      let client = await findClient(organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let auth = context.get(Auth) as GoodAuth<User>;

@@ -4,7 +4,13 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLogin,
+  getHtml,
+  origin,
+  postForm,
+  submitForm,
+} from '../../../../test/http.ts';
 
 /** A structurally valid 15-character GSTIN (format only; nothing is verified). */
 const VALID_GSTIN = '27AAPCS2319F1Z5';
@@ -461,7 +467,7 @@ describe('client tax identifiers', () => {
     assert.doesNotMatch(profile, /already recorded/);
   });
 
-  it('shares tax identifiers with a second authenticated User', async () => {
+  it('does not disclose or edit another Organization’s tax identifier', async () => {
     let firstCookie = await createUserAndLogin(router, 'tax');
     let secondCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('Shared Tax Client');
@@ -475,11 +481,15 @@ describe('client tax identifiers', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(router, location, secondCookie);
-    assert.match(secondProfile, /GB222222222/);
+    let secondProfile = await router.fetch(new URL(location, origin), {
+      headers: { Cookie: secondCookie },
+    });
+    assert.equal(secondProfile.status, 404);
+    assert.doesNotMatch(await secondProfile.text(), /GB222222222/);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
+      routes.app.clients.index.href(),
       routes.app.clients.edit.action.href({ clientId: row.id }),
       clientFields({
         legal_name: legalName,
@@ -489,16 +499,12 @@ describe('client tax identifiers', () => {
       }),
       secondCookie,
     );
-    assert.equal(edited.status, 302);
+    assert.equal(edited.status, 404);
 
     let stored = await db.find(clients, row.id);
-    assert.equal(stored?.tax_country, 'US');
-    assert.equal(stored?.tax_type, 'EIN');
-    assert.equal(stored?.tax_value, '12-3456789');
-
-    let anonymous = await router.fetch(new URL(location, origin));
-    assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    assert.equal(stored?.tax_country, 'GB');
+    assert.equal(stored?.tax_type, 'VAT');
+    assert.equal(stored?.tax_value, 'GB222222222');
   });
 
   it('rejects tax identifier mutations without a CSRF token', async () => {

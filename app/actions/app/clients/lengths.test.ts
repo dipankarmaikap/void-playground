@@ -32,7 +32,7 @@ function maxLengthValues() {
   let maxEmail = `${'a'.repeat(242)}@example.com`;
   return {
     type: 'business',
-    legal_name: 'L'.repeat(120),
+    legal_name: `${'L'.repeat(88)}${crypto.randomUUID().replaceAll('-', '').slice(0, 32)}`,
     preferred_name: 'P'.repeat(120),
     trading_name: 'T'.repeat(120),
     industry: 'I'.repeat(120),

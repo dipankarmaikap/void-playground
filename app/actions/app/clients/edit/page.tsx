@@ -35,7 +35,7 @@ export function EditClientPage(handle: Handle<EditClientPageProps>) {
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Edit {label}</h1>
-          <p mix={pageIntroStyle}>Changes apply to the shared client book.</p>
+          <p mix={pageIntroStyle}>Changes apply to your Organization's Client book.</p>
         </header>
         <ClientForm
           csrfToken={csrfToken}

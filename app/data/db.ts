@@ -89,6 +89,7 @@ export const clients = table({
   name: 'clients',
   columns: {
     id: c.text().notNull(),
+    organization_id: c.text().notNull(),
     type: c.enum(['individual', 'business'] as const).notNull(),
     legal_name: c.text().notNull(),
     preferred_name: c.text().nullable(),
@@ -120,6 +121,29 @@ export const clients = table({
 });
 
 export const db = createSqliteDatabase({ filename: dbPath, foreignKeys: true });
+
+function missingClientOrganizationSchemaError(): Error {
+  return new Error(
+    'This database schema is missing required Client Organization ownership. ' +
+      'Stop the app and perform the operator-managed clean start before continuing. ' +
+      'No stored data was deleted.',
+  );
+}
+
+/** Rejects a persisted pre-Organization Client schema before startup creates any new tables. */
+export async function assertClientSchemaCompatible(database: typeof db = db): Promise<void> {
+  let clientTable = getTableReference(clients);
+  if (
+    (await database.hasTable(clientTable)) &&
+    !(await database.hasColumn(clientTable, 'organization_id'))
+  ) {
+    throw missingClientOrganizationSchemaError();
+  }
+}
+
+if (!isTest) {
+  await assertClientSchemaCompatible();
+}
 
 await db.executeScript(`
 CREATE TABLE IF NOT EXISTS users (
@@ -180,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('individual', 'business')),
   legal_name TEXT NOT NULL,
   preferred_name TEXT,
@@ -205,7 +230,8 @@ CREATE TABLE IF NOT EXISTS clients (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   archived_at INTEGER,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status);
@@ -228,10 +254,20 @@ for (let [columnName, sqlType] of clientExtraColumns) {
   }
 }
 
-export async function assertOrganizationSchemaCompatible(): Promise<void> {
+export async function assertOrganizationSchemaCompatible(
+  database: typeof db = db,
+): Promise<void> {
+  let clientsHaveOrganization = await database.hasColumn(
+    getTableReference(clients),
+    'organization_id',
+  );
+  if (!clientsHaveOrganization) {
+    throw missingClientOrganizationSchemaError();
+  }
+
   let [existingUsers, memberships] = await Promise.all([
-    db.findMany(users),
-    db.findMany(organizationMemberships),
+    database.findMany(users),
+    database.findMany(organizationMemberships),
   ]);
   let membershipCounts = new Map<string, number>();
   for (let membership of memberships) {
@@ -243,14 +279,7 @@ export async function assertOrganizationSchemaCompatible(): Promise<void> {
   let hasUnassociatedUsers = existingUsers.some(
     (user) => (membershipCounts.get(user.id) ?? 0) === 0,
   );
-  let clientsHaveOrganization = await db.hasColumn(
-    getTableReference(clients),
-    'organization_id',
-  );
-  let hasUnownedClients =
-    !clientsHaveOrganization && (await db.findMany(clients, { limit: 1 })).length > 0;
-
-  if (hasUnassociatedUsers || hasUnownedClients) {
+  if (hasUnassociatedUsers) {
     throw new Error(
       'This database contains identity or Client data without Organization ownership. ' +
         'Stop the app and perform the operator-managed clean start before continuing. ' +
@@ -262,6 +291,11 @@ export async function assertOrganizationSchemaCompatible(): Promise<void> {
 if (!isTest) {
   await assertOrganizationSchemaCompatible();
 }
+
+await db.executeScript(`
+CREATE INDEX IF NOT EXISTS idx_clients_organization_status
+  ON clients(organization_id, status);
+`);
 
 export type User = TableRow<typeof users>;
 export type Organization = TableRow<typeof organizations>;

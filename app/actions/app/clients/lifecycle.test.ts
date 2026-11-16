@@ -218,35 +218,41 @@ describe('client lifecycle', () => {
     assert.match(directory, new RegExp(legalName));
   });
 
-  it('shares archive and restore across authenticated Users', async () => {
+  it('does not archive or restore another Organization’s Client', async () => {
     let firstCookie = await createUserAndLogin(router, 'lifecycle');
     let secondCookie = await createUserAndLogin(router, 'lifecycle');
     let legalName = uniqueName('Shared Lifecycle');
 
-    let { id, profilePath } = await createClient(firstCookie, {
+    let { id } = await createClient(firstCookie, {
       type: 'individual',
       legal_name: legalName,
     });
 
-    assert.equal((await archive(secondCookie, id)).status, 302);
-    assert.equal((await db.find(clients, id))?.status, 'archived');
-
-    let archivedDirectory = await getHtml(
+    let foreignArchive = await submitForm(
       router,
-      routes.app.clients.index.href({}, { searchParams: { status: 'archived' } }),
+      routes.app.clients.index.href(),
+      routes.app.clients.lifecycle.archive.href({ clientId: id }),
+      {},
       secondCookie,
     );
-    assert.match(archivedDirectory, new RegExp(legalName));
-
-    assert.equal((await restore(secondCookie, id)).status, 302);
+    assert.equal(foreignArchive.status, 404);
     assert.equal((await db.find(clients, id))?.status, 'active');
 
-    let secondProfile = await getHtml(router, profilePath, secondCookie);
-    assert.match(secondProfile, /<p role="status"[^>]*>Client restored<\/p>/);
+    assert.equal((await archive(firstCookie, id)).status, 302);
+    assert.equal((await db.find(clients, id))?.status, 'archived');
 
-    let firstProfile = await getHtml(router, profilePath, firstCookie);
-    assert.match(firstProfile, /<dd[^>]*>Active<\/dd>/);
-    assert.match(firstProfile, /Archive client/);
+    let foreignRestore = await submitForm(
+      router,
+      routes.app.clients.index.href(),
+      routes.app.clients.lifecycle.restore.href({ clientId: id }),
+      {},
+      secondCookie,
+    );
+    assert.equal(foreignRestore.status, 404);
+    assert.equal((await db.find(clients, id))?.status, 'archived');
+
+    assert.equal((await restore(firstCookie, id)).status, 302);
+    assert.equal((await db.find(clients, id))?.status, 'active');
   });
 
   it('rejects lifecycle mutations without a CSRF token', async () => {

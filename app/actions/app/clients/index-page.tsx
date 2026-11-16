@@ -221,7 +221,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
           <p mix={pageIntroStyle}>
             {archived
               ? 'Archived clients keep their details and can be restored to the active directory.'
-              : 'One shared client book. Every signed-in user can view and edit these profiles.'}
+              : 'Manage the people and businesses your Organization works with.'}
           </p>
         </header>
         {error ? (

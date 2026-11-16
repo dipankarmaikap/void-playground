@@ -7,13 +7,20 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { createClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
+import {
+  CurrentOrganization,
+  requireOrganizationContext,
+} from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
 import { readClientFormValues } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
 import { NewClientPage } from './page.tsx';
 
 export default createController(routes.app.clients.new, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [
+    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireOrganizationContext,
+  ],
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -27,7 +34,10 @@ export default createController(routes.app.clients.new, {
       );
     },
     async action(context) {
-      let { issues, changes, warning } = await parseClientForm(context.formData);
+      let organization = context.get(CurrentOrganization);
+      let { issues, changes, warning } = await parseClientForm(context.formData, {
+        organizationId: organization.id,
+      });
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;
 
@@ -44,7 +54,7 @@ export default createController(routes.app.clients.new, {
         );
       }
 
-      let client = await createClient(changes);
+      let client = await createClient(organization.id, changes);
       context.session.flash(
         'message',
         warning ? `Client created. ${warning}` : 'Client created',

@@ -1,5 +1,6 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
+import { createSqliteDatabase } from 'remix/data-table/sqlite';
 
 import {
   clients,
@@ -8,6 +9,7 @@ import {
   organizations,
   users,
   userPasswords,
+  assertClientSchemaCompatible,
   assertOrganizationSchemaCompatible,
 } from './db.ts';
 
@@ -138,6 +140,100 @@ describe('db', () => {
     assert.equal(invalidOrganizationMembershipRejected, true);
   });
 
+  it('requires a valid Organization for every Client in SQLite', async () => {
+    let organizationId = await createOrganization('Client Ownership Test');
+    let now = Date.now();
+    let missingOrganizationId = crypto.randomUUID();
+    let missingOrganizationRejected = false;
+    try {
+      await db.create(clients, {
+        id: missingOrganizationId,
+        type: 'individual',
+        legal_name: 'Missing Organization Client',
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      });
+    } catch {
+      missingOrganizationRejected = true;
+    }
+    assert.equal(missingOrganizationRejected, true);
+    assert.equal(await db.find(clients, missingOrganizationId), null);
+
+    let invalidOrganizationId = crypto.randomUUID();
+    let invalidOrganizationRejected = false;
+    try {
+      await db.create(clients, {
+        id: invalidOrganizationId,
+        organization_id: crypto.randomUUID(),
+        type: 'individual',
+        legal_name: 'Invalid Organization Client',
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      });
+    } catch {
+      invalidOrganizationRejected = true;
+    }
+    assert.equal(invalidOrganizationRejected, true);
+    assert.equal(await db.find(clients, invalidOrganizationId), null);
+
+    let validClientId = crypto.randomUUID();
+    await db.create(clients, {
+      id: validClientId,
+      organization_id: organizationId,
+      type: 'individual',
+      legal_name: 'Owned Client',
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    });
+    assert.equal((await db.find(clients, validClientId))?.organization_id, organizationId);
+  });
+
+  it('rejects an incompatible old Client schema without serving or erasing it', async () => {
+    let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
+    await legacyDb.executeScript(`
+      CREATE TABLE clients (
+        id TEXT PRIMARY KEY NOT NULL,
+        legal_name TEXT NOT NULL
+      );
+    `);
+
+    let rejectedEmptySchema = false;
+    try {
+      await assertClientSchemaCompatible(legacyDb);
+    } catch (error) {
+      rejectedEmptySchema =
+        error instanceof Error && /operator-managed clean start/.test(error.message);
+    }
+    assert.equal(rejectedEmptySchema, true, 'even an empty legacy table is incompatible');
+
+    await legacyDb.executeScript(`
+      INSERT INTO clients (id, legal_name) VALUES ('legacy-client', 'Preserved Legacy Client');
+    `);
+    let rejectedExistingData = false;
+    try {
+      await assertClientSchemaCompatible(legacyDb);
+    } catch (error) {
+      rejectedExistingData =
+        error instanceof Error && /operator-managed clean start/.test(error.message);
+    }
+    assert.equal(rejectedExistingData, true);
+    let rejectedIncompatibleSchema = false;
+    try {
+      await assertOrganizationSchemaCompatible(legacyDb);
+    } catch (error) {
+      rejectedIncompatibleSchema =
+        error instanceof Error && /operator-managed clean start/.test(error.message);
+    }
+    assert.equal(rejectedIncompatibleSchema, true);
+
+    let result = await legacyDb.exec('SELECT legal_name FROM clients');
+    assert.equal(result.rows?.[0]?.legal_name, 'Preserved Legacy Client');
+    await legacyDb.close();
+  });
+
   it('rejects incompatible existing identity data without deleting it', async () => {
     let id = await createUser();
     let rejected = false;
@@ -170,26 +266,5 @@ describe('db', () => {
       });
     }
     await assertOrganizationSchemaCompatible();
-
-    let clientId = crypto.randomUUID();
-    let now = Date.now();
-    await db.create(clients, {
-      id: clientId,
-      type: 'individual',
-      legal_name: 'Legacy Client',
-      status: 'active',
-      created_at: now,
-      updated_at: now,
-    });
-
-    let legacyClientRejected = false;
-    try {
-      await assertOrganizationSchemaCompatible();
-    } catch (error) {
-      legacyClientRejected =
-        error instanceof Error && /operator-managed clean start/.test(error.message);
-    }
-    assert.equal(legacyClientRejected, true);
-    assert.ok(await db.find(clients, clientId));
   });
 });

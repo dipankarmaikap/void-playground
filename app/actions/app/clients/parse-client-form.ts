@@ -13,7 +13,7 @@ export interface ParsedClientForm {
 /** Parses every registered Client form section and combines its changes and feedback. */
 export async function parseClientForm(
   formData: FormData,
-  context?: ClientFormSectionContext,
+  context: ClientFormSectionContext,
 ): Promise<ParsedClientForm> {
   let results = await Promise.all(
     clientFormSections.map((section) => section.parse(formData, context)),

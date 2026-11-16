@@ -4,7 +4,13 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLogin,
+  getHtml,
+  origin,
+  postForm,
+  submitForm,
+} from '../../../../test/http.ts';
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -370,7 +376,7 @@ describe('client contacts', () => {
     assert.equal(rows[0].contact_email, contactEmail);
   });
 
-  it('persists contacts for a second authenticated User to view and edit', async () => {
+  it('does not disclose or edit another Organization’s contact details', async () => {
     let firstCookie = await createUserAndLogin(router, 'contacts');
     let secondCookie = await createUserAndLogin(router, 'contacts');
     let legalName = uniqueName('Shared Contacts');
@@ -389,26 +395,27 @@ describe('client contacts', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(router, location, secondCookie);
-    assert.match(secondProfile, new RegExp(email));
-    assert.ok(secondProfile.includes(phone));
+    let secondProfile = await router.fetch(new URL(location, origin), {
+      headers: { Cookie: secondCookie },
+    });
+    assert.equal(secondProfile.status, 404);
+    let secondBody = await secondProfile.text();
+    assert.doesNotMatch(secondBody, new RegExp(email));
+    assert.ok(!secondBody.includes(phone));
 
     let updatedPhone = '+61 2 9999 1111';
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
+      routes.app.clients.index.href(),
       routes.app.clients.edit.action.href({ clientId: row.id }),
       { type: 'individual', legal_name: legalName, email, phone: updatedPhone },
       secondCookie,
     );
-    assert.equal(edited.status, 302);
+    assert.equal(edited.status, 404);
 
     let stored = await db.find(clients, row.id);
-    assert.equal(stored?.phone, updatedPhone);
+    assert.equal(stored?.phone, phone);
     assert.equal(stored?.email, email);
-
-    let anonymous = await router.fetch(new URL(location, origin));
-    assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
   });
 
   it('keeps Business primary-contact values through a type change', async () => {

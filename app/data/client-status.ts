@@ -17,21 +17,37 @@ export function parseClientStatusFilter(value: unknown): ClientStatus {
   return value === 'archived' ? 'archived' : 'active';
 }
 
-/** Archives a Client in place, keeping every profile field. */
-export async function archiveClient(id: string): Promise<Client> {
+/** Archives a Client in place only when it belongs to the given Organization. */
+export async function archiveClient(
+  organizationId: string,
+  id: string,
+): Promise<Client | null> {
   let now = Date.now();
-  return db.update(clients, id, {
-    status: 'archived',
-    archived_at: now,
-    updated_at: now,
-  });
+  await db.updateMany(
+    clients,
+    {
+      status: 'archived',
+      archived_at: now,
+      updated_at: now,
+    },
+    { where: { id, organization_id: organizationId }, limit: 1 },
+  );
+  return db.findOne(clients, { where: { id, organization_id: organizationId } });
 }
 
-/** Returns an archived Client to Active and clears the archive timestamp. */
-export async function restoreClient(id: string): Promise<Client> {
-  return db.update(clients, id, {
-    status: 'active',
-    archived_at: null,
-    updated_at: Date.now(),
-  });
+/** Returns an archived Client to Active only within the given Organization. */
+export async function restoreClient(
+  organizationId: string,
+  id: string,
+): Promise<Client | null> {
+  await db.updateMany(
+    clients,
+    {
+      status: 'active',
+      archived_at: null,
+      updated_at: Date.now(),
+    },
+    { where: { id, organization_id: organizationId }, limit: 1 },
+  );
+  return db.findOne(clients, { where: { id, organization_id: organizationId } });
 }

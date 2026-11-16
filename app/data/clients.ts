@@ -69,7 +69,7 @@ const DIRECTORY_COLUMNS = {
 };
 
 /**
- * Returns one stable page from the shared Client book, active Clients by default.
+ * Returns one stable page from the current Organization's Client book, active Clients by default.
  *
  * Search never touches tax identifiers, lifecycle status, industry, or address columns.
  * Percent and underscore are LIKE wildcards, and the SQLite data-table driver compiles
@@ -77,6 +77,7 @@ const DIRECTORY_COLUMNS = {
  * matched literally in bounded batches after status and type predicates run.
  */
 export async function listClients(
+  organizationId: string,
   filter: ClientListFilter = {},
 ): Promise<ClientDirectoryPage> {
   let status = filter.status ?? 'active';
@@ -85,7 +86,10 @@ export async function listClients(
   let page = normalizePage(filter.page);
   let offset = (page - 1) * CLIENT_DIRECTORY_PAGE_SIZE;
 
-  let predicates: Predicate[] = [eq(clients.status, status)];
+  let predicates: Predicate[] = [
+    eq(clients.organization_id, organizationId),
+    eq(clients.status, status),
+  ];
   if (type !== 'all') predicates.push(eq(clients.type, type));
 
   let literalSearch = q !== '' && LIKE_WILDCARDS.test(q);
@@ -165,18 +169,22 @@ function matchesClientQuery(client: ClientDirectoryItem, q: string): boolean {
   return SEARCH_FIELDS.some((field) => client[field]?.toLowerCase().includes(needle));
 }
 
-export async function findClient(id: string): Promise<Client | null> {
-  return db.find(clients, id);
+export async function findClient(organizationId: string, id: string): Promise<Client | null> {
+  return db.findOne(clients, { where: { id, organization_id: organizationId } });
 }
 
-/** Inserts a Client into the global book. New Clients always start Active. */
-export async function createClient(values: Partial<Client>): Promise<Client> {
+/** Inserts a Client into the given Organization. New Clients always start Active. */
+export async function createClient(
+  organizationId: string,
+  values: Omit<Partial<Client>, 'organization_id'>,
+): Promise<Client> {
   let now = Date.now();
   return db.create(
     clients,
     {
       ...values,
       id: values.id ?? crypto.randomUUID(),
+      organization_id: organizationId,
       status: values.status ?? 'active',
       archived_at: values.archived_at ?? null,
       created_at: values.created_at ?? now,
@@ -186,10 +194,22 @@ export async function createClient(values: Partial<Client>): Promise<Client> {
   );
 }
 
-/** Updates a Client, always refreshing `updated_at`. Throws when the row is missing. */
+/** Updates only a Client in the given Organization, always refreshing `updated_at`. */
 export async function updateClient(
+  organizationId: string,
   id: string,
-  changes: Partial<Client>,
-): Promise<Client> {
-  return db.update(clients, id, { ...changes, updated_at: Date.now() });
+  changes: Omit<Partial<Client>, 'id' | 'organization_id' | 'created_at' | 'updated_at'>,
+): Promise<Client | null> {
+  let safeChanges = { ...changes } as Partial<Client>;
+  delete safeChanges.id;
+  delete safeChanges.organization_id;
+  delete safeChanges.created_at;
+  delete safeChanges.updated_at;
+
+  await db.updateMany(
+    clients,
+    { ...safeChanges, updated_at: Date.now() },
+    { where: { id, organization_id: organizationId }, limit: 1 },
+  );
+  return findClient(organizationId, id);
 }

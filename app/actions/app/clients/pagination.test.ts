@@ -5,7 +5,15 @@ import { clients, db } from '../../../data/db.ts';
 import { listClients } from '../../../data/clients.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin } from '../../../../test/http.ts';
+import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
+
+let organizationId: string;
+
+async function createPageUser() {
+  let tenant = await createUserAndLoginWithOrganization(router, 'client-page');
+  organizationId = tenant.organizationId;
+  return tenant.sessionCookie;
+}
 
 function indexHref(params: Record<string, string> = {}) {
   return Object.keys(params).length === 0
@@ -24,6 +32,7 @@ async function seedClient(input: {
     clients,
     {
       id: input.id,
+      organization_id: organizationId,
       type: input.type ?? 'individual',
       legal_name: input.legalName,
       status: input.status ?? 'active',
@@ -51,7 +60,7 @@ beforeEach(async () => {
 
 describe('Client directory pagination', () => {
   it('returns bounded, stable pages ordered by legal name and id', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    let sessionCookie = await createPageUser();
     for (let number = 1; number <= 45; number += 1) {
       await seedClient({
         id: String(number).padStart(3, '0'),
@@ -64,7 +73,7 @@ describe('Client directory pagination', () => {
     assert.ok(first.includes('Paged Client 020'));
     assert.ok(!first.includes('Paged Client 021'));
 
-    let directory = await listClients();
+    let directory = await listClients(organizationId);
     assert.equal(directory.clients.length, 20);
     assert.ok(directory.clients[0]);
     for (let field of ['tax_value', 'billing_line1', 'created_at']) {
@@ -90,7 +99,7 @@ describe('Client directory pagination', () => {
   });
 
   it('uses Client id as a stable tie-breaker for equal legal names', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    let sessionCookie = await createPageUser();
     await seedClient({ id: 'z-tie', legalName: 'Tie Break Client' });
     await seedClient({ id: 'a-tie', legalName: 'Tie Break Client' });
 
@@ -99,7 +108,7 @@ describe('Client directory pagination', () => {
   });
 
   it('preserves search, type, and status while moving between pages', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    let sessionCookie = await createPageUser();
     let query = `Paged Batch ${crypto.randomUUID()}`;
 
     for (let number = 1; number <= 25; number += 1) {
@@ -144,7 +153,7 @@ describe('Client directory pagination', () => {
   });
 
   it('paginates literal wildcard searches without matching wildcard lookalikes', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    let sessionCookie = await createPageUser();
     for (let number = 1; number <= 25; number += 1) {
       await seedClient({
         id: `literal-${String(number).padStart(2, '0')}`,
@@ -170,7 +179,7 @@ describe('Client directory pagination', () => {
   });
 
   it('normalizes invalid page numbers to the first page', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-page');
+    let sessionCookie = await createPageUser();
     await seedClient({ id: 'only-client', legalName: 'Only Client' });
 
     for (let page of ['0', '-1', 'not-a-page']) {

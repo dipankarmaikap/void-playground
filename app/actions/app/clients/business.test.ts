@@ -4,7 +4,13 @@ import { describe, it } from 'remix/test';
 import { clients, db } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLogin,
+  getHtml,
+  origin,
+  postForm,
+  submitForm,
+} from '../../../../test/http.ts';
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -354,7 +360,7 @@ describe('business clients', () => {
     assert.match(restoredProfile, new RegExp(industry));
   });
 
-  it('shares Business profiles with a second authenticated User', async () => {
+  it('keeps Business profiles unavailable to a different Organization', async () => {
     let firstCookie = await createUserAndLogin(router, 'business');
     let secondCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('Shared Business Legal');
@@ -371,12 +377,18 @@ describe('business clients', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let secondProfile = await getHtml(router, location, secondCookie);
-    assert.match(secondProfile, new RegExp(tradingName));
+    let secondProfile = await router.fetch(new URL(location, origin), {
+      headers: { Cookie: secondCookie },
+    });
+    assert.equal(secondProfile.status, 404);
+    let secondBody = await secondProfile.text();
+    assert.doesNotMatch(secondBody, new RegExp(tradingName));
+    assert.doesNotMatch(secondBody, new RegExp(industry));
 
     let updatedIndustry = uniqueName('Management consulting');
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
+      routes.app.clients.index.href(),
       routes.app.clients.edit.action.href({ clientId: row.id }),
       newClientFields({
         legal_name: legalName,
@@ -385,10 +397,10 @@ describe('business clients', () => {
       }),
       secondCookie,
     );
-    assert.equal(edited.status, 302);
+    assert.equal(edited.status, 404);
 
     let stored = await db.find(clients, row.id);
-    assert.equal(stored?.industry, updatedIndustry);
+    assert.equal(stored?.industry, industry);
 
     let anonymous = await router.fetch(new URL(location, origin));
     assert.equal(anonymous.status, 302);

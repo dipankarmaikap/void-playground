@@ -5,9 +5,22 @@ import { clients, db } from '../../../data/db.ts';
 import type { Client } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, getHtml, origin, postForm } from '../../../../test/http.ts';
+import {
+  createUserAndLoginWithOrganization,
+  getHtml,
+  origin,
+  postForm,
+} from '../../../../test/http.ts';
 
 type ClientFixture = Partial<Client> & Pick<Client, 'type' | 'legal_name'>;
+
+let organizationId: string;
+
+async function createSearchUser() {
+  let tenant = await createUserAndLoginWithOrganization(router, 'search');
+  organizationId = tenant.organizationId;
+  return tenant.sessionCookie;
+}
 
 function indexHref(params: Record<string, string> = {}) {
   return Object.keys(params).length === 0
@@ -26,6 +39,7 @@ async function createClient(fixture: ClientFixture): Promise<Client> {
       created_at: now,
       updated_at: now,
       ...fixture,
+      organization_id: organizationId,
     },
     { returnRow: true },
   );
@@ -45,7 +59,7 @@ beforeEach(async () => {
 
 describe('client directory search and filters', () => {
   it('searches individual legal and preferred names and business legal and trading names', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let legalToken = crypto.randomUUID();
     let preferredToken = crypto.randomUUID();
     let tradingToken = crypto.randomUUID();
@@ -79,7 +93,7 @@ describe('client directory search and filters', () => {
   });
 
   it('searches Client email and phone plus primary-contact email and phone', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let email = `client-${crypto.randomUUID()}@example.com`;
     let phone = `+1 555 ${Math.floor(1_000_000 + Math.random() * 8_999_999)}`;
     let contactEmail = `contact-${crypto.randomUUID()}@example.com`;
@@ -112,7 +126,7 @@ describe('client directory search and filters', () => {
   });
 
   it('matches search terms case-insensitively', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let token = `CaseMixed${crypto.randomUUID().replaceAll('-', '')}`;
     let client = await createClient({
       type: 'individual',
@@ -124,7 +138,7 @@ describe('client directory search and filters', () => {
   });
 
   it('filters by Individual and Business type', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let token = crypto.randomUUID();
     let individual = await createClient({
       type: 'individual',
@@ -149,7 +163,7 @@ describe('client directory search and filters', () => {
   });
 
   it('filters by Active and Archived status and keeps archived results searchable', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let token = crypto.randomUUID();
     let active = await createClient({
       type: 'individual',
@@ -184,7 +198,7 @@ describe('client directory search and filters', () => {
   });
 
   it('combines search, type, and status filters', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let token = crypto.randomUUID();
     let fixtures = [
       await createClient({ type: 'individual', legal_name: `Combo Individual Active ${token}` }),
@@ -223,7 +237,7 @@ describe('client directory search and filters', () => {
   });
 
   it('never searches tax identifiers, industry, or billing details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let taxToken = `TAXVALUE${crypto.randomUUID().replaceAll('-', '')}`;
     let stateCodeToken = `STATECODE${crypto.randomUUID().replaceAll('-', '')}`;
     let industryToken = `Industry${crypto.randomUUID().replaceAll('-', '')}`;
@@ -251,9 +265,9 @@ describe('client directory search and filters', () => {
     }
   });
 
-  it('searches the shared book for a second authenticated User', async () => {
-    let firstCookie = await createUserAndLogin(router, 'search');
-    let secondCookie = await createUserAndLogin(router, 'search');
+  it('does not search Clients from another Organization', async () => {
+    let firstCookie = await createSearchUser();
+    let secondCookie = await createSearchUser();
     let legalName = unique('Shared Searchable');
 
     let created = await postForm(
@@ -265,11 +279,12 @@ describe('client directory search and filters', () => {
     assert.equal(created.status, 302);
 
     let html = await getHtml(router, indexHref({ q: legalName }), secondCookie);
-    includes(html, legalName);
+    assert.match(html, /No clients match your search and filters\./);
+    assert.doesNotMatch(html, /<li\b/);
   });
 
   it('distinguishes an empty Client book from an empty search result', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
 
     let activeDirectory = await getHtml(router, indexHref(), sessionCookie);
     assert.match(activeDirectory, /No active clients yet\./);
@@ -289,7 +304,7 @@ describe('client directory search and filters', () => {
   });
 
   it('renders an accessible GET search/filter form and preserves submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
 
     let html = await getHtml(
       router,
@@ -311,7 +326,7 @@ describe('client directory search and filters', () => {
   });
 
   it('keeps the searchable directory authenticated and noindex', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let path = indexHref({ q: 'private' });
 
     let anonymous = await router.fetch(new URL(path, origin));
@@ -324,7 +339,7 @@ describe('client directory search and filters', () => {
   });
 
   it('treats percent and underscore as literal search characters', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'search');
+    let sessionCookie = await createSearchUser();
     let percentMatch = await createClient({
       type: 'business',
       legal_name: `${unique('Percent')} 100% Cotton`,

@@ -7,16 +7,24 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { findClient, updateClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
+import {
+  CurrentOrganization,
+  requireOrganizationContext,
+} from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
 import { clientFormValuesOf, readClientFormValues } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
 import { EditClientPage } from './page.tsx';
 
 export default createController(routes.app.clients.edit, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [
+    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireOrganizationContext,
+  ],
   actions: {
     async index(context) {
-      let client = await findClient(context.params.clientId);
+      let organization = context.get(CurrentOrganization);
+      let client = await findClient(organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -32,10 +40,12 @@ export default createController(routes.app.clients.edit, {
       );
     },
     async action(context) {
-      let client = await findClient(context.params.clientId);
+      let organization = context.get(CurrentOrganization);
+      let client = await findClient(organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let { issues, changes, warning } = await parseClientForm(context.formData, {
+        organizationId: organization.id,
         clientId: client.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -55,7 +65,8 @@ export default createController(routes.app.clients.edit, {
         );
       }
 
-      await updateClient(client.id, changes);
+      let updated = await updateClient(organization.id, client.id, changes);
+      if (!updated) return new Response('Client not found', { status: 404 });
       context.session.flash(
         'message',
         warning ? `Client updated. ${warning}` : 'Client updated',
