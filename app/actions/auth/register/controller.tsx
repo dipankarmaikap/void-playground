@@ -9,7 +9,13 @@ import { Auth } from 'remix/middleware/auth';
 import type { AuthState } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
-import { db, users, userPasswords } from '../../../data/db.ts';
+import {
+  db,
+  organizationMemberships,
+  organizations,
+  users,
+  userPasswords,
+} from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { parseDisplayName } from '../../../data/display-name.ts';
 import { hashPassword } from '../../../data/password.ts';
@@ -18,12 +24,13 @@ import { RegisterPage } from './page.tsx';
 
 const registerForm = f.object({
   email: f.field(s.string().pipe(checks.email())),
+  organization_name: f.field(s.defaulted(s.string(), '')),
   display_name: f.field(s.defaulted(s.string(), '')),
   password: f.field(s.string().pipe(checks.minLength(8))),
 });
 
-function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Error && error.message.includes('UNIQUE constraint failed');
+function isDuplicateEmailViolation(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('UNIQUE constraint failed: users.email');
 }
 
 export default createController(routes.auth.register, {
@@ -48,6 +55,9 @@ export default createController(routes.auth.register, {
       let displayNameValue = context.formData.get('display_name');
       let submittedDisplayName =
         typeof displayNameValue === 'string' ? displayNameValue : undefined;
+      let organizationNameValue = context.formData.get('organization_name');
+      let submittedOrganizationName =
+        typeof organizationNameValue === 'string' ? organizationNameValue : undefined;
 
       let parsed = s.parseSafe(registerForm, context.formData);
       if (!parsed.success) {
@@ -58,6 +68,7 @@ export default createController(routes.auth.register, {
             error={parsed.issues[0]?.message ?? 'Invalid input'}
             email={submittedEmail}
             displayName={submittedDisplayName}
+            organizationName={submittedOrganizationName}
           />,
           { status: 400 },
         );
@@ -72,6 +83,22 @@ export default createController(routes.auth.register, {
             error={displayName.error}
             email={submittedEmail}
             displayName={submittedDisplayName}
+            organizationName={submittedOrganizationName}
+          />,
+          { status: 400 },
+        );
+      }
+
+      let organizationName = parsed.value.organization_name.trim();
+      if (!organizationName) {
+        let csrfToken = getCsrfToken(context);
+        return context.render(
+          <RegisterPage
+            csrfToken={csrfToken}
+            error="Organization name is required"
+            email={submittedEmail}
+            displayName={submittedDisplayName}
+            organizationName={submittedOrganizationName}
           />,
           { status: 400 },
         );
@@ -90,6 +117,8 @@ export default createController(routes.auth.register, {
       let token = crypto.randomUUID();
       let expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       let userId = crypto.randomUUID();
+      let organizationId = crypto.randomUUID();
+      let now = Date.now();
 
       try {
         await db.transaction(async (tx) => {
@@ -100,16 +129,29 @@ export default createController(routes.auth.register, {
             email_verified: false,
             verification_token: token,
             verification_expires_at: expiresAt,
-            created_at: Date.now(),
+            created_at: now,
           });
           await tx.create(userPasswords, {
             user_id: userId,
             password_hash: passwordHash,
-            updated_at: Date.now(),
+            updated_at: now,
+          });
+          await tx.create(organizations, {
+            id: organizationId,
+            name: organizationName,
+            created_at: now,
+            updated_at: now,
+          });
+          await tx.create(organizationMemberships, {
+            id: crypto.randomUUID(),
+            organization_id: organizationId,
+            user_id: userId,
+            is_owner: true,
+            created_at: now,
           });
         });
       } catch (error) {
-        if (isUniqueViolation(error)) {
+        if (isDuplicateEmailViolation(error)) {
           context.session.flash('error', 'Email already registered');
           return redirect(routes.auth.register.index.href());
         }

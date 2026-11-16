@@ -10,6 +10,14 @@ The domain language for this app's identity, sign-in, and client-management feat
 A person who can authenticate, identified by their email address.
 _Avoid_: account, member, customer
 
+**Organization**:
+A business workspace that owns its managed Clients and other organization-specific work. It is distinct from its Users and from a Business Client.
+_Avoid_: account, tenant
+
+**OrganizationMembership**:
+The relationship connecting a User to an Organization and granting that User access to its work. The User who creates a new Organization is its initial owner.
+_Avoid_: member
+
 **Display name**:
 An optional, non-unique name a User chooses to be addressed by. Blank means unset, and the app falls back to the email address.
 _Avoid_: username, nickname, handle
@@ -41,7 +49,7 @@ _Avoid_: delete, kill, terminate
 ### Clients
 
 **Client**:
-A person or business managed in the shared client book, with an Individual or Business profile. A Client is not a User and cannot sign in.
+A person or business managed by an Organization, with an Individual or Business profile. A Client is not a User and cannot sign in.
 _Avoid_: customer, account, contact, lead
 
 **Individual**:
@@ -49,7 +57,7 @@ A Client that is a person, identified by a legal name and optionally a preferred
 _Avoid_: person record, customer, sole trader
 
 **Business**:
-A Client that is an organization, identified by a legal name and optionally a trading name, industry, and one primary contact.
+A Client profile for a business entity, identified by a legal name and optionally a trading name, industry, and one primary contact.
 _Avoid_: company, organization, vendor
 
 **Active**:

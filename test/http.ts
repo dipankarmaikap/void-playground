@@ -1,6 +1,12 @@
 import * as assert from 'remix/assert';
 
-import { db, users, userPasswords } from '../app/data/db.ts';
+import {
+  db,
+  organizationMemberships,
+  organizations,
+  users,
+  userPasswords,
+} from '../app/data/db.ts';
 import { hashPassword } from '../app/data/password.ts';
 import { routes } from '../app/routes.ts';
 
@@ -29,17 +35,34 @@ export async function createUser(
   displayName: string | null = null,
 ): Promise<string> {
   let id = crypto.randomUUID();
-  await db.create(users, {
-    id,
-    email,
-    display_name: displayName,
-    email_verified: verified,
-    created_at: Date.now(),
-  });
-  await db.create(userPasswords, {
-    user_id: id,
-    password_hash: hashPassword(password),
-    updated_at: Date.now(),
+  let organizationId = crypto.randomUUID();
+  let now = Date.now();
+  await db.transaction(async (tx) => {
+    await tx.create(users, {
+      id,
+      email,
+      display_name: displayName,
+      email_verified: verified,
+      created_at: now,
+    });
+    await tx.create(userPasswords, {
+      user_id: id,
+      password_hash: hashPassword(password),
+      updated_at: now,
+    });
+    await tx.create(organizations, {
+      id: organizationId,
+      name: `Test Organization ${organizationId}`,
+      created_at: now,
+      updated_at: now,
+    });
+    await tx.create(organizationMemberships, {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      user_id: id,
+      is_owner: true,
+      created_at: now,
+    });
   });
   return id;
 }

@@ -32,6 +32,35 @@ export const users = table({
   },
 });
 
+export const organizations = table({
+  name: 'organizations',
+  columns: {
+    id: c.text().notNull(),
+    name: c.text().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
+export const organizationMemberships = table({
+  name: 'organization_memberships',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    user_id: c.text().notNull(),
+    is_owner: c.boolean().notNull(),
+    created_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+  afterRead({ value }) {
+    if ('is_owner' in value) {
+      return { value: { ...value, is_owner: Boolean(value.is_owner) } };
+    }
+    return { value };
+  },
+});
+
 export const userPasswords = table({
   name: 'user_passwords',
   columns: {
@@ -103,6 +132,27 @@ CREATE TABLE IF NOT EXISTS users (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL
+    CHECK (
+      length(trim(name, ' ' || char(9) || char(10) || char(11) || char(12) || char(13))) > 0
+    ),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_memberships (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  is_owner INTEGER NOT NULL CHECK (is_owner IN (0, 1)),
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (organization_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS user_passwords (
   user_id TEXT PRIMARY KEY NOT NULL,
   password_hash TEXT NOT NULL,
@@ -122,6 +172,10 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users(verification_token);
+CREATE INDEX IF NOT EXISTS idx_organization_memberships_user_id
+  ON organization_memberships(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organization_memberships_one_owner
+  ON organization_memberships(organization_id) WHERE is_owner = 1;
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -174,7 +228,44 @@ for (let [columnName, sqlType] of clientExtraColumns) {
   }
 }
 
+export async function assertOrganizationSchemaCompatible(): Promise<void> {
+  let [existingUsers, memberships] = await Promise.all([
+    db.findMany(users),
+    db.findMany(organizationMemberships),
+  ]);
+  let membershipCounts = new Map<string, number>();
+  for (let membership of memberships) {
+    membershipCounts.set(
+      membership.user_id,
+      (membershipCounts.get(membership.user_id) ?? 0) + 1,
+    );
+  }
+  let hasUnassociatedUsers = existingUsers.some(
+    (user) => (membershipCounts.get(user.id) ?? 0) === 0,
+  );
+  let clientsHaveOrganization = await db.hasColumn(
+    getTableReference(clients),
+    'organization_id',
+  );
+  let hasUnownedClients =
+    !clientsHaveOrganization && (await db.findMany(clients, { limit: 1 })).length > 0;
+
+  if (hasUnassociatedUsers || hasUnownedClients) {
+    throw new Error(
+      'This database contains identity or Client data without Organization ownership. ' +
+        'Stop the app and perform the operator-managed clean start before continuing. ' +
+        'No stored data was deleted.',
+    );
+  }
+}
+
+if (!isTest) {
+  await assertOrganizationSchemaCompatible();
+}
+
 export type User = TableRow<typeof users>;
+export type Organization = TableRow<typeof organizations>;
+export type OrganizationMembership = TableRow<typeof organizationMemberships>;
 export type UserPassword = TableRow<typeof userPasswords>;
 export type SessionRow = TableRow<typeof sessions>;
 export type Client = TableRow<typeof clients>;
