@@ -59,10 +59,37 @@ export const organizationInvoicingProfiles = table({
     address_country: c.text().nullable(),
     billing_email: c.text().nullable(),
     billing_phone: c.text().nullable(),
+    pan: c.text().nullable(),
+    gst_registered: c.boolean().notNull(),
+    gstin: c.text().nullable(),
+    gst_state_code: c.text().nullable(),
+    gst_state_name: c.text().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'organization_id',
+  afterRead({ value }) {
+    if ('gst_registered' in value) {
+      return { value: { ...value, gst_registered: Boolean(value.gst_registered) } };
+    }
+    return { value };
+  },
+});
+
+/**
+ * Organization-owned, editable Indian GST rate presets. Rates are stored as canonical decimal
+ * strings so invoice calculations never inherit floating-point rounding from the database.
+ */
+export const organizationGstRatePresets = table({
+  name: 'organization_gst_rate_presets',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    rate: c.text().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
 });
 
 export const organizationMemberships = table({
@@ -198,6 +225,11 @@ CREATE TABLE IF NOT EXISTS organization_invoicing_profiles (
   address_country TEXT,
   billing_email TEXT CHECK (billing_email IS NULL OR length(trim(billing_email)) > 0),
   billing_phone TEXT CHECK (billing_phone IS NULL OR length(trim(billing_phone)) > 0),
+  pan TEXT CHECK (pan IS NULL OR length(pan) = 10),
+  gst_registered INTEGER NOT NULL DEFAULT 0 CHECK (gst_registered IN (0, 1)),
+  gstin TEXT,
+  gst_state_code TEXT,
+  gst_state_name TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CHECK (
@@ -210,7 +242,31 @@ CREATE TABLE IF NOT EXISTS organization_invoicing_profiles (
       AND address_country IS NOT NULL AND length(trim(address_country)) > 0
     )
   ),
+  CHECK (gst_registered = 0 OR (
+    gstin IS NOT NULL AND length(gstin) = 15
+    AND gst_state_code IS NOT NULL AND length(gst_state_code) = 2
+  )),
+  CHECK (gst_registered = 1 OR (
+    gstin IS NULL AND gst_state_code IS NULL AND gst_state_name IS NULL
+  )),
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS organization_gst_rate_presets (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  rate TEXT NOT NULL CHECK (
+    length(rate) > 0
+    AND rate GLOB '[0-9]*'
+    AND rate NOT GLOB '*[^0-9.]*'
+    AND rate NOT LIKE '%.%.%'
+    AND CAST(rate AS REAL) >= 0
+    AND CAST(rate AS REAL) <= 100
+  ),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  UNIQUE (organization_id, rate)
 );
 
 CREATE TABLE IF NOT EXISTS organization_memberships (
@@ -248,6 +304,8 @@ CREATE INDEX IF NOT EXISTS idx_organization_memberships_user_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_organization_memberships_one_owner
   ON organization_memberships(organization_id) WHERE is_owner = 1;
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_gst_presets_organization
+  ON organization_gst_rate_presets(organization_id);
 
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY NOT NULL,
@@ -301,6 +359,24 @@ for (let [columnName, sqlType] of clientExtraColumns) {
   }
 }
 
+// #40 extends the #39 profile with tax registration columns. Guard each ALTER so a database
+// created by an earlier ticket upgrades in place; CHECK constraints apply to fresh databases.
+const invoicingExtraColumns: Array<[string, string]> = [
+  ['pan', 'TEXT'],
+  ['gst_registered', 'INTEGER NOT NULL DEFAULT 0 CHECK (gst_registered IN (0, 1))'],
+  ['gstin', 'TEXT'],
+  ['gst_state_code', 'TEXT'],
+  ['gst_state_name', 'TEXT'],
+];
+
+for (let [columnName, sqlType] of invoicingExtraColumns) {
+  if (!(await db.hasColumn(getTableReference(organizationInvoicingProfiles), columnName))) {
+    await db.executeScript(
+      `ALTER TABLE organization_invoicing_profiles ADD COLUMN ${columnName} ${sqlType};`,
+    );
+  }
+}
+
 export async function assertOrganizationSchemaCompatible(
   database: typeof db = db,
 ): Promise<void> {
@@ -347,6 +423,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_organization_status
 export type User = TableRow<typeof users>;
 export type Organization = TableRow<typeof organizations>;
 export type OrganizationInvoicingProfile = TableRow<typeof organizationInvoicingProfiles>;
+export type OrganizationGstRatePreset = TableRow<typeof organizationGstRatePresets>;
 export type OrganizationMembership = TableRow<typeof organizationMemberships>;
 export type UserPassword = TableRow<typeof userPasswords>;
 export type SessionRow = TableRow<typeof sessions>;

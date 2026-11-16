@@ -13,6 +13,10 @@ export function invoicingFormValuesOf(view: InvoicingProfileView): InvoicingForm
     address_country: view.address_country ?? '',
     billing_email: view.billing_email ?? '',
     billing_phone: view.billing_phone ?? '',
+    pan: view.pan ?? '',
+    gst_registered: view.gst_registered ? 'on' : '',
+    gstin: view.gstin ?? '',
+    gst_state_code: view.gst_state_code ?? '',
   };
 }
 
@@ -27,6 +31,10 @@ export function readInvoicingFormValues(formData: FormData): InvoicingFormValues
     address_country: readText(formData, 'address_country'),
     billing_email: readText(formData, 'billing_email'),
     billing_phone: readText(formData, 'billing_phone'),
+    pan: readText(formData, 'pan'),
+    gst_registered: readText(formData, 'gst_registered'),
+    gstin: readText(formData, 'gstin'),
+    gst_state_code: readText(formData, 'gst_state_code'),
   };
 }
 

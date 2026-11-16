@@ -4,12 +4,15 @@ import type { Issue } from 'remix/data-schema';
 
 import { COUNTRIES, countryName } from '../../../../data/client-billing.ts';
 import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
+import type { OrganizationGstRatePreset } from '../../../../data/db.ts';
+import { INDIA_STATES } from '../../../../data/india-states.ts';
 import type { InvoicingProfileView } from '../../../../data/organization-invoicing.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
 import { Field } from '../../../../ui/field.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import { Input } from '../../../../ui/input.tsx';
+import { Select } from '../../../../ui/select.tsx';
 import {
   formStackStyle,
   noticeErrorStyle,
@@ -34,6 +37,10 @@ export interface InvoicingPageProps {
   /** A 400 re-render echoes every field exactly as submitted, before canonicalization. */
   submitted?: boolean;
   message?: string;
+  presets: OrganizationGstRatePreset[];
+  /** A rejected preset submission is echoed back so the User can fix it without retyping. */
+  presetRate?: string;
+  presetError?: string;
 }
 
 const cardStyle = css({
@@ -87,6 +94,39 @@ const addressGroupStyle = css({
   gap: '1rem',
 });
 
+const checkboxStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  color: colors.text,
+  fontSize: '0.875rem',
+  fontWeight: 600,
+});
+
+const presetListStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  marginBottom: '1rem',
+});
+
+const presetRowStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  flexWrap: 'wrap',
+});
+
+const presetRowFormStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+});
+
+const presetRateInputStyle = css({
+  width: '7rem',
+});
+
 export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
   return () => {
     let {
@@ -98,6 +138,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
       issues = [],
       submitted = false,
       message,
+      presets,
+      presetRate = '',
+      presetError,
     } = handle.props;
     let legalNameIssue = issueFor(issues, 'legal_name');
     let line1Issue = issueFor(issues, 'address_line1');
@@ -107,6 +150,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
     let countryIssue = issueFor(issues, 'address_country');
     let emailIssue = issueFor(issues, 'billing_email');
     let phoneIssue = issueFor(issues, 'billing_phone');
+    let panIssue = issueFor(issues, 'pan');
+    let gstinIssue = issueFor(issues, 'gstin');
+    let gstStateIssue = issueFor(issues, 'gst_state_code');
 
     return (
       <AppShell
@@ -153,27 +199,27 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
           </dl>
         </section>
 
-        {issues.length > 0 ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
-            Please correct the fields below.
-          </p>
-        ) : null}
-        {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
-            {message}
-          </p>
-        ) : null}
+        <form
+          method="post"
+          action={routes.app.settings.invoicing.action.href()}
+          mix={formStackStyle}
+        >
+          <input type="hidden" name="_csrf" value={csrfToken} />
+          {issues.length > 0 ? (
+            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+              Please correct the fields below.
+            </p>
+          ) : null}
+          {message ? (
+            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+              {message}
+            </p>
+          ) : null}
 
-        <section aria-labelledby="seller-profile-heading" mix={[cardStyle, cardGapStyle]}>
-          <h2 id="seller-profile-heading" mix={cardHeadingStyle}>
-            Seller profile
-          </h2>
-          <form
-            method="post"
-            action={routes.app.settings.invoicing.action.href()}
-            mix={formStackStyle}
-          >
-            <input type="hidden" name="_csrf" value={csrfToken} />
+          <section aria-labelledby="seller-profile-heading" mix={[cardStyle, cardGapStyle]}>
+            <h2 id="seller-profile-heading" mix={cardHeadingStyle}>
+              Seller profile
+            </h2>
             <Field
               label="Legal seller name"
               hint="Optional. Leave blank to use the Organization name on invoices."
@@ -291,7 +337,148 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               />
             </Field>
 
+          </section>
+
+          <section aria-labelledby="tax-registration-heading" mix={[cardStyle, cardGapStyle]}>
+            <h2 id="tax-registration-heading" mix={cardHeadingStyle}>
+              Tax registration
+            </h2>
+            <Field
+              label="PAN (India)"
+              hint="Optional. 10-character Permanent Account Number, saved in uppercase."
+              error={panIssue?.message}
+            >
+              <Input
+                name="pan"
+                maxLength={10}
+                autoComplete="off"
+                defaultValue={values.pan}
+                aria-invalid={panIssue ? true : undefined}
+                variant={panIssue ? 'error' : 'default'}
+              />
+            </Field>
+
+            <label mix={checkboxStyle}>
+              <input
+                type="checkbox"
+                name="gst_registered"
+                value="on"
+                defaultChecked={Boolean(values.gst_registered)}
+              />
+              <span>GST registration is enabled for this Organization</span>
+            </label>
+
+            <Field
+              label="GSTIN (India)"
+              hint="Required when GST registration is enabled. 15 characters; no registry lookup is performed."
+              error={gstinIssue?.message}
+            >
+              <Input
+                name="gstin"
+                maxLength={15}
+                autoComplete="off"
+                defaultValue={values.gstin}
+                aria-invalid={gstinIssue ? true : undefined}
+                variant={gstinIssue ? 'error' : 'default'}
+              />
+            </Field>
+            <Field
+              label="GST State or UT (India)"
+              hint="Required when GST registration is enabled; its code must match the first two GSTIN digits."
+              error={gstStateIssue?.message}
+            >
+              <Select
+                name="gst_state_code"
+                aria-invalid={gstStateIssue ? true : undefined}
+                variant={gstStateIssue ? 'error' : 'default'}
+              >
+                <option value="" selected={!values.gst_state_code}>
+                  Not recorded
+                </option>
+                {INDIA_STATES.map((state) => (
+                  <option
+                    key={state.code}
+                    value={state.code}
+                    selected={values.gst_state_code === state.code}
+                  >
+                    {state.name} ({state.code})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+          </section>
+
+          <div>
             <Button type="submit">Save invoicing settings</Button>
+          </div>
+        </form>
+
+        <section aria-labelledby="gst-presets-heading" mix={[cardStyle, cardGapStyle]}>
+          <h2 id="gst-presets-heading" mix={cardHeadingStyle}>
+            GST rate presets
+          </h2>
+          <p mix={detailStyle}>
+            Editable rate presets available on this Organization&rsquo;s invoice service lines.
+          </p>
+          {presetError ? (
+            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+              {presetError}
+            </p>
+          ) : null}
+          <div mix={presetListStyle}>
+            {presets.map((preset) => (
+              <div key={preset.id} mix={presetRowStyle}>
+                <form
+                  method="post"
+                  action={routes.app.settings.invoicing.action.href()}
+                  mix={presetRowFormStyle}
+                >
+                  <input type="hidden" name="_csrf" value={csrfToken} />
+                  <input type="hidden" name="_form" value="preset_update" />
+                  <input type="hidden" name="preset_id" value={preset.id} />
+                  <Input
+                    name="rate"
+                    aria-label={`GST rate preset ${preset.rate}%`}
+                    mix={presetRateInputStyle}
+                    defaultValue={preset.rate}
+                  />
+                  <Button type="submit" variant="secondary">
+                    Save
+                  </Button>
+                </form>
+                <form method="post" action={routes.app.settings.invoicing.action.href()}>
+                  <input type="hidden" name="_csrf" value={csrfToken} />
+                  <input type="hidden" name="_form" value="preset_remove" />
+                  <input type="hidden" name="preset_id" value={preset.id} />
+                  <Button type="submit" variant="danger">
+                    Remove
+                  </Button>
+                </form>
+              </div>
+            ))}
+          </div>
+          <form
+            method="post"
+            action={routes.app.settings.invoicing.action.href()}
+            mix={formStackStyle}
+          >
+            <input type="hidden" name="_csrf" value={csrfToken} />
+            <input type="hidden" name="_form" value="preset_add" />
+            <Field
+              label="Add a GST rate preset"
+              hint="A non-negative decimal percentage from 0 to 100, such as 12.5."
+            >
+              <Input
+                name="rate"
+                defaultValue={presetRate}
+                aria-invalid={presetError ? true : undefined}
+                variant={presetError ? 'error' : 'default'}
+              />
+            </Field>
+            <Button type="submit" variant="secondary">
+              Add rate
+            </Button>
           </form>
         </section>
       </AppShell>

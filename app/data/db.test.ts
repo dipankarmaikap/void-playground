@@ -5,6 +5,7 @@ import { createSqliteDatabase } from 'remix/data-table/sqlite';
 import {
   clients,
   db,
+  organizationGstRatePresets,
   organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
@@ -287,6 +288,132 @@ describe('db', () => {
     assert.equal(
       (await db.find(organizationInvoicingProfiles, organizationId))?.address_country,
       'IN',
+    );
+  });
+
+  it('enforces tax registration constraints on the Organization invoicing profile', async () => {
+    let organizationId = await createOrganization('Tax Profile Constraint Test');
+    let now = Date.now();
+    let base = { organization_id: organizationId, created_at: now, updated_at: now };
+
+    let badPanRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, { ...base, pan: 'AAPCS2319' });
+    } catch {
+      badPanRejected = true;
+    }
+    assert.equal(badPanRejected, true, 'PAN must be 10 characters');
+
+    let enabledWithoutGstinRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, {
+        ...base,
+        pan: 'AAPCS2319F',
+        gst_registered: true,
+        gst_state_code: '27',
+      });
+    } catch {
+      enabledWithoutGstinRejected = true;
+    }
+    assert.equal(enabledWithoutGstinRejected, true, 'enabled GST requires a GSTIN');
+
+    let disabledWithGstinRejected = false;
+    try {
+      await db.create(organizationInvoicingProfiles, {
+        ...base,
+        gst_registered: false,
+        gstin: '27AAPCS2319F1Z5',
+        gst_state_code: '27',
+      });
+    } catch {
+      disabledWithGstinRejected = true;
+    }
+    assert.equal(disabledWithGstinRejected, true, 'disabling GST must clear its identifiers');
+
+    await db.create(organizationInvoicingProfiles, {
+      ...base,
+      pan: 'AAPCS2319F',
+      gst_registered: true,
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+      gst_state_name: 'Maharashtra',
+    });
+    let row = await db.find(organizationInvoicingProfiles, organizationId);
+    assert.ok(row);
+    assert.equal(row.pan, 'AAPCS2319F');
+    assert.equal(row.gst_registered, true);
+    assert.equal(row.gstin, '27AAPCS2319F1Z5');
+  });
+
+  it('enforces Organization ownership and valid rates on GST presets', async () => {
+    let organizationId = await createOrganization('Preset Constraint Test');
+    let otherOrganizationId = await createOrganization('Other Preset Constraint Test');
+    let now = Date.now();
+
+    let orphanRejected = false;
+    try {
+      await db.create(organizationGstRatePresets, {
+        id: crypto.randomUUID(),
+        organization_id: crypto.randomUUID(),
+        rate: '5',
+        created_at: now,
+        updated_at: now,
+      });
+    } catch {
+      orphanRejected = true;
+    }
+    assert.equal(orphanRejected, true, 'a preset must belong to an existing Organization');
+
+    for (let rate of ['-1', '101', 'abc', '1.2.3']) {
+      let invalidRejected = false;
+      try {
+        await db.create(organizationGstRatePresets, {
+          id: crypto.randomUUID(),
+          organization_id: organizationId,
+          rate,
+          created_at: now,
+          updated_at: now,
+        });
+      } catch {
+        invalidRejected = true;
+      }
+      assert.equal(invalidRejected, true, `${rate} should be rejected by the database`);
+    }
+
+    await db.create(organizationGstRatePresets, {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      rate: '12.5',
+      created_at: now,
+      updated_at: now,
+    });
+    let duplicateRejected = false;
+    try {
+      await db.create(organizationGstRatePresets, {
+        id: crypto.randomUUID(),
+        organization_id: organizationId,
+        rate: '12.5',
+        created_at: now,
+        updated_at: now,
+      });
+    } catch {
+      duplicateRejected = true;
+    }
+    assert.equal(duplicateRejected, true, 'rates are unique within an Organization');
+
+    await db.create(organizationGstRatePresets, {
+      id: crypto.randomUUID(),
+      organization_id: otherOrganizationId,
+      rate: '12.5',
+      created_at: now,
+      updated_at: now,
+    });
+    assert.equal(
+      await db.count(organizationGstRatePresets, {
+        where: { organization_id: otherOrganizationId, rate: '12.5' },
+      }),
+      1,
+      'another Organization may use the same rate',
     );
   });
 

@@ -2,9 +2,11 @@ import type { Issue } from 'remix/data-schema';
 
 import { canonicalCountry } from './client-billing.ts';
 import { parseClientContacts } from './client-contacts.ts';
+import { GSTIN_PATTERN } from './client-tax.ts';
 import { CLIENT_TEXT_LIMITS } from './client-text.ts';
 import { db, organizationInvoicingProfiles } from './db.ts';
 import type { Organization, OrganizationInvoicingProfile } from './db.ts';
+import { findIndiaStateByCode } from './india-states.ts';
 import { parseOrganizationName } from './organization-name.ts';
 
 /** The seller profile fields an Organization can save. All are optional strings from a form. */
@@ -17,6 +19,11 @@ export interface InvoicingProfileInput {
   address_country?: string;
   billing_email?: string;
   billing_phone?: string;
+  pan?: string;
+  /** The form posts `on` for a checked registration checkbox and omits it when unchecked. */
+  gst_registered?: string;
+  gstin?: string;
+  gst_state_code?: string;
 }
 
 /** Normalized values persisted for one Organization; blank optional fields become `null`. */
@@ -29,6 +36,11 @@ export interface InvoicingProfileValues {
   address_country: string | null;
   billing_email: string | null;
   billing_phone: string | null;
+  pan: string | null;
+  gst_registered: boolean;
+  gstin: string | null;
+  gst_state_code: string | null;
+  gst_state_name: string | null;
 }
 
 export type InvoicingProfileResult =
@@ -43,6 +55,9 @@ export interface InvoicingProfileView extends InvoicingProfileValues {
   issueReady: boolean;
   missingRequirements: string[];
 }
+
+/** Standard 10-character Indian PAN shape; format only, no external registry is consulted. */
+const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
 // Bound free text with the same limits the Client address and legal-name fields use.
 const PROFILE_TEXT_LIMITS = {
@@ -119,6 +134,64 @@ export function parseInvoicingProfile(input: InvoicingProfileInput): InvoicingPr
     }
   }
 
+  let panInput = (input.pan ?? '').trim().toUpperCase();
+  let pan: string | null = null;
+  if (panInput) {
+    if (!PAN_PATTERN.test(panInput)) {
+      issues.push({
+        message: 'Enter a valid 10-character PAN, for example AAPCS2319F.',
+        path: ['pan'],
+      });
+    } else {
+      pan = panInput;
+    }
+  }
+
+  let gstRegistered = Boolean(
+    input.gst_registered && ['on', 'true', '1', 'yes'].includes(input.gst_registered.trim().toLowerCase()),
+  );
+  let gstinInput = (input.gstin ?? '').trim().toUpperCase();
+  let gstStateCode = (input.gst_state_code ?? '').trim();
+  let gstin: string | null = null;
+  let gstStateName: string | null = null;
+
+  if (gstRegistered) {
+    let state = findIndiaStateByCode(gstStateCode);
+    if (!state) {
+      issues.push({
+        message: 'Choose the State or UT for GST registration.',
+        path: ['gst_state_code'],
+      });
+    }
+
+    if (!gstinInput) {
+      issues.push({
+        message: 'Enter a 15-character GSTIN, for example 27AAPCS2319F1Z5.',
+        path: ['gstin'],
+      });
+    } else if (!GSTIN_PATTERN.test(gstinInput)) {
+      issues.push({
+        message: 'Enter a 15-character GSTIN, for example 27AAPCS2319F1Z5.',
+        path: ['gstin'],
+      });
+    } else {
+      if (state && gstinInput.slice(0, 2) !== state.code) {
+        issues.push({
+          message: 'State or UT code must match the first two digits of the GSTIN.',
+          path: ['gst_state_code'],
+        });
+      }
+      if (pan && gstinInput.slice(2, 12) !== pan) {
+        issues.push({
+          message: 'GSTIN characters 3 to 12 must match the PAN.',
+          path: ['gstin'],
+        });
+      }
+      gstin = gstinInput;
+      gstStateName = state?.name ?? null;
+    }
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
   return {
@@ -132,6 +205,11 @@ export function parseInvoicingProfile(input: InvoicingProfileInput): InvoicingPr
       address_country: hasAddress ? canonicalCountry(countryInput) : null,
       billing_email: contacts.ok ? contacts.value.email : null,
       billing_phone: contacts.ok ? contacts.value.phone : null,
+      pan,
+      gst_registered: gstRegistered,
+      gstin: gstRegistered ? gstin : null,
+      gst_state_code: gstRegistered && gstin ? gstStateCode : null,
+      gst_state_name: gstRegistered && gstin ? gstStateName : null,
     },
   };
 }
@@ -180,6 +258,14 @@ export async function getInvoicingProfileView(
   if (!legalName.trim()) missingRequirements.push('Seller legal name');
   if (!addressLine1?.trim()) missingRequirements.push('Business address line 1');
   if (!addressCountry?.trim()) missingRequirements.push('Business country');
+  if (profile?.gst_registered) {
+    if (!profile.gstin?.trim() || !GSTIN_PATTERN.test(profile.gstin)) {
+      missingRequirements.push('GSTIN');
+    }
+    if (!profile.gst_state_code?.trim() || !findIndiaStateByCode(profile.gst_state_code)) {
+      missingRequirements.push('GST State/UT');
+    }
+  }
 
   return {
     legal_name: explicitLegalName,
@@ -190,6 +276,11 @@ export async function getInvoicingProfileView(
     address_country: addressCountry,
     billing_email: profile?.billing_email ?? null,
     billing_phone: profile?.billing_phone ?? null,
+    pan: profile?.pan ?? null,
+    gst_registered: profile?.gst_registered ?? false,
+    gstin: profile?.gstin ?? null,
+    gst_state_code: profile?.gst_state_code ?? null,
+    gst_state_name: profile?.gst_state_name ?? null,
     legalName,
     explicitLegalName,
     issueReady: missingRequirements.length === 0,
