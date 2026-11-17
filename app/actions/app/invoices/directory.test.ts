@@ -377,9 +377,9 @@ describe('invoice directory filters', () => {
     assert.ok(nextHref, 'the filtered first page should provide a Next link');
     let nextUrl = new URL(nextHref!.replaceAll('&amp;', '&'), origin);
 
-    assert.match(html, /<form[^>]*method="get"/);
+    assert.match(html, /<search>[\s\S]*?<form[^>]*method="get"/);
     assert.match(html, /<form[^>]*action="\/app\/invoices"/);
-    assert.match(html, /role="search"/);
+    assert.doesNotMatch(html, /role="search"/);
     assert.match(html, new RegExp(`name="clientId"[^>]*value="${client.id}"`));
     assert.match(html, />Search invoices</);
     assert.match(html, />Status</);

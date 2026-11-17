@@ -10,6 +10,7 @@ import {
   invoiceLineGstComponents,
 } from '../../../data/invoice-tax.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
+import { invoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -32,6 +33,9 @@ export interface InvoiceShowPageProps {
   lines: InvoiceLine[];
   client: Client | null;
   message?: string;
+  validationErrors?: readonly string[];
+  internalNoteValue?: string;
+  internalNoteError?: string;
 }
 
 const cardStyle = css({
@@ -57,11 +61,67 @@ const amountCellStyle = css({ padding: '0.5rem 0.625rem', textAlign: 'right' });
 const breakdownStyle = css({ margin: 0, fontSize: '0.9375rem', lineHeight: 1.6 });
 const totalStyle = css({ margin: 0, textAlign: 'right', fontSize: '1.0625rem', fontWeight: 700 });
 const actionsStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.25rem' });
+const errorStyle = css({
+  margin: 0,
+  padding: '1rem',
+  border: `1px solid ${colors.danger}`,
+  borderRadius: radius.md,
+  background: colors.surface,
+  color: colors.danger,
+});
+const textAreaStyle = css({
+  width: '100%',
+  boxSizing: 'border-box',
+  minHeight: '7rem',
+  padding: '0.75rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.sm,
+  background: colors.surface,
+  color: colors.text,
+  fontFamily: 'inherit',
+  fontSize: 'max(1rem, 1em)',
+});
+const noteFieldStyle = css({ display: 'grid', gap: '0.375rem', marginBottom: '0.75rem' });
+const snapshotImageStyle = css({ display: 'block', maxWidth: '12rem', maxHeight: '8rem' });
 
 export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
   return () => {
-    let { csrfToken, identity, organizationName, invoice, lines, client, message } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      invoice,
+      lines,
+      client,
+      message,
+      validationErrors = [],
+      internalNoteValue,
+      internalNoteError,
+    } = handle.props;
     let taxSummary = groupedInvoiceTaxes(lines, invoice.currency);
+    let displayStatus = invoiceDisplayStatus(invoice);
+    let isDraft = invoice.status === 'draft';
+    let recipientAddress = [
+      invoice.recipient_billing_line1,
+      invoice.recipient_billing_locality,
+      invoice.recipient_billing_region,
+      invoice.recipient_billing_postal_code,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(', ');
+    let sellerAddress = [
+      invoice.seller_address_line1,
+      invoice.seller_address_locality,
+      invoice.seller_address_region,
+      invoice.seller_address_postal_code,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(', ');
+    let pageTitle = isDraft
+      ? 'Invoice draft'
+      : displayStatus === 'overdue'
+        ? 'Overdue invoice'
+        : 'Sent invoice';
 
     return (
       <AppShell
@@ -69,14 +129,16 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
         identity={identity}
         organizationName={organizationName}
         section="invoices"
-        title="Invoice draft"
-        description={`Draft invoice for ${invoice.recipient_legal_name}.`}
+        title={pageTitle}
+        description={`${isDraft ? 'Draft' : displayStatus === 'overdue' ? 'Overdue' : 'Sent'} invoice for ${invoice.recipient_legal_name}.`}
       >
         <header mix={pageHeaderStyle}>
-          <h1 mix={pageHeadingStyle}>Invoice draft</h1>
+          <h1 mix={pageHeadingStyle}>{pageTitle}</h1>
           <p mix={pageIntroStyle}>
-            Status: {DRAFT_STATUS_LABEL}. Drafts have no final invoice number and can be edited or
-            discarded.
+            Status: {isDraft ? DRAFT_STATUS_LABEL : displayStatus === 'overdue' ? 'Overdue' : 'Sent'}.
+            {isDraft
+              ? ' Drafts have no final invoice number and can be edited or discarded.'
+              : ' Client-facing invoice details are locked after issue.'}
           </p>
         </header>
         {message ? (
@@ -84,13 +146,28 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             {message}
           </p>
         ) : null}
+        {validationErrors.length > 0 ? (
+          <div role="alert" mix={errorStyle}>
+            <p>Please complete these requirements before issuing the invoice:</p>
+            <ul>
+              {validationErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div mix={cardStyle}>
-          <h2 mix={headingStyle}>Draft details</h2>
+          <h2 mix={headingStyle}>{isDraft ? 'Draft details' : 'Issued invoice details'}</h2>
+          {invoice.invoice_number ? (
+            <p mix={detailStyle}>Invoice number: {invoice.invoice_number}</p>
+          ) : null}
           <p mix={detailStyle}>Recipient: {invoice.recipient_legal_name}</p>
-          <p mix={detailStyle}>
-            Client: {client?.legal_name ?? 'Client record unavailable'}
-            {client?.status === 'archived' ? ' (Archived)' : ''}
-          </p>
+          {isDraft ? (
+            <p mix={detailStyle}>
+              Client: {client?.legal_name ?? 'Client record unavailable'}
+              {client?.status === 'archived' ? ' (Archived)' : ''}
+            </p>
+          ) : null}
           <p mix={detailStyle}>Currency: {invoice.currency}</p>
           <p mix={detailStyle}>Invoice date: {invoice.invoice_date}</p>
           <p mix={detailStyle}>Due date: {invoice.due_date}</p>
@@ -100,8 +177,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           {invoice.custom_payment_terms ? (
             <p mix={detailStyle}>Custom terms: {invoice.custom_payment_terms}</p>
           ) : null}
-          {invoice.recipient_billing_line1 ? (
-            <p mix={detailStyle}>Billing address: {invoice.recipient_billing_line1}</p>
+          {recipientAddress ? (
+            <p mix={detailStyle}>Billing address: {recipientAddress}</p>
           ) : null}
           {invoice.recipient_billing_country ? (
             <p mix={detailStyle}>Country: {countryName(invoice.recipient_billing_country)}</p>
@@ -144,6 +221,48 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             </>
           ) : null}
         </div>
+
+        {!isDraft ? (
+          <div mix={cardStyle}>
+            <h2 mix={headingStyle}>Seller snapshot</h2>
+            <p mix={detailStyle}>Legal name: {invoice.seller_legal_name}</p>
+            <p mix={detailStyle}>Business address: {sellerAddress}</p>
+            <p mix={detailStyle}>Country: {countryName(invoice.seller_country)}</p>
+            {invoice.seller_email ? <p mix={detailStyle}>Email: {invoice.seller_email}</p> : null}
+            {invoice.seller_phone ? <p mix={detailStyle}>Phone: {invoice.seller_phone}</p> : null}
+            {invoice.seller_pan ? <p mix={detailStyle}>PAN: {invoice.seller_pan}</p> : null}
+            {invoice.seller_gst_registered ? (
+              <>
+                <p mix={detailStyle}>GSTIN: {invoice.seller_gstin}</p>
+                <p mix={detailStyle}>
+                  GST State/UT: {invoice.seller_gst_state_name} ({invoice.seller_gst_state_code})
+                </p>
+              </>
+            ) : null}
+            {invoice.seller_logo_data_url ? (
+              <img
+                src={invoice.seller_logo_data_url}
+                alt={`${invoice.seller_legal_name} logo`}
+                mix={snapshotImageStyle}
+              />
+            ) : null}
+            {invoice.seller_signature_data_url ? (
+              <img
+                src={invoice.seller_signature_data_url}
+                alt={`Authorized signature for ${invoice.seller_signatory_name ?? invoice.seller_legal_name}`}
+                mix={snapshotImageStyle}
+              />
+            ) : null}
+            {invoice.seller_signatory_name ? (
+              <p mix={detailStyle}>
+                Authorized signatory: {invoice.seller_signatory_name}
+                {invoice.seller_signatory_designation
+                  ? ` · ${invoice.seller_signatory_designation}`
+                  : ''}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div mix={cardStyle}>
           <h2 mix={headingStyle}>Service lines</h2>
@@ -241,35 +360,89 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           <h2 mix={headingStyle}>Notes</h2>
           <p mix={detailStyle}>Payment instructions: {invoice.payment_instructions ?? '—'}</p>
           <p mix={detailStyle}>Customer notes: {invoice.customer_notes ?? '—'}</p>
-          <p mix={detailStyle}>Internal note (private): {invoice.internal_note ?? '—'}</p>
+          {isDraft ? (
+            <p mix={detailStyle}>Internal note (private): {invoice.internal_note ?? '—'}</p>
+          ) : (
+            <>
+              <h3 id="internal-note-heading" mix={headingStyle}>
+                Private internal note
+              </h3>
+              <form
+                method="post"
+                action={routes.app.invoices.lifecycle.internalNote.href({ invoiceId: invoice.id })}
+                aria-labelledby="internal-note-heading"
+              >
+                <input type="hidden" name="_csrf" value={csrfToken} />
+                <div mix={noteFieldStyle}>
+                  <label htmlFor="invoice-internal-note">Internal note</label>
+                  <textarea
+                    id="invoice-internal-note"
+                    name="internal_note"
+                    maxLength={1000}
+                    mix={textAreaStyle}
+                    defaultValue={internalNoteValue ?? invoice.internal_note ?? ''}
+                    aria-invalid={internalNoteError ? true : undefined}
+                    aria-describedby={internalNoteError ? 'internal-note-error' : undefined}
+                  />
+                  {internalNoteError ? (
+                    <p id="internal-note-error" role="alert">
+                      {internalNoteError}
+                    </p>
+                  ) : null}
+                </div>
+                <Button type="submit">Save internal note</Button>
+              </form>
+            </>
+          )}
         </div>
 
-        <div mix={actionsStyle}>
-          <a
-            href={routes.app.invoices.edit.index.href({ invoiceId: invoice.id })}
-            mix={linkButtonStyle}
-          >
-            Edit draft
-          </a>
-          <details>
-            <summary>Discard draft</summary>
-            <div>
-              <p>
-                Discarding this Draft permanently removes it and its service lines. This cannot be
-                undone.
+        {isDraft ? (
+          <>
+            <div mix={actionsStyle}>
+              <a
+                href={routes.app.invoices.edit.index.href({ invoiceId: invoice.id })}
+                mix={linkButtonStyle}
+              >
+                Edit draft
+              </a>
+              <details>
+                <summary>Discard draft</summary>
+                <div>
+                  <p>
+                    Discarding this Draft permanently removes it and its service lines. This cannot
+                    be undone.
+                  </p>
+                  <form
+                    method="post"
+                    action={routes.app.invoices.lifecycle.discard.href({ invoiceId: invoice.id })}
+                    aria-label="Discard invoice draft"
+                  >
+                    <input type="hidden" name="_csrf" value={csrfToken} />
+                    <Button type="submit" variant="danger">
+                      Confirm discard draft
+                    </Button>
+                  </form>
+                </div>
+              </details>
+            </div>
+            <div mix={cardStyle}>
+              <h2 id="issue-invoice-heading" mix={headingStyle}>
+                Issue invoice
+              </h2>
+              <p mix={detailStyle}>
+                Issuing assigns the financial-year invoice number and locks client-facing details.
               </p>
               <form
                 method="post"
-                action={routes.app.invoices.lifecycle.discard.href({ invoiceId: invoice.id })}
+                action={routes.app.invoices.lifecycle.issue.href({ invoiceId: invoice.id })}
+                aria-labelledby="issue-invoice-heading"
               >
                 <input type="hidden" name="_csrf" value={csrfToken} />
-                <Button type="submit" variant="danger">
-                  Confirm discard draft
-                </Button>
+                <Button type="submit">Mark as sent</Button>
               </form>
             </div>
-          </details>
-        </div>
+          </>
+        ) : null}
       </AppShell>
     );
   };

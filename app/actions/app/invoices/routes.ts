@@ -10,6 +10,8 @@ export const invoiceRoutes = route({
   show: get('/:invoiceId'),
   edit: form('/:invoiceId/edit'),
   lifecycle: route('/:invoiceId', {
+    issue: post('/issue'),
     discard: post('/discard'),
+    internalNote: post('/internal-note'),
   }),
 });

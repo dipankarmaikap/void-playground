@@ -31,6 +31,9 @@ export default createController(routes.app.invoices.edit, {
       let organization = context.get(CurrentOrganization);
       let invoice = await findInvoice(organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
+      if (invoice.status !== 'draft') {
+        return new Response('Issued invoices cannot be edited', { status: 409 });
+      }
 
       let [lines, client] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
@@ -58,6 +61,9 @@ export default createController(routes.app.invoices.edit, {
       let organization = context.get(CurrentOrganization);
       let invoice = await findInvoice(organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
+      if (invoice.status !== 'draft') {
+        return new Response('Issued invoices cannot be edited', { status: 409 });
+      }
 
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
@@ -108,7 +114,7 @@ export default createController(routes.app.invoices.edit, {
 
       // The Client is fixed for this Draft; a forged `client_id` in the form is ignored.
       let updated = await updateDraftInvoice(organization.id, invoice.id, parsed.value);
-      if (!updated) return new Response('Invoice not found', { status: 404 });
+      if (!updated) return new Response('Only a Draft invoice can be edited', { status: 409 });
 
       context.session.flash('message', 'Invoice draft updated');
       return redirect(routes.app.invoices.show.href({ invoiceId: invoice.id }));

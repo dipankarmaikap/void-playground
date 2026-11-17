@@ -5,6 +5,7 @@ import { createSqliteDatabase } from 'remix/data-table/sqlite';
 import {
   clients,
   db,
+  documentSequences,
   invoiceLines,
   invoices,
   organizationGstRatePresets,
@@ -17,6 +18,7 @@ import {
   assertOrganizationSchemaCompatible,
   migrateInvoiceDiscountColumns,
   migrateInvoiceExtendedTaxColumns,
+  migrateInvoiceIssueColumns,
   migrateInvoiceTaxColumns,
   migrateInvoiceTaxRateConstraints,
 } from './db.ts';
@@ -841,6 +843,103 @@ describe('db', () => {
     );
   });
 
+  it('enforces Organization-scoped invoice numbers and financial-year sequence keys', async () => {
+    let organizationId = await createOrganization('Invoice Issue Constraint Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Issue Constraint Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let now = Date.now();
+    let invoiceNumber = 'NS/26-27/0050';
+    let issued = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      status: 'issued',
+      invoice_number: invoiceNumber,
+      issued_at: now,
+      seller_legal_name: 'Constraint Seller',
+      seller_address_line1: '1 Seller Road',
+      seller_country: 'IN',
+    });
+    await db.create(invoices, issued);
+
+    let duplicateNumberRejected = false;
+    try {
+      await db.create(
+        invoices,
+        validInvoice({
+          organization_id: organizationId,
+          client_id: clientId,
+          status: 'issued',
+          invoice_number: invoiceNumber,
+          issued_at: now,
+          seller_legal_name: 'Constraint Seller',
+          seller_address_line1: '1 Seller Road',
+          seller_country: 'IN',
+        }),
+      );
+    } catch {
+      duplicateNumberRejected = true;
+    }
+    assert.equal(duplicateNumberRejected, true, 'invoice numbers are unique within an Organization');
+
+    let sameNumberForOtherOrganization = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+      status: 'issued',
+      invoice_number: invoiceNumber,
+      issued_at: now,
+      seller_legal_name: 'Other Seller',
+      seller_address_line1: '2 Other Road',
+      seller_country: 'IN',
+    });
+    await db.create(invoices, sameNumberForOtherOrganization);
+
+    let sequence = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      document_type: 'invoice',
+      financial_year: '26-27',
+      current_number: 50,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    await db.create(documentSequences, sequence());
+
+    let duplicateSequenceRejected = false;
+    try {
+      await db.create(documentSequences, sequence());
+    } catch {
+      duplicateSequenceRejected = true;
+    }
+    assert.equal(
+      duplicateSequenceRejected,
+      true,
+      'one Organization has only one invoice sequence per financial year',
+    );
+
+    await db.create(
+      documentSequences,
+      sequence({ document_type: 'credit_note' }),
+    );
+    await db.create(documentSequences, sequence({ financial_year: '25-26' }));
+    await db.create(
+      documentSequences,
+      sequence({ organization_id: otherOrganizationId }),
+    );
+
+    let missingOrganizationRejected = false;
+    try {
+      await db.create(
+        documentSequences,
+        sequence({ organization_id: crypto.randomUUID() }),
+      );
+    } catch {
+      missingOrganizationRejected = true;
+    }
+    assert.equal(missingOrganizationRejected, true, 'sequences require an existing Organization');
+  });
+
   it('backfills net amounts when upgrading an existing #42 invoice schema', async () => {
     let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
     let now = Date.now();
@@ -903,6 +1002,7 @@ describe('db', () => {
     await migrateInvoiceDiscountColumns(legacyDb);
     await migrateInvoiceTaxColumns(legacyDb);
     await migrateInvoiceExtendedTaxColumns(legacyDb);
+    await migrateInvoiceIssueColumns(legacyDb);
 
     let invoice = await legacyDb.find(invoices, invoiceId);
     assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
@@ -914,6 +1014,11 @@ describe('db', () => {
     assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
     assert.equal(line?.amount_minor, 15000);
     assert.equal(line?.foreign_tax_amount_minor, 0, 'new manual tax amounts default to zero');
+    assert.equal(
+      (await legacyDb.find(invoices, invoiceId))?.issued_at,
+      null,
+      'legacy Drafts upgrade without an issue timestamp',
+    );
 
     let rejectedNegativeManualTax = false;
     try {

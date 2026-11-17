@@ -183,9 +183,8 @@ export const clients = table({
 });
 
 /**
- * An Organization-scoped invoice. Drafts carry no `invoice_number`; that is allocated only when
- * the invoice is issued in a later ticket. Recipient details are copied from the Client at draft
- * creation so later edits to the Draft never change the Client profile.
+ * An Organization-scoped invoice. Drafts carry no `invoice_number`; issue-time numbering and seller
+ * snapshots are stored alongside the recipient values already copied onto the invoice.
  */
 export const invoices = table({
   name: 'invoices',
@@ -196,6 +195,24 @@ export const invoices = table({
     document_type: c.text().notNull(),
     status: c.text().notNull(),
     invoice_number: c.text().nullable(),
+    issued_at: c.integer().nullable(),
+    seller_legal_name: c.text().nullable(),
+    seller_address_line1: c.text().nullable(),
+    seller_address_locality: c.text().nullable(),
+    seller_address_region: c.text().nullable(),
+    seller_address_postal_code: c.text().nullable(),
+    seller_country: c.text().nullable(),
+    seller_email: c.text().nullable(),
+    seller_phone: c.text().nullable(),
+    seller_pan: c.text().nullable(),
+    seller_gst_registered: c.boolean().notNull(),
+    seller_gstin: c.text().nullable(),
+    seller_gst_state_code: c.text().nullable(),
+    seller_gst_state_name: c.text().nullable(),
+    seller_logo_data_url: c.text().nullable(),
+    seller_signature_data_url: c.text().nullable(),
+    seller_signatory_name: c.text().nullable(),
+    seller_signatory_designation: c.text().nullable(),
     currency: c.text().notNull(),
     invoice_date: c.text().notNull(),
     due_date: c.text().notNull(),
@@ -237,17 +254,31 @@ export const invoices = table({
   },
   primaryKey: 'id',
   afterRead({ value }) {
-    if ('recipient_gstin_applicable' in value) {
-      return {
-        value: {
-          ...value,
-          recipient_gstin_applicable: Boolean(value.recipient_gstin_applicable),
-          reverse_charge: Boolean(value.reverse_charge),
-        },
-      };
+    let normalized = { ...value };
+    if ('recipient_gstin_applicable' in normalized) {
+      normalized.recipient_gstin_applicable = Boolean(normalized.recipient_gstin_applicable);
+      normalized.reverse_charge = Boolean(normalized.reverse_charge);
     }
-    return { value };
+    if ('seller_gst_registered' in normalized) {
+      normalized.seller_gst_registered = Boolean(normalized.seller_gst_registered);
+    }
+    return { value: normalized };
   },
+});
+
+/** The last issued sequence number for one Organization, document type, and financial year. */
+export const documentSequences = table({
+  name: 'document_sequences',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    document_type: c.text().notNull(),
+    financial_year: c.text().notNull(),
+    current_number: c.integer().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
 });
 
 /** A free-form service line belonging to one invoice in the same Organization. */
@@ -522,10 +553,28 @@ CREATE TABLE IF NOT EXISTS invoices (
   organization_id TEXT NOT NULL,
   client_id TEXT NOT NULL,
   document_type TEXT NOT NULL DEFAULT 'invoice' CHECK (document_type IN ('invoice', 'credit_note')),
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'issued')),
   invoice_number TEXT CHECK (
     invoice_number IS NULL OR (status <> 'draft' AND length(trim(invoice_number)) > 0)
   ),
+  issued_at INTEGER,
+  seller_legal_name TEXT,
+  seller_address_line1 TEXT,
+  seller_address_locality TEXT,
+  seller_address_region TEXT,
+  seller_address_postal_code TEXT,
+  seller_country TEXT,
+  seller_email TEXT,
+  seller_phone TEXT,
+  seller_pan TEXT,
+  seller_gst_registered INTEGER NOT NULL DEFAULT 0 CHECK (seller_gst_registered IN (0, 1)),
+  seller_gstin TEXT,
+  seller_gst_state_code TEXT,
+  seller_gst_state_name TEXT,
+  seller_logo_data_url TEXT,
+  seller_signature_data_url TEXT,
+  seller_signatory_name TEXT,
+  seller_signatory_designation TEXT,
   currency TEXT NOT NULL CHECK (currency GLOB '[A-Z][A-Z][A-Z]'),
   invoice_date TEXT NOT NULL CHECK (
     invoice_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
@@ -602,15 +651,46 @@ CREATE TABLE IF NOT EXISTS invoices (
       + CASE WHEN reverse_charge = 1 THEN 0 ELSE tax_total_minor END
       + round_off_minor
   ),
+  CHECK (
+    (status = 'draft' AND invoice_number IS NULL AND issued_at IS NULL)
+    OR (
+      status = 'issued' AND invoice_number IS NOT NULL
+      AND length(trim(invoice_number)) > 0 AND issued_at IS NOT NULL
+    )
+  ),
+  CHECK (status <> 'issued' OR (
+    seller_legal_name IS NOT NULL AND length(trim(seller_legal_name)) > 0
+    AND seller_address_line1 IS NOT NULL AND length(trim(seller_address_line1)) > 0
+    AND seller_country IS NOT NULL AND length(trim(seller_country)) > 0
+  )),
+  CHECK (status <> 'issued' OR seller_gst_registered = 0 OR (
+    seller_gstin IS NOT NULL AND length(seller_gstin) = 15
+    AND seller_gst_state_code IS NOT NULL AND length(seller_gst_state_code) = 2
+    AND seller_gst_state_name IS NOT NULL AND length(trim(seller_gst_state_name)) > 0
+  )),
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
   FOREIGN KEY (organization_id, client_id) REFERENCES clients(organization_id, id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_id ON invoices(organization_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_invoice_number
+  ON invoices(organization_id, invoice_number);
 CREATE INDEX IF NOT EXISTS idx_invoices_organization_status
   ON invoices(organization_id, status);
 CREATE INDEX IF NOT EXISTS idx_invoices_organization_dates
   ON invoices(organization_id, invoice_date DESC, created_at DESC, id ASC);
+
+CREATE TABLE IF NOT EXISTS document_sequences (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  document_type TEXT NOT NULL CHECK (document_type IN ('invoice', 'credit_note')),
+  financial_year TEXT NOT NULL CHECK (financial_year GLOB '[0-9][0-9]-[0-9][0-9]'),
+  current_number INTEGER NOT NULL CHECK (current_number BETWEEN 1 AND 9007199254740991),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  UNIQUE (organization_id, document_type, financial_year)
+);
 
 CREATE TABLE IF NOT EXISTS invoice_lines (
   id TEXT PRIMARY KEY NOT NULL,
@@ -1139,8 +1219,151 @@ export async function migrateInvoiceTaxRateConstraints(database: typeof db = db)
   }
 }
 
+const invoiceIssueColumns: Array<[string, string]> = [
+  ['issued_at', 'INTEGER'],
+  ['seller_legal_name', 'TEXT'],
+  ['seller_address_line1', 'TEXT'],
+  ['seller_address_locality', 'TEXT'],
+  ['seller_address_region', 'TEXT'],
+  ['seller_address_postal_code', 'TEXT'],
+  ['seller_country', 'TEXT'],
+  ['seller_email', 'TEXT'],
+  ['seller_phone', 'TEXT'],
+  ['seller_pan', 'TEXT'],
+  ['seller_gst_registered', 'INTEGER NOT NULL DEFAULT 0 CHECK (seller_gst_registered IN (0, 1))'],
+  ['seller_gstin', 'TEXT'],
+  ['seller_gst_state_code', 'TEXT'],
+  ['seller_gst_state_name', 'TEXT'],
+  ['seller_logo_data_url', 'TEXT'],
+  ['seller_signature_data_url', 'TEXT'],
+  ['seller_signatory_name', 'TEXT'],
+  ['seller_signatory_designation', 'TEXT'],
+];
+
+const invoiceIssueChecks = `
+  CHECK (
+    (status = 'draft' AND invoice_number IS NULL AND issued_at IS NULL)
+    OR (
+      status = 'issued' AND invoice_number IS NOT NULL
+      AND length(trim(invoice_number)) > 0 AND issued_at IS NOT NULL
+    )
+  ),
+  CHECK (status <> 'issued' OR (
+    seller_legal_name IS NOT NULL AND length(trim(seller_legal_name)) > 0
+    AND seller_address_line1 IS NOT NULL AND length(trim(seller_address_line1)) > 0
+    AND seller_country IS NOT NULL AND length(trim(seller_country)) > 0
+  )),
+  CHECK (status <> 'issued' OR seller_gst_registered = 0 OR (
+    seller_gstin IS NOT NULL AND length(seller_gstin) = 15
+    AND seller_gst_state_code IS NOT NULL AND length(seller_gst_state_code) = 2
+    AND seller_gst_state_name IS NOT NULL AND length(trim(seller_gst_state_name)) > 0
+  )),
+`;
+
+function quoteSqlIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+/** Adds issue-time seller snapshots, lifecycle state, numbering constraints, and sequence storage. */
+export async function migrateInvoiceIssueColumns(database: typeof db = db): Promise<void> {
+  await database.executeScript(`
+    CREATE TABLE IF NOT EXISTS document_sequences (
+      id TEXT PRIMARY KEY NOT NULL,
+      organization_id TEXT NOT NULL,
+      document_type TEXT NOT NULL CHECK (document_type IN ('invoice', 'credit_note')),
+      financial_year TEXT NOT NULL CHECK (financial_year GLOB '[0-9][0-9]-[0-9][0-9]'),
+      current_number INTEGER NOT NULL CHECK (current_number BETWEEN 1 AND 9007199254740991),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      UNIQUE (organization_id, document_type, financial_year)
+    );
+  `);
+
+  let invoiceTable = getTableReference(invoices);
+  let schemaResult = await database.exec(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'invoices'",
+  );
+  let schemaRow = schemaResult.rows?.[0] as { sql?: unknown } | undefined;
+  let schemaSql = typeof schemaRow?.sql === 'string' ? schemaRow.sql : '';
+  if (!schemaSql) throw new Error('Unable to read the invoice schema for issue-flow migration.');
+
+  if (!schemaSql.includes("status IN ('draft', 'issued')")) {
+    let columnResult = await database.exec('PRAGMA table_info(invoices)');
+    let existingColumns = (columnResult.rows ?? [])
+      .map((row) => (row as { name?: unknown }).name)
+      .filter((name): name is string => typeof name === 'string');
+    let issueColumnsToAdd = invoiceIssueColumns.filter(
+      ([columnName]) => !existingColumns.includes(columnName),
+    );
+    let renamedSchema = schemaSql.replace(
+      /^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["'`]?invoices["'`]?\s*\(/i,
+      'CREATE TABLE invoices_with_issue_state (',
+    );
+    let statusSchema = renamedSchema.replace(
+      /CHECK\s*\(\s*status\s+IN\s*\(\s*'draft'\s*\)\s*\)/i,
+      "CHECK (status IN ('draft', 'issued'))",
+    );
+    if (statusSchema === renamedSchema || statusSchema === schemaSql) {
+      throw new Error('Unable to rebuild the invoice table for issued invoices.');
+    }
+
+    let issueColumnSchema = statusSchema;
+    if (issueColumnsToAdd.length > 0) {
+      let definitions = issueColumnsToAdd.map(
+        ([columnName, definition]) => `${columnName} ${definition}`,
+      );
+      let updatedSchema = issueColumnSchema.replace(
+        /(\bupdated_at\s+INTEGER\s+NOT\s+NULL,)/i,
+        `$1\n  ${definitions.join(',\n  ')},`,
+      );
+      if (updatedSchema === issueColumnSchema) {
+        throw new Error('Unable to add issue-time snapshot columns to the invoice table.');
+      }
+      issueColumnSchema = updatedSchema;
+    }
+    let checkedSchema = issueColumnSchema.replace(
+      /(\s+FOREIGN KEY\s+\(organization_id\)\s+REFERENCES\s+organizations\(id\)\s+ON DELETE CASCADE,)/i,
+      `${invoiceIssueChecks}$1`,
+    );
+    if (checkedSchema === issueColumnSchema) {
+      throw new Error('Unable to add issue-time invoice constraints.');
+    }
+
+    let oldColumns = existingColumns.map(quoteSqlIdentifier).join(', ');
+    await database.executeScript(`
+      PRAGMA foreign_keys = OFF;
+      ${checkedSchema};
+      INSERT INTO invoices_with_issue_state (${oldColumns})
+        SELECT ${oldColumns} FROM invoices;
+      DROP TABLE invoices;
+      ALTER TABLE invoices_with_issue_state RENAME TO invoices;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_id
+        ON invoices(organization_id, id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_invoice_number
+        ON invoices(organization_id, invoice_number);
+      CREATE INDEX IF NOT EXISTS idx_invoices_organization_status
+        ON invoices(organization_id, status);
+      CREATE INDEX IF NOT EXISTS idx_invoices_organization_dates
+        ON invoices(organization_id, invoice_date DESC, created_at DESC, id ASC);
+      PRAGMA foreign_keys = ON;
+    `);
+  }
+
+  for (let [columnName, sqlType] of invoiceIssueColumns) {
+    if (!(await database.hasColumn(invoiceTable, columnName))) {
+      await database.executeScript(`ALTER TABLE invoices ADD COLUMN ${columnName} ${sqlType};`);
+    }
+  }
+  await database.executeScript(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_invoice_number
+      ON invoices(organization_id, invoice_number);
+  `);
+}
+
 await migrateInvoiceExtendedTaxColumns();
 await migrateInvoiceTaxRateConstraints();
+await migrateInvoiceIssueColumns();
 
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');

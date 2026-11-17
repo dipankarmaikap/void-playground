@@ -202,49 +202,59 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
             New invoice draft
           </a>
         </div>
-        <form
-          method="get"
-          action={routes.app.invoices.index.href()}
-          role="search"
-          aria-label="Search and filter invoices"
-          mix={filterFormStyle}
-        >
-          {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-          <Field label="Search invoices" hint="Search recipient names or invoice numbers.">
-            <Input name="q" type="search" defaultValue={query} />
-          </Field>
-          <Field label="Status">
-            <Select name="status">
-              <option value="all" selected={status === 'all'}>
-                All statuses
-              </option>
-              <option value="draft" selected={status === 'draft'}>
-                Draft
-              </option>
-              {status !== 'all' && status !== 'draft' ? (
-                <option value={status} selected>
-                  {statusLabel(status)}
+        <search>
+          <form
+            method="get"
+            action={routes.app.invoices.index.href()}
+            aria-label="Search and filter invoices"
+            mix={filterFormStyle}
+          >
+            {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
+            <Field label="Search invoices" hint="Search recipient names or invoice numbers.">
+              <Input name="q" type="search" defaultValue={query} />
+            </Field>
+            <Field label="Status">
+              <Select name="status">
+                <option value="all" selected={status === 'all'}>
+                  All statuses
                 </option>
-              ) : null}
-            </Select>
-          </Field>
-          <Field label="Invoice date from">
-            <Input name="from" type="date" defaultValue={from} />
-          </Field>
-          <Field label="Invoice date to">
-            <Input name="to" type="date" defaultValue={to} />
-          </Field>
-          <div mix={filterActionsStyle}>
-            <Button type="submit">Apply filters</Button>
-            <a
-              href={directoryHref({ ...filters, query: '', status: 'all', from: '', to: '' })}
-              data-variant="secondary"
-              mix={linkButtonStyle}
-            >
-              Reset
-            </a>
-          </div>
-        </form>
+                <option value="draft" selected={status === 'draft'}>
+                  Draft
+                </option>
+                <option value="sent" selected={status === 'sent'}>
+                  Sent
+                </option>
+                <option value="overdue" selected={status === 'overdue'}>
+                  Overdue
+                </option>
+                {status !== 'all' &&
+                status !== 'draft' &&
+                status !== 'sent' &&
+                status !== 'overdue' ? (
+                  <option value={status} selected>
+                    {statusLabel(status)}
+                  </option>
+                ) : null}
+              </Select>
+            </Field>
+            <Field label="Invoice date from">
+              <Input name="from" type="date" defaultValue={from} />
+            </Field>
+            <Field label="Invoice date to">
+              <Input name="to" type="date" defaultValue={to} />
+            </Field>
+            <div mix={filterActionsStyle}>
+              <Button type="submit">Apply filters</Button>
+              <a
+                href={directoryHref({ ...filters, query: '', status: 'all', from: '', to: '' })}
+                data-variant="secondary"
+                mix={linkButtonStyle}
+              >
+                Reset
+              </a>
+            </div>
+          </form>
+        </search>
         {invoices.length === 0 ? (
           <div mix={emptyStyle}>
             <p>{hasFilters ? 'No invoices match your search and filters.' : 'No invoices yet.'}</p>

@@ -1,9 +1,11 @@
-import { gte, ilike, lte, or } from 'remix/data-table';
+import { gt, gte, ilike, lt, lte, or } from 'remix/data-table';
 
 import { db, invoiceLines, invoices } from './db.ts';
 import type { Invoice, InvoiceLine } from './db.ts';
+import { invoiceDisplayStatus } from './invoice-issuance.ts';
+import type { InvoiceDisplayStatus } from './invoice-issuance.ts';
 import type { InvoiceDraftChanges, InvoiceLineChanges } from './invoice-draft.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
+import { isValidIsoDate, todayInKolkata } from './invoice-dates.ts';
 
 /** User-facing label for the only status a Draft can have in this ticket. */
 export const DRAFT_STATUS_LABEL = 'Draft';
@@ -16,9 +18,21 @@ export type InvoiceDirectoryItem = Pick<
   | 'id'
   | 'recipient_legal_name'
   | 'invoice_number'
+  | 'currency'
+  | 'invoice_date'
+  | 'total_minor'
+  | 'created_at'
+> & { status: InvoiceDisplayStatus };
+
+type InvoiceDirectoryRow = Pick<
+  Invoice,
+  | 'id'
+  | 'recipient_legal_name'
+  | 'invoice_number'
   | 'status'
   | 'currency'
   | 'invoice_date'
+  | 'due_date'
   | 'total_minor'
   | 'created_at'
 >;
@@ -35,7 +49,7 @@ export interface InvoiceListFilter {
   q?: string;
   /** Optional Client scope used by the Client profile's invoice link. */
   clientId?: string;
-  /** Exact status, or `all` to include every current and future status. */
+  /** Derived display status (`draft`, `sent`, `overdue`), or `all`. */
   status?: string;
   /** Inclusive invoice-date lower bound. Invalid dates are ignored. */
   from?: string;
@@ -64,11 +78,26 @@ export async function listInvoices(
   let page = normalizePage(filter.page);
   let offset = (page - 1) * INVOICE_DIRECTORY_PAGE_SIZE;
   let literalSearch = q !== '' && LIKE_WILDCARDS.test(q);
+  let today = todayInKolkata();
   let filteredQuery = db
     .query(invoices)
     .where({ organization_id: organizationId, document_type: 'invoice' });
   if (filter.clientId) filteredQuery = filteredQuery.where({ client_id: filter.clientId });
-  if (status !== 'all') filteredQuery = filteredQuery.where({ status });
+  if (status === 'draft') {
+    filteredQuery = filteredQuery.where({ status: 'draft' });
+  } else if (status === 'sent') {
+    filteredQuery = filteredQuery
+      .where({ status: 'issued' })
+      .where(or(gte(invoices.due_date, today), lte(invoices.total_minor, 0)));
+  } else if (status === 'overdue') {
+    filteredQuery = filteredQuery
+      .where({ status: 'issued' })
+      .where(lt(invoices.due_date, today))
+      .where(gt(invoices.total_minor, 0));
+  } else if (status !== 'all') {
+    // Raw lifecycle values such as `issued` are not display statuses and must not bypass derivation.
+    filteredQuery = filteredQuery.where({ status: '__no_display_status__' });
+  }
   if (filter.from && isValidIsoDate(filter.from)) {
     filteredQuery = filteredQuery.where(gte(invoices.invoice_date, filter.from));
   }
@@ -93,6 +122,7 @@ export async function listInvoices(
       status: invoices.status,
       currency: invoices.currency,
       invoice_date: invoices.invoice_date,
+      due_date: invoices.due_date,
       total_minor: invoices.total_minor,
       created_at: invoices.created_at,
     })
@@ -106,7 +136,9 @@ export async function listInvoices(
       .offset(offset)
       .all();
     return {
-      invoices: rows.slice(0, INVOICE_DIRECTORY_PAGE_SIZE),
+      invoices: rows
+        .slice(0, INVOICE_DIRECTORY_PAGE_SIZE)
+        .map((row) => invoiceDirectoryItem(row, today)),
       page,
       hasPrevious: page > 1,
       hasNext: rows.length > INVOICE_DIRECTORY_PAGE_SIZE,
@@ -125,7 +157,9 @@ export async function listInvoices(
 
     for (let invoice of batch) {
       if (!matchesInvoiceQuery(invoice, q)) continue;
-      if (matchingCount >= offset) matches.push(invoice);
+      if (matchingCount >= offset) {
+        matches.push(invoiceDirectoryItem(invoice, today));
+      }
       matchingCount += 1;
       if (matches.length >= INVOICE_DIRECTORY_PAGE_SIZE + 1) break;
     }
@@ -170,7 +204,12 @@ function normalizePage(page: number | undefined): number {
   return page;
 }
 
-function matchesInvoiceQuery(invoice: InvoiceDirectoryItem, q: string): boolean {
+function invoiceDirectoryItem(row: InvoiceDirectoryRow, today: string): InvoiceDirectoryItem {
+  let { due_date: _dueDate, status: _storedStatus, ...item } = row;
+  return { ...item, status: invoiceDisplayStatus(row, today) };
+}
+
+function matchesInvoiceQuery(invoice: InvoiceDirectoryRow, q: string): boolean {
   let needle = q.toLowerCase();
   return (
     invoice.recipient_legal_name.toLowerCase().includes(needle) ||
@@ -275,12 +314,15 @@ export async function updateDraftInvoice(
   changes: InvoiceDraftChanges,
 ): Promise<Invoice | null> {
   let now = Date.now();
+  let updated = false;
   await db.transaction(async (tx) => {
-    await tx.updateMany(
+    let result = await tx.updateMany(
       invoices,
       { ...invoiceValues(changes), updated_at: now },
       { where: { id, organization_id: organizationId, status: 'draft' }, limit: 1 },
     );
+    if (result.affectedRows === 0) return;
+    updated = true;
     await tx.deleteMany(invoiceLines, {
       where: { organization_id: organizationId, invoice_id: id },
     });
@@ -288,6 +330,7 @@ export async function updateDraftInvoice(
       await tx.create(invoiceLines, invoiceLineValues(organizationId, id, line, now));
     }
   });
+  if (!updated) return null;
   return findInvoice(organizationId, id);
 }
 
@@ -300,5 +343,19 @@ export async function discardDraftInvoice(
     where: { id, organization_id: organizationId, status: 'draft' },
     limit: 1,
   });
+  return result.affectedRows > 0;
+}
+
+/** Changes only the private note on an issued invoice; all Client-facing fields stay locked. */
+export async function updateIssuedInvoiceInternalNote(
+  organizationId: string,
+  id: string,
+  internalNote: string | null,
+): Promise<boolean> {
+  let result = await db.updateMany(
+    invoices,
+    { internal_note: internalNote, updated_at: Date.now() },
+    { where: { id, organization_id: organizationId, status: 'issued' }, limit: 1 },
+  );
   return result.affectedRows > 0;
 }
