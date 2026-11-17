@@ -1091,6 +1091,31 @@ describe('draft invoices', () => {
     assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
   });
 
+  it('rejects a discount-only blank line instead of silently dropping its discount', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-only-row',
+    );
+    let client = await makeClient(organizationId);
+
+    let rejected = await createDraft(sessionCookie, client.id, {
+      line_description: ['Consulting', ''],
+      line_sac: ['998313', ''],
+      line_quantity: ['1', ''],
+      line_unit_price: ['100.0000', ''],
+      line_discount_mode: ['', 'percent'],
+      line_discount_value: ['', '12.5'],
+    });
+
+    assert.equal(rejected.status, 400);
+    let html = await rejected.text();
+    assert.match(html, /role="alert"[^>]*>Please correct the fields below\.</);
+    assert.match(html, /Enter a service description/);
+    assert.match(html, /<option value="percent" selected>Percentage<\/option>/);
+    assert.match(html, /name="line_discount_value"[^>]*value="12\.5"/);
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+  });
+
   it('rejects amounts outside the exact persisted numeric range without saving anything', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,

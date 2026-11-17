@@ -591,49 +591,73 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
 `);
 
-// #43 adds discount and round-off columns. Guard each ALTER so a database created by #42 upgrades
-// in place; the CHECK constraints above apply to fresh databases.
-const invoiceExtraColumns: Array<[string, string]> = [
-  ['line_discount_total_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_total_minor >= 0)'],
-  ['invoice_discount_mode', "TEXT CHECK (invoice_discount_mode IN ('percent', 'fixed'))"],
-  [
-    'invoice_discount_value',
-    "TEXT CHECK (invoice_discount_value IS NULL OR (length(invoice_discount_value) > 0 " +
-      "AND invoice_discount_value GLOB '[0-9]*' AND invoice_discount_value NOT GLOB '*[^0-9.]*' " +
-      "AND invoice_discount_value NOT LIKE '%.%.%'))",
-  ],
-  ['invoice_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (invoice_discount_minor >= 0)'],
-  ['net_subtotal_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_subtotal_minor >= 0)'],
-  ['round_off_minor', 'INTEGER NOT NULL DEFAULT 0'],
-];
+/**
+ * Adds #43's discount and round-off columns to a database created by #42 and backfills net amounts
+ * for rows that predate them. The backfill is guarded by the absence of the net columns, so it runs
+ * only during the upgrade and never rewrites legitimate discounted rows on later startups. The
+ * CHECK constraints above apply only to databases created with the current schema.
+ */
+export async function migrateInvoiceDiscountColumns(database: typeof db = db): Promise<void> {
+  let invoiceNeedsNetBackfill = !(await database.hasColumn(
+    getTableReference(invoices),
+    'net_subtotal_minor',
+  ));
+  let lineNeedsNetBackfill = !(await database.hasColumn(
+    getTableReference(invoiceLines),
+    'net_minor',
+  ));
 
-for (let [columnName, sqlType] of invoiceExtraColumns) {
-  if (!(await db.hasColumn(getTableReference(invoices), columnName))) {
-    await db.executeScript(`ALTER TABLE invoices ADD COLUMN ${columnName} ${sqlType};`);
+  const invoiceExtraColumns: Array<[string, string]> = [
+    ['line_discount_total_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_total_minor >= 0)'],
+    ['invoice_discount_mode', "TEXT CHECK (invoice_discount_mode IN ('percent', 'fixed'))"],
+    [
+      'invoice_discount_value',
+      "TEXT CHECK (invoice_discount_value IS NULL OR (length(invoice_discount_value) > 0 " +
+        "AND invoice_discount_value GLOB '[0-9]*' AND invoice_discount_value NOT GLOB '*[^0-9.]*' " +
+        "AND invoice_discount_value NOT LIKE '%.%.%'))",
+    ],
+    ['invoice_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (invoice_discount_minor >= 0)'],
+    ['net_subtotal_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_subtotal_minor >= 0)'],
+    ['round_off_minor', 'INTEGER NOT NULL DEFAULT 0'],
+  ];
+
+  for (let [columnName, sqlType] of invoiceExtraColumns) {
+    if (!(await database.hasColumn(getTableReference(invoices), columnName))) {
+      await database.executeScript(`ALTER TABLE invoices ADD COLUMN ${columnName} ${sqlType};`);
+    }
+  }
+
+  const invoiceLineExtraColumns: Array<[string, string]> = [
+    ['discount_mode', "TEXT CHECK (discount_mode IN ('percent', 'fixed'))"],
+    [
+      'discount_value',
+      "TEXT CHECK (discount_value IS NULL OR (length(discount_value) > 0 " +
+        "AND discount_value GLOB '[0-9]*' AND discount_value NOT GLOB '*[^0-9.]*' " +
+        "AND discount_value NOT LIKE '%.%.%'))",
+    ],
+    ['line_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_minor >= 0)'],
+    [
+      'allocated_invoice_discount_minor',
+      'INTEGER NOT NULL DEFAULT 0 CHECK (allocated_invoice_discount_minor >= 0)',
+    ],
+    ['net_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_minor >= 0)'],
+  ];
+
+  for (let [columnName, sqlType] of invoiceLineExtraColumns) {
+    if (!(await database.hasColumn(getTableReference(invoiceLines), columnName))) {
+      await database.executeScript(`ALTER TABLE invoice_lines ADD COLUMN ${columnName} ${sqlType};`);
+    }
+  }
+
+  if (invoiceNeedsNetBackfill) {
+    await database.executeScript('UPDATE invoices SET net_subtotal_minor = subtotal_minor;');
+  }
+  if (lineNeedsNetBackfill) {
+    await database.executeScript('UPDATE invoice_lines SET net_minor = amount_minor;');
   }
 }
 
-const invoiceLineExtraColumns: Array<[string, string]> = [
-  ['discount_mode', "TEXT CHECK (discount_mode IN ('percent', 'fixed'))"],
-  [
-    'discount_value',
-    "TEXT CHECK (discount_value IS NULL OR (length(discount_value) > 0 " +
-      "AND discount_value GLOB '[0-9]*' AND discount_value NOT GLOB '*[^0-9.]*' " +
-      "AND discount_value NOT LIKE '%.%.%'))",
-  ],
-  ['line_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_minor >= 0)'],
-  [
-    'allocated_invoice_discount_minor',
-    'INTEGER NOT NULL DEFAULT 0 CHECK (allocated_invoice_discount_minor >= 0)',
-  ],
-  ['net_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_minor >= 0)'],
-];
-
-for (let [columnName, sqlType] of invoiceLineExtraColumns) {
-  if (!(await db.hasColumn(getTableReference(invoiceLines), columnName))) {
-    await db.executeScript(`ALTER TABLE invoice_lines ADD COLUMN ${columnName} ${sqlType};`);
-  }
-}
+await migrateInvoiceDiscountColumns();
 
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');

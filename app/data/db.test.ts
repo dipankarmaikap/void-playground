@@ -15,6 +15,7 @@ import {
   userPasswords,
   assertClientSchemaCompatible,
   assertOrganizationSchemaCompatible,
+  migrateInvoiceDiscountColumns,
 } from './db.ts';
 
 async function createUser(): Promise<string> {
@@ -766,6 +767,84 @@ describe('db', () => {
       (await db.find(invoiceLines, validLine.id))?.allocated_invoice_discount_minor,
       500,
     );
+  });
+
+  it('backfills net amounts when upgrading an existing #42 invoice schema', async () => {
+    let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
+    let now = Date.now();
+    let organizationId = crypto.randomUUID();
+    let clientId = crypto.randomUUID();
+    let invoiceId = crypto.randomUUID();
+    let lineId = crypto.randomUUID();
+    await legacyDb.executeScript(`
+      CREATE TABLE organizations (
+        id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE clients (
+        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL,
+        legal_name TEXT NOT NULL, status TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE invoices (
+        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, client_id TEXT NOT NULL,
+        document_type TEXT NOT NULL, status TEXT NOT NULL, invoice_number TEXT,
+        currency TEXT NOT NULL, invoice_date TEXT NOT NULL, due_date TEXT NOT NULL,
+        payment_term TEXT NOT NULL, custom_payment_terms TEXT, recipient_legal_name TEXT NOT NULL,
+        recipient_billing_line1 TEXT, recipient_billing_locality TEXT, recipient_billing_region TEXT,
+        recipient_billing_postal_code TEXT, recipient_billing_country TEXT,
+        recipient_tax_country TEXT, recipient_tax_type TEXT, recipient_tax_value TEXT,
+        recipient_tax_state_name TEXT, recipient_tax_state_code TEXT,
+        payment_instructions TEXT, customer_notes TEXT, internal_note TEXT,
+        subtotal_minor INTEGER NOT NULL, total_minor INTEGER NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE invoice_lines (
+        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, invoice_id TEXT NOT NULL,
+        position INTEGER NOT NULL, description TEXT NOT NULL, sac TEXT,
+        quantity TEXT NOT NULL, unit_price TEXT NOT NULL, amount_minor INTEGER NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      INSERT INTO organizations (id, name, created_at, updated_at)
+        VALUES ('${organizationId}', 'Legacy Org', ${now}, ${now});
+      INSERT INTO clients (id, organization_id, legal_name, status, created_at, updated_at)
+        VALUES ('${clientId}', '${organizationId}', 'Legacy Client', 'active', ${now}, ${now});
+      INSERT INTO invoices (
+        id, organization_id, client_id, document_type, status, invoice_number, currency,
+        invoice_date, due_date, payment_term, recipient_legal_name, subtotal_minor, total_minor,
+        created_at, updated_at
+      ) VALUES (
+        '${invoiceId}', '${organizationId}', '${clientId}', 'invoice', 'draft', NULL, 'INR',
+        '2026-11-17', '2026-11-17', 'due_on_receipt', 'Legacy Recipient', 17469, 17469,
+        ${now}, ${now}
+      );
+      INSERT INTO invoice_lines (
+        id, organization_id, invoice_id, position, description, sac, quantity, unit_price,
+        amount_minor, created_at, updated_at
+      ) VALUES (
+        '${lineId}', '${organizationId}', '${invoiceId}', 0, 'Legacy line', NULL, '1.5000',
+        '100.0000', 15000, ${now}, ${now}
+      );
+    `);
+
+    await migrateInvoiceDiscountColumns(legacyDb);
+
+    let invoice = await legacyDb.find(invoices, invoiceId);
+    assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
+    assert.equal(invoice?.total_minor, 17469, 'the stored total is untouched');
+    let line = await legacyDb.find(invoiceLines, lineId);
+    assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
+    assert.equal(line?.amount_minor, 15000);
+
+    // A later startup must not overwrite a legitimate net value produced by #43 discounts.
+    await legacyDb.executeScript(
+      `UPDATE invoices SET net_subtotal_minor = 999 WHERE id = '${invoiceId}';` +
+        `UPDATE invoice_lines SET net_minor = 888 WHERE id = '${lineId}';`,
+    );
+    await migrateInvoiceDiscountColumns(legacyDb);
+    assert.equal((await legacyDb.find(invoices, invoiceId))?.net_subtotal_minor, 999);
+    assert.equal((await legacyDb.find(invoiceLines, lineId))?.net_minor, 888);
+    await legacyDb.close();
   });
 
   it('rejects an incompatible old Client schema without serving or erasing it', async () => {

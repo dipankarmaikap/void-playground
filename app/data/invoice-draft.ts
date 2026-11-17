@@ -190,7 +190,13 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
     let sac = line.sac.trim();
     let quantityRaw = line.quantity.trim();
     let priceRaw = line.unit_price.trim();
-    let isBlank = !description && !sac && !quantityRaw && !priceRaw;
+    let isBlank =
+      !description &&
+      !sac &&
+      !quantityRaw &&
+      !priceRaw &&
+      !line.discount_mode.trim() &&
+      !line.discount_value.trim();
     if (isBlank) return;
 
     let lineIssue = (field: string, message: string) =>
