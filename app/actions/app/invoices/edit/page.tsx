@@ -3,7 +3,9 @@ import { css } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
 import { clientDisplayLabel } from '../../../../data/client-names.ts';
-import type { Client, Invoice } from '../../../../data/db.ts';
+import type { Client, Invoice, InvoiceLine } from '../../../../data/db.ts';
+import { formatMoney } from '../../../../data/invoice-calculation.ts';
+import { groupedInvoiceTaxes } from '../../../../data/invoice-tax.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
@@ -22,15 +24,28 @@ export interface EditInvoicePageProps {
   organizationName?: string;
   invoice: Invoice;
   client: Client | null;
+  lines: InvoiceLine[];
   values: InvoiceFormValues;
   issues?: readonly Issue[];
+  gstRatePresets: readonly string[];
 }
 
 const hintStyle = css({ margin: 0, color: colors.muted, fontSize: '0.875rem' });
 
 export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
   return () => {
-    let { csrfToken, identity, organizationName, invoice, client, values, issues } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      invoice,
+      client,
+      lines,
+      values,
+      issues,
+      gstRatePresets,
+    } = handle.props;
+    let taxSummary = groupedInvoiceTaxes(lines, invoice.currency);
 
     return (
       <AppShell
@@ -47,12 +62,52 @@ export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
             Drafts stay editable until issued. Recipient changes affect this invoice only.
           </p>
         </header>
+        {invoice.gst_mode === 'india_gst' ? (
+          <section aria-labelledby="saved-tax-summary-heading">
+            <h2 id="saved-tax-summary-heading">Current GST summary</h2>
+            <ul>
+              {lines.map((line) => {
+                let components = [
+                  line.cgst_rate != null
+                    ? `CGST @ ${line.cgst_rate}%: ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
+                    : null,
+                  line.sgst_rate != null
+                    ? `SGST @ ${line.sgst_rate}%: ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
+                    : null,
+                  line.igst_rate != null
+                    ? `IGST @ ${line.igst_rate}%: ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
+                    : null,
+                ].filter((value): value is string => value != null);
+                return (
+                  <li key={line.id}>
+                    {line.description}: {line.tax_treatment?.replace('_', '-') ?? '—'}
+                    {components.length > 0 ? ` · ${components.join(' · ')}` : ' · 0%'}
+                  </li>
+                );
+              })}
+            </ul>
+            <h3>Grouped tax summary</h3>
+            {taxSummary.length > 0 ? (
+              <ul>
+                {taxSummary.map((tax) => (
+                  <li key={tax.label}>
+                    {tax.label}: {tax.formattedAmount}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No GST charged.</p>
+            )}
+            <p>Total tax: {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}</p>
+          </section>
+        ) : null}
         <InvoiceForm
           csrfToken={csrfToken}
           action={routes.app.invoices.edit.action.href({ invoiceId: invoice.id })}
           submitLabel="Save draft"
           values={values}
           issues={issues}
+          gstRatePresets={gstRatePresets}
         >
           <p mix={hintStyle}>
             Bill to: {client ? clientDisplayLabel(client) : invoice.recipient_legal_name}

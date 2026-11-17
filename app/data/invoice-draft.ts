@@ -1,6 +1,6 @@
 import type { Issue } from 'remix/data-schema';
 
-import { isIndiaCountry, normalizeTaxValue } from './client-tax.ts';
+import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from './client-tax.ts';
 import { CLIENT_TEXT_LIMITS } from './client-text.ts';
 import { findIndiaStateByCode } from './india-states.ts';
 import { canonicalCountry } from './client-billing.ts';
@@ -29,6 +29,8 @@ export interface InvoiceDraftLineInput {
   unit_price: string;
   discount_mode: string;
   discount_value: string;
+  tax_treatment: string;
+  gst_rate: string;
 }
 
 /** Editable invoice values, independent of the route's client-selection and display fields. */
@@ -54,6 +56,9 @@ export interface InvoiceDraftInput {
   invoice_discount_mode: string;
   invoice_discount_value: string;
   round_off: string;
+  gst_mode: string;
+  place_of_supply_state_code: string;
+  recipient_gstin_applicable: string;
   lines: InvoiceDraftLineInput[];
 }
 
@@ -69,6 +74,14 @@ export interface InvoiceLineChanges {
   line_discount_minor: number;
   allocated_invoice_discount_minor: number;
   net_minor: number;
+  tax_treatment: 'taxable' | 'nil_rated' | 'exempt' | 'non_gst' | null;
+  gst_rate: string | null;
+  cgst_rate: string | null;
+  sgst_rate: string | null;
+  igst_rate: string | null;
+  cgst_amount_minor: number;
+  sgst_amount_minor: number;
+  igst_amount_minor: number;
 }
 
 /** The invoice-row plus line-row changes a valid Draft form submission produces. */
@@ -89,6 +102,10 @@ export interface InvoiceDraftChanges {
   recipient_tax_value: string | null;
   recipient_tax_state_name: string | null;
   recipient_tax_state_code: string | null;
+  gst_mode: 'none' | 'india_gst';
+  place_of_supply_state_code: string | null;
+  place_of_supply_state_name: string | null;
+  recipient_gstin_applicable: boolean;
   payment_instructions: string | null;
   customer_notes: string | null;
   internal_note: string | null;
@@ -98,6 +115,7 @@ export interface InvoiceDraftChanges {
   invoice_discount_value: string | null;
   invoice_discount_minor: number;
   net_subtotal_minor: number;
+  tax_total_minor: number;
   round_off_minor: number;
   total_minor: number;
   lines: InvoiceLineChanges[];
@@ -106,6 +124,23 @@ export interface InvoiceDraftChanges {
 export type InvoiceDraftResult =
   | { ok: true; value: InvoiceDraftChanges }
   | { ok: false; issues: Issue[] };
+
+export interface InvoiceDraftTaxConfig {
+  gstRegistered: boolean;
+  gstStateCode: string | null;
+  gstRatePresets: readonly string[];
+}
+
+function isChecked(value: string): boolean {
+  return ['on', 'true', '1', 'yes'].includes(value.trim().toLowerCase());
+}
+
+function formatHalfRate(rateScaled: bigint): string {
+  let fivePlaceScaled = rateScaled * 5n;
+  let whole = fivePlaceScaled / 100_000n;
+  let fraction = (fivePlaceScaled % 100_000n).toString().padStart(5, '0').replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole.toString();
+}
 
 const RECIPIENT_LIMITS: Record<string, number> = {
   recipient_legal_name: CLIENT_TEXT_LIMITS.legal_name,
@@ -172,7 +207,14 @@ function parseDiscountInput(
  * checked. Lines are ignored when every field is blank, so a blank row removes a line. Amounts are
  * computed once, with BigInt arithmetic, at the selected currency's minor-unit precision.
  */
-export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
+export function parseInvoiceDraft(
+  form: InvoiceDraftInput,
+  taxConfig: InvoiceDraftTaxConfig = {
+    gstRegistered: false,
+    gstStateCode: null,
+    gstRatePresets: [],
+  },
+): InvoiceDraftResult {
   let issues: Issue[] = [];
   let push = (field: string, message: string) => issues.push({ message, path: [field] });
 
@@ -203,6 +245,37 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
   let paymentTerm = form.payment_term.trim();
   if (!(PAYMENT_TERMS as readonly string[]).includes(paymentTerm)) {
     push('payment_term', 'Choose a valid payment term.');
+  }
+
+  let gstMode = form.gst_mode.trim() || 'none';
+  if (gstMode !== 'none' && gstMode !== 'india_gst') {
+    push('gst_mode', 'Choose a valid invoice tax mode.');
+  }
+  if (gstMode === 'india_gst' && !taxConfig.gstRegistered) {
+    push('gst_mode', 'Indian GST is available only when your Organization has GST registration enabled.');
+  }
+  if (gstMode === 'india_gst' && taxConfig.gstRegistered && !findIndiaStateByCode(taxConfig.gstStateCode ?? '')) {
+    push('gst_mode', 'Your Organization must have a valid GST State/UT configured before using Indian GST.');
+  }
+  let placeStateCode = form.place_of_supply_state_code.trim();
+  let placeState = gstMode === 'india_gst' ? findIndiaStateByCode(placeStateCode) : undefined;
+  if (gstMode === 'india_gst' && !placeState) {
+    push('place_of_supply_state_code', 'Choose a valid Place of Supply State or UT.');
+  }
+  let recipientGstinApplicable = isChecked(form.recipient_gstin_applicable);
+  if (recipientGstinApplicable && gstMode !== 'india_gst') {
+    push('recipient_gstin_applicable', 'Recipient GSTIN applicability is available only on GST invoices.');
+  } else if (recipientGstinApplicable) {
+    let taxType = form.recipient_tax_type.trim().toLowerCase();
+    let taxValue = normalizeTaxValue(form.recipient_tax_value);
+    let validGstin = taxType === 'gstin' && GSTIN_PATTERN.test(taxValue);
+    let validUin = taxType === 'uin' && UIN_PATTERN.test(taxValue);
+    if (!isIndiaCountry(form.recipient_tax_country) || (!validGstin && !validUin)) {
+      push(
+        'recipient_tax_value',
+        'Enter a valid 15-character Indian GSTIN or UIN when recipient GSTIN is applicable.',
+      );
+    }
   }
 
   let optionalText: Array<[keyof InvoiceDraftInput, number, string]> = [
@@ -260,6 +333,31 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
     );
     if (discount === undefined) return;
 
+    let treatment = line.tax_treatment.trim();
+    let parsedTreatment: InvoiceLineChanges['tax_treatment'] = null;
+    let parsedRate: string | null = null;
+    if (gstMode === 'india_gst') {
+      if (!['taxable', 'nil_rated', 'exempt', 'non_gst'].includes(treatment)) {
+        lineIssue('tax_treatment', 'Choose a GST treatment for this service line.');
+      } else {
+        parsedTreatment = treatment as NonNullable<InvoiceLineChanges['tax_treatment']>;
+      }
+      if (treatment === 'taxable') {
+        let rateScaled = parseScaledDecimal(line.gst_rate.trim());
+        let isPreset = taxConfig.gstRatePresets.some((presetRate) => {
+          let presetScaled = parseScaledDecimal(presetRate);
+          return presetScaled != null && presetScaled === rateScaled;
+        });
+        if (rateScaled == null || rateScaled > PERCENT_MAX_SCALED || !isPreset) {
+          lineIssue('gst_rate', 'Choose a GST rate preset configured for your Organization.');
+        } else {
+          parsedRate = formatScaledDecimal(rateScaled);
+        }
+      }
+    } else if (!taxConfig.gstRegistered && (treatment || line.gst_rate.trim())) {
+      lineIssue('tax_treatment', 'GST line treatments require Indian GST mode.');
+    }
+
     if (quantity != null && quantity > 0n && unitPrice != null) {
       let amount = calculateLineAmountMinor(quantity, unitPrice, calculationCurrency);
       let amountMinor = toExactMinorNumber(amount);
@@ -295,6 +393,14 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
           line_discount_minor: toExactMinorNumber(lineDiscountMinor)!,
           allocated_invoice_discount_minor: 0,
           net_minor: toExactMinorNumber(net)!,
+          tax_treatment: parsedTreatment,
+          gst_rate: parsedRate,
+          cgst_rate: null,
+          sgst_rate: null,
+          igst_rate: null,
+          cgst_amount_minor: 0,
+          sgst_amount_minor: 0,
+          igst_amount_minor: 0,
         });
         linePostValues.push(net);
       }
@@ -347,8 +453,8 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
   let lineDiscountTotal = toExactMinorNumber(lineDiscountTotalMinor);
   let netSubtotal = toExactMinorNumber(netSubtotalMinor);
   let invoiceDiscountAmount = toExactMinorNumber(invoiceDiscountMinor);
-  let totalMinor = netSubtotalMinor + roundOffMinor;
-  let total = toExactMinorNumber(totalMinor);
+  let preTaxTotalMinor = netSubtotalMinor + roundOffMinor;
+  let preTaxTotal = toExactMinorNumber(preTaxTotalMinor);
   if (
     subtotal == null ||
     lineDiscountTotal == null ||
@@ -357,9 +463,9 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
   ) {
     push('total', 'The invoice total is too large to store exactly.');
   }
-  if (totalMinor < 0n) {
+  if (preTaxTotalMinor < 0n) {
     push('round_off', 'Round-off cannot make the total negative.');
-  } else if (total == null) {
+  } else if (preTaxTotal == null) {
     push('total', 'The invoice total is too large to store exactly.');
   }
 
@@ -371,6 +477,52 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
     line.allocated_invoice_discount_minor = toExactMinorNumber(allocated)!;
     line.net_minor -= Number(allocated);
   });
+
+  let taxTotalMinor = 0n;
+  if (gstMode === 'india_gst' && placeState && taxConfig.gstStateCode) {
+    for (let line of lines) {
+      if (line.tax_treatment !== 'taxable' || !line.gst_rate) continue;
+      let rateScaled = parseScaledDecimal(line.gst_rate);
+      if (rateScaled == null) continue;
+      let lineTax = percentOfMinor(BigInt(line.net_minor), rateScaled);
+      if (taxConfig.gstStateCode === placeState.code) {
+        let cgstAmount = (lineTax + 1n) / 2n;
+        let sgstAmount = lineTax / 2n;
+        let cgstNumber = toExactMinorNumber(cgstAmount);
+        let sgstNumber = toExactMinorNumber(sgstAmount);
+        if (cgstNumber == null || sgstNumber == null) {
+          push('total', 'The invoice tax total is too large to store exactly.');
+          continue;
+        }
+        line.cgst_rate = formatHalfRate(rateScaled);
+        line.sgst_rate = formatHalfRate(rateScaled);
+        line.cgst_amount_minor = cgstNumber;
+        line.sgst_amount_minor = sgstNumber;
+        taxTotalMinor += cgstAmount + sgstAmount;
+      } else {
+        let igstNumber = toExactMinorNumber(lineTax);
+        if (igstNumber == null) {
+          push('total', 'The invoice tax total is too large to store exactly.');
+          continue;
+        }
+        line.igst_rate = line.gst_rate;
+        line.igst_amount_minor = igstNumber;
+        taxTotalMinor += lineTax;
+      }
+    }
+  }
+  let taxTotal = toExactMinorNumber(taxTotalMinor);
+  if (taxTotal == null) {
+    push('total', 'The invoice tax total is too large to store exactly.');
+  }
+  let totalMinor = netSubtotalMinor + taxTotalMinor + roundOffMinor;
+  let total = toExactMinorNumber(totalMinor);
+  if (totalMinor < 0n) {
+    push('round_off', 'Round-off cannot make the total negative.');
+  } else if (total == null) {
+    push('total', 'The invoice total is too large to store exactly.');
+  }
+  if (issues.length > 0) return { ok: false, issues };
 
   let taxState = form.recipient_tax_state_code.trim();
   let taxCountry = optional(form.recipient_tax_country);
@@ -402,6 +554,10 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
         : null,
       recipient_tax_state_name: taxStateName,
       recipient_tax_state_code: taxState || null,
+      gst_mode: gstMode === 'india_gst' ? 'india_gst' : 'none',
+      place_of_supply_state_code: gstMode === 'india_gst' ? placeState?.code ?? null : null,
+      place_of_supply_state_name: gstMode === 'india_gst' ? placeState?.name ?? null : null,
+      recipient_gstin_applicable: gstMode === 'india_gst' && recipientGstinApplicable,
       payment_instructions: optional(form.payment_instructions),
       customer_notes: optional(form.customer_notes),
       internal_note: optional(form.internal_note),
@@ -411,6 +567,7 @@ export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
       invoice_discount_value: invoiceDiscount?.value ?? null,
       invoice_discount_minor: invoiceDiscountAmount!,
       net_subtotal_minor: netSubtotal!,
+      tax_total_minor: taxTotal!,
       round_off_minor: roundOffAmount!,
       total_minor: total!,
       lines,

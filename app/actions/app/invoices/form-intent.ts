@@ -17,6 +17,8 @@ export function withAdditionalLine(values: InvoiceFormValues): InvoiceFormValues
     unit_price: '',
     discount_mode: '',
     discount_value: '',
+    tax_treatment: '',
+    gst_rate: '',
   };
   return { ...values, lines: [...values.lines, blank] };
 }

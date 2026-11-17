@@ -267,6 +267,224 @@ describe('draft invoices', () => {
     assert.match(html, new RegExp(`name="due_date"[^>]*value="${expectedDueDate(today, 30)}"`));
   });
 
+  it('defaults Place of Supply from the Client and calculates intra-state GST after discounts', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-domestic-gst',
+    );
+    await setInvoicingDefaults(organizationId, {
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+    });
+    let client = await makeClient(organizationId, {
+      tax_country: 'IN',
+      tax_state_code: '27',
+      tax_state_name: 'Maharashtra',
+    });
+
+    let page = await getHtml(router, newDraftPath(client.id), sessionCookie);
+    assert.match(page, /name="gst_mode"[\s\S]*?<option value="india_gst" selected/);
+    assert.match(page, /name="place_of_supply_state_code"[\s\S]*?<option value="27" selected/);
+    assert.match(page, /name="line_tax_treatment"/);
+    assert.match(page, /value="18"/);
+
+    let created = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      recipient_gstin_applicable: 'on',
+      recipient_tax_value: '27AAPCS2319F1Z5',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+      line_discount_mode: ['percent'],
+      line_discount_value: ['10'],
+    });
+    assert.equal(created.status, 302);
+    let id = draftIdFrom(created);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(detail, /Place of Supply: Maharashtra/);
+    assert.match(detail, /CGST @ 9%/);
+    assert.match(detail, /SGST @ 9%/);
+    assert.match(detail, /12\.15 INR/);
+    assert.match(detail, /Total tax: 24\.30 INR/);
+    assert.match(detail, /Total: 159\.30 INR/);
+  });
+
+  it('gates GST for unregistered Organizations and allows no-tax Drafts', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-gst-disabled',
+    );
+    let client = await makeClient(organizationId);
+    let page = await getHtml(router, newDraftPath(client.id), sessionCookie);
+    assert.doesNotMatch(page, /aria-labelledby="invoice-gst-heading"/);
+
+    let rejectedMode = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(rejectedMode.status, 400);
+    assert.match(await rejectedMode.text(), /GST is available only when your Organization/i);
+
+    let rejectedLine = await createDraft(sessionCookie, client.id, {
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(rejectedLine.status, 400);
+    assert.match(await rejectedLine.text(), /GST line treatments require Indian GST mode/i);
+
+    let noTax = await createDraft(sessionCookie, client.id, { gst_mode: 'none' });
+    assert.equal(noTax.status, 302);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: draftIdFrom(noTax) }),
+      sessionCookie,
+    );
+    assert.match(detail, /Total: 150\.00 INR/);
+    assert.doesNotMatch(detail, /IGST|CGST|SGST/);
+  });
+
+  it('applies multiple GST slabs after invoice discounts and groups zero-tax treatments', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-gst-slabs',
+    );
+    await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+    });
+    let client = await makeClient(organizationId);
+    let created = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      recipient_gstin_applicable: '',
+      line_description: ['Eighteen percent', 'Twelve percent', 'Nil-rated service', 'Exempt service', 'Non-GST service'],
+      line_quantity: ['1', '1', '1', '1', '1'],
+      line_unit_price: ['1000', '1000', '100', '100', '100'],
+      line_tax_treatment: ['taxable', 'taxable', 'nil_rated', 'exempt', 'non_gst'],
+      line_gst_rate: ['18', '12', '', '', ''],
+      invoice_discount_mode: 'fixed',
+      invoice_discount_value: '100',
+    });
+    assert.equal(created.status, 302);
+    let id = draftIdFrom(created);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Subtotal: 2,300\.00 INR/);
+    assert.match(detail, /Invoice discount \(fixed\): 100\.00 INR/);
+    assert.match(detail, /Net taxable subtotal: 2,200\.00 INR/);
+    assert.match(detail, /CGST @ 9%: 86\.09 INR/);
+    assert.match(detail, /SGST @ 9%: 86\.08 INR/);
+    assert.match(detail, /CGST @ 6%: 57\.39 INR/);
+    assert.match(detail, /SGST @ 6%: 57\.39 INR/);
+    assert.match(detail, /Total tax: 286\.95 INR/);
+    assert.match(detail, /Total: 2,486\.95 INR/);
+    assert.match(detail, /nil-rated: 0%/);
+    assert.match(detail, /exempt: 0%/);
+    assert.match(detail, /non-gst: 0%/);
+
+    let edit = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(edit, /Current GST summary/);
+    assert.match(edit, /CGST @ 9%: 86\.09 INR/);
+    assert.match(edit, /SGST @ 6%: 57\.39 INR/);
+  });
+
+  it('defaults Place of Supply from Indian billing region and permits an inter-state override', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-gst-place-override',
+    );
+    await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+    });
+    let billingClient = await makeClient(organizationId, {
+      tax_country: null,
+      tax_type: null,
+      tax_value: null,
+      tax_state_name: null,
+      tax_state_code: null,
+      billing_country: 'IN',
+      billing_region: 'Karnataka',
+    });
+    let billingPage = await getHtml(router, newDraftPath(billingClient.id), sessionCookie);
+    assert.match(
+      billingPage,
+      /name="place_of_supply_state_code"[\s\S]*?<option value="29" selected/,
+    );
+
+    let client = await makeClient(organizationId);
+    let page = await getHtml(router, newDraftPath(client.id), sessionCookie);
+    assert.match(
+      page,
+      /name="place_of_supply_state_code"[\s\S]*?<option value="27" selected/,
+    );
+    let created = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '29',
+      recipient_gstin_applicable: 'on',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(created.status, 302);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: draftIdFrom(created) }),
+      sessionCookie,
+    );
+    assert.match(detail, /Place of Supply: Karnataka/);
+    assert.match(detail, /IGST @ 18%/);
+    assert.match(detail, /27\.00 INR/);
+    assert.doesNotMatch(detail, /CGST @|SGST @/);
+
+    let missingTaxId = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      recipient_gstin_applicable: '',
+      recipient_tax_value: '',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(missingTaxId.status, 302);
+    let invalidTaxId = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      recipient_gstin_applicable: 'on',
+      recipient_tax_value: 'not-a-gstin',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(invalidTaxId.status, 400);
+    assert.match(await invalidTaxId.text(), /valid 15-character Indian GSTIN or UIN/i);
+    let uin = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      recipient_gstin_applicable: 'on',
+      recipient_tax_type: 'uin',
+      recipient_tax_value: '123456789012345',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(uin.status, 302);
+  });
+
   it('refuses new drafts for Archived and foreign-Organization Clients', async () => {
     let first = await createUserAndLoginWithOrganization(router, 'invoice-archived');
     let client = await makeClient(first.organizationId);

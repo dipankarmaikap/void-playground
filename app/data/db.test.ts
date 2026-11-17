@@ -16,6 +16,7 @@ import {
   assertClientSchemaCompatible,
   assertOrganizationSchemaCompatible,
   migrateInvoiceDiscountColumns,
+  migrateInvoiceTaxColumns,
 } from './db.ts';
 
 async function createUser(): Promise<string> {
@@ -603,6 +604,27 @@ describe('db', () => {
       client_id: clientId,
       payment_term: 'net_45',
     });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      gst_mode: 'foreign_manual',
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      tax_total_minor: -1,
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      recipient_gstin_applicable: 2,
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      recipient_gstin_applicable: true,
+      gst_mode: 'none',
+    });
   });
 
   it('requires invoice lines to reference an invoice in the same Organization', async () => {
@@ -694,11 +716,13 @@ describe('db', () => {
       invoice_discount_value: '5.00',
       invoice_discount_minor: 500,
       net_subtotal_minor: 8500,
+      tax_total_minor: 250,
       round_off_minor: 100,
-      total_minor: 8600,
+      total_minor: 8850,
     });
     await db.create(invoices, invoice);
     assert.equal((await db.find(invoices, invoice.id))?.round_off_minor, 100);
+    assert.equal((await db.find(invoices, invoice.id))?.tax_total_minor, 250);
 
     let negativeRoundOff = validInvoice({
       organization_id: organizationId,
@@ -753,6 +777,9 @@ describe('db', () => {
     await lineRejects({ line_discount_minor: 10001 });
     await lineRejects({ line_discount_minor: 6000, allocated_invoice_discount_minor: 5000 });
     await lineRejects({ line_discount_minor: 100 });
+    await lineRejects({ tax_treatment: 'manual_foreign' });
+    await lineRejects({ cgst_amount_minor: -1 });
+    await lineRejects({ igst_amount_minor: -1 });
 
     let validLine = line({
       discount_mode: 'percent',
@@ -760,6 +787,12 @@ describe('db', () => {
       line_discount_minor: 1000,
       allocated_invoice_discount_minor: 500,
       net_minor: 8500,
+      tax_treatment: 'taxable',
+      gst_rate: '18',
+      cgst_rate: '9',
+      sgst_rate: '9',
+      cgst_amount_minor: 765,
+      sgst_amount_minor: 765,
     });
     await db.create(invoiceLines, validLine);
     assert.equal((await db.find(invoiceLines, validLine.id))?.line_discount_minor, 1000);
@@ -828,17 +861,20 @@ describe('db', () => {
     `);
 
     await migrateInvoiceDiscountColumns(legacyDb);
+    await migrateInvoiceTaxColumns(legacyDb);
 
     let invoice = await legacyDb.find(invoices, invoiceId);
     assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
     assert.equal(invoice?.total_minor, 17469, 'the stored total is untouched');
+    assert.equal(invoice?.gst_mode, 'none', 'existing invoices upgrade into no-tax mode');
+    assert.equal(invoice?.tax_total_minor, 0);
     let line = await legacyDb.find(invoiceLines, lineId);
     assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
     assert.equal(line?.amount_minor, 15000);
 
     // A later startup must not overwrite a legitimate net value produced by #43 discounts.
     await legacyDb.executeScript(
-      `UPDATE invoices SET net_subtotal_minor = 999 WHERE id = '${invoiceId}';` +
+      `UPDATE invoices SET subtotal_minor = 999, net_subtotal_minor = 999, total_minor = 999 WHERE id = '${invoiceId}';` +
         `UPDATE invoice_lines SET net_minor = 888 WHERE id = '${lineId}';`,
     );
     await migrateInvoiceDiscountColumns(legacyDb);

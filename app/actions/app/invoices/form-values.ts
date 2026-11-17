@@ -2,6 +2,8 @@ import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
 import type { InvoiceDraftInput, InvoiceDraftLineInput } from '../../../data/invoice-draft.ts';
 import { formatMinorInput } from '../../../data/invoice-calculation.ts';
 import { suggestDueDate } from '../../../data/invoice-dates.ts';
+import { findIndiaStateByCode, INDIA_STATES } from '../../../data/india-states.ts';
+import { isIndiaCountry } from '../../../data/client-tax.ts';
 import type { InvoicingProfileView } from '../../../data/organization-invoicing.ts';
 
 /** One editable free-form service line as it appears in a submitted form. */
@@ -12,6 +14,7 @@ export interface InvoiceFormValues extends InvoiceDraftInput {
   client_id: string;
   /** Carried for redisplay only; the saved name is always derived from the State/UT code. */
   recipient_tax_state_name: string;
+  recipient_gstin_applicable: string;
 }
 
 const LINE_FIELDS = [
@@ -21,6 +24,8 @@ const LINE_FIELDS = [
   'unit_price',
   'discount_mode',
   'discount_value',
+  'tax_treatment',
+  'gst_rate',
 ] as const;
 
 export function emptyInvoiceFormValues(): InvoiceFormValues {
@@ -42,6 +47,9 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
     recipient_tax_value: '',
     recipient_tax_state_code: '',
     recipient_tax_state_name: '',
+    recipient_gstin_applicable: '',
+    gst_mode: 'none',
+    place_of_supply_state_code: '',
     payment_instructions: '',
     customer_notes: '',
     internal_note: '',
@@ -56,6 +64,8 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
         unit_price: '',
         discount_mode: '',
         discount_value: '',
+        tax_treatment: '',
+        gst_rate: '',
       },
     ],
   };
@@ -86,6 +96,9 @@ export function draftFormValuesFor(
     recipient_tax_value: client.tax_value ?? '',
     recipient_tax_state_code: client.tax_state_code ?? '',
     recipient_tax_state_name: client.tax_state_name ?? '',
+    gst_mode: view.gst_registered ? 'india_gst' : 'none',
+    place_of_supply_state_code: defaultPlaceOfSupply(client),
+    recipient_gstin_applicable: '',
     payment_instructions: view.payment_instructions ?? '',
     customer_notes: view.customer_notes ?? '',
     internal_note: '',
@@ -114,6 +127,9 @@ export function invoiceFormValuesOf(
     recipient_tax_value: invoice.recipient_tax_value ?? '',
     recipient_tax_state_code: invoice.recipient_tax_state_code ?? '',
     recipient_tax_state_name: invoice.recipient_tax_state_name ?? '',
+    gst_mode: invoice.gst_mode,
+    place_of_supply_state_code: invoice.place_of_supply_state_code ?? '',
+    recipient_gstin_applicable: invoice.recipient_gstin_applicable ? 'on' : '',
     payment_instructions: invoice.payment_instructions ?? '',
     customer_notes: invoice.customer_notes ?? '',
     internal_note: invoice.internal_note ?? '',
@@ -130,6 +146,8 @@ export function invoiceFormValuesOf(
       unit_price: line.unit_price,
       discount_mode: line.discount_mode ?? '',
       discount_value: line.discount_value ?? '',
+      tax_treatment: line.tax_treatment ?? '',
+      gst_rate: line.gst_rate ?? '',
     })),
   };
 }
@@ -172,6 +190,9 @@ export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
     recipient_tax_value: readText(formData, 'recipient_tax_value'),
     recipient_tax_state_code: readText(formData, 'recipient_tax_state_code'),
     recipient_tax_state_name: readText(formData, 'recipient_tax_state_name'),
+    gst_mode: readText(formData, 'gst_mode'),
+    place_of_supply_state_code: readText(formData, 'place_of_supply_state_code'),
+    recipient_gstin_applicable: readText(formData, 'recipient_gstin_applicable'),
     payment_instructions: readText(formData, 'payment_instructions'),
     customer_notes: readText(formData, 'customer_notes'),
     internal_note: readText(formData, 'internal_note'),
@@ -180,4 +201,23 @@ export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
     round_off: readText(formData, 'round_off'),
     lines,
   };
+}
+
+function defaultPlaceOfSupply(client: Client): string {
+  if (
+    client.tax_state_code &&
+    (!client.tax_country || isIndiaCountry(client.tax_country)) &&
+    findIndiaStateByCode(client.tax_state_code)
+  ) {
+    return client.tax_state_code;
+  }
+  if (!client.billing_country || !isIndiaCountry(client.billing_country)) return '';
+  let region = (client.billing_region ?? '').trim().toLowerCase();
+  let state = INDIA_STATES.find(
+    (candidate) =>
+      candidate.name.toLowerCase() === region ||
+      candidate.code === region ||
+      `${candidate.code} - ${candidate.name}`.toLowerCase() === region,
+  );
+  return state?.code ?? '';
 }

@@ -5,6 +5,7 @@ import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
 import { formatMoney, formatMoneySigned } from '../../../data/invoice-calculation.ts';
+import { groupedInvoiceTaxes } from '../../../data/invoice-tax.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
@@ -57,6 +58,7 @@ const actionsStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', ma
 export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
   return () => {
     let { csrfToken, identity, organizationName, invoice, lines, client, message } = handle.props;
+    let taxSummary = groupedInvoiceTaxes(lines, invoice.currency);
 
     return (
       <AppShell
@@ -109,6 +111,16 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           {invoice.recipient_tax_state_name ? (
             <p mix={detailStyle}>Tax State/UT: {invoice.recipient_tax_state_name}</p>
           ) : null}
+          {invoice.gst_mode === 'india_gst' ? (
+            <>
+              <p mix={detailStyle}>
+                Place of Supply: {invoice.place_of_supply_state_name ?? '—'}
+              </p>
+              <p mix={detailStyle}>
+                Recipient GSTIN applicable: {invoice.recipient_gstin_applicable ? 'Yes' : 'No'}
+              </p>
+            </>
+          ) : null}
         </div>
 
         <div mix={cardStyle}>
@@ -123,6 +135,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                 <th mix={amountCellStyle}>Amount</th>
                 <th mix={amountCellStyle}>Line discount</th>
                 <th mix={amountCellStyle}>Net</th>
+                <th mix={cellStyle}>Tax</th>
               </tr>
             </thead>
             <tbody>
@@ -142,6 +155,21 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   </td>
                   <td mix={amountCellStyle}>
                     {formatMoney(BigInt(line.net_minor), invoice.currency)}
+                  </td>
+                  <td mix={cellStyle}>
+                    {[
+                      line.cgst_rate != null
+                        ? `CGST @ ${line.cgst_rate}% ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
+                        : null,
+                      line.sgst_rate != null
+                        ? `SGST @ ${line.sgst_rate}% ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
+                        : null,
+                      line.igst_rate != null
+                        ? `IGST @ ${line.igst_rate}% ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || (line.tax_treatment ? `${line.tax_treatment.replace('_', '-')}: 0%` : '—')}
                   </td>
                 </tr>
               ))}
@@ -164,6 +192,23 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           <p mix={breakdownStyle}>
             Net taxable subtotal: {formatMoney(BigInt(invoice.net_subtotal_minor), invoice.currency)}
           </p>
+          {invoice.gst_mode === 'india_gst' ? (
+            <>
+              <h3 mix={headingStyle}>Grouped tax summary</h3>
+              {taxSummary.length > 0 ? (
+                taxSummary.map((tax) => (
+                  <p key={tax.label} mix={breakdownStyle}>
+                    {tax.label}: {tax.formattedAmount}
+                  </p>
+                ))
+              ) : (
+                <p mix={breakdownStyle}>No GST charged.</p>
+              )}
+              <p mix={breakdownStyle}>
+                Total tax: {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}
+              </p>
+            </>
+          ) : null}
           <p mix={breakdownStyle}>
             Round-off: {formatMoneySigned(BigInt(invoice.round_off_minor), invoice.currency)}
           </p>

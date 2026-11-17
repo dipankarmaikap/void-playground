@@ -9,6 +9,8 @@ import { findClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../../data/invoice-draft.ts';
 import { findInvoice, findInvoiceLines, updateDraftInvoice } from '../../../../data/invoices.ts';
+import { ensureGstPresets } from '../../../../data/organization-gst-presets.ts';
+import { getInvoicingProfileView } from '../../../../data/organization-invoicing.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -34,6 +36,10 @@ export default createController(routes.app.invoices.edit, {
         findInvoiceLines(organization.id, invoice.id),
         findClient(organization.id, invoice.client_id),
       ]);
+      let profile = await getInvoicingProfileView(organization);
+      let gstRatePresets = profile.gst_registered
+        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        : [];
       return context.render(
         <EditInvoicePage
           csrfToken={getCsrfToken(context)}
@@ -41,7 +47,9 @@ export default createController(routes.app.invoices.edit, {
           organizationName={organization.name}
           invoice={invoice}
           client={client}
+          lines={lines}
           values={invoiceFormValuesOf(invoice, lines)}
+          gstRatePresets={gstRatePresets}
         />,
       );
     },
@@ -54,6 +62,16 @@ export default createController(routes.app.invoices.edit, {
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
       let values = readInvoiceFormValues(context.formData);
+      let profile = await getInvoicingProfileView(organization);
+      let gstRatePresets = profile.gst_registered
+        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        : [];
+      let taxConfig = {
+        gstRegistered: profile.gst_registered,
+        gstStateCode: profile.gst_state_code,
+        gstRatePresets,
+      };
+      let savedLines = await findInvoiceLines(organization.id, invoice.id);
       if (isAddLineIntent(context.formData)) {
         return context.render(
           <EditInvoicePage
@@ -62,12 +80,14 @@ export default createController(routes.app.invoices.edit, {
             organizationName={organization.name}
             invoice={invoice}
             client={await findClient(organization.id, invoice.client_id)}
+            lines={savedLines}
             values={withAdditionalLine(values)}
+            gstRatePresets={gstRatePresets}
           />,
         );
       }
 
-      let parsed = parseInvoiceDraft(values);
+      let parsed = parseInvoiceDraft(values, taxConfig);
       if (!parsed.ok) {
         let client = await findClient(organization.id, invoice.client_id);
         return context.render(
@@ -77,8 +97,10 @@ export default createController(routes.app.invoices.edit, {
             organizationName={organization.name}
             invoice={invoice}
             client={client}
+            lines={savedLines}
             values={values}
             issues={parsed.issues}
+            gstRatePresets={gstRatePresets}
           />,
           { status: 400 },
         );

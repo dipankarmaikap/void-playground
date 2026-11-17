@@ -4,6 +4,7 @@ import type { Issue } from 'remix/data-schema';
 
 import { CURRENCIES } from '../../../data/client-billing.ts';
 import { PAYMENT_TERMS, PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
+import { INDIA_STATES } from '../../../data/india-states.ts';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
@@ -17,6 +18,7 @@ export interface InvoiceFormProps {
   submitLabel: string;
   values: InvoiceFormValues;
   issues?: readonly Issue[];
+  gstRatePresets: readonly string[];
   children?: RemixNode;
 }
 
@@ -97,7 +99,15 @@ function lineIssue(
 
 export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
   return () => {
-    let { csrfToken, action, submitLabel, values, issues = [], children } = handle.props;
+    let {
+      csrfToken,
+      action,
+      submitLabel,
+      values,
+      issues = [],
+      children,
+      gstRatePresets,
+    } = handle.props;
     let lineCount = Math.max(MIN_VISIBLE_LINES, values.lines.length);
     let linesIssue = firstIssue(issues, 'lines');
 
@@ -113,6 +123,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
         {children}
         {issues.length > 0 ? (
           <p role="alert">Please correct the fields below.</p>
+        ) : null}
+        {!gstRatePresets.length && firstIssue(issues, 'gst_mode') ? (
+          <p role="alert">{firstIssue(issues, 'gst_mode')?.message}</p>
         ) : null}
         {firstIssue(issues, 'client_id') ? (
           <p role="alert">{firstIssue(issues, 'client_id')?.message}</p>
@@ -259,6 +272,65 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
+        {gstRatePresets.length > 0 ? (
+          <section aria-labelledby="invoice-gst-heading" mix={cardStyle}>
+            <h2 id="invoice-gst-heading" mix={sectionHeadingStyle}>
+              Indian GST
+            </h2>
+            <p mix={hintStyle}>
+              Select the tax treatment and configured rate for each service. Rates are never inferred
+              from SAC codes.
+            </p>
+            <div mix={gridStyle}>
+              <Field label="Invoice tax mode" error={firstIssue(issues, 'gst_mode')?.message}>
+                <select name="gst_mode" aria-invalid={firstIssue(issues, 'gst_mode') ? true : undefined}>
+                  <option value="none" selected={values.gst_mode === 'none'}>
+                    No Indian GST
+                  </option>
+                  <option value="india_gst" selected={values.gst_mode === 'india_gst'}>
+                    Indian GST
+                  </option>
+                </select>
+              </Field>
+              <Field
+                label="Place of Supply State/UT"
+                error={firstIssue(issues, 'place_of_supply_state_code')?.message}
+              >
+                <select
+                  name="place_of_supply_state_code"
+                  aria-invalid={
+                    firstIssue(issues, 'place_of_supply_state_code') ? true : undefined
+                  }
+                >
+                  <option value="" selected={values.place_of_supply_state_code === ''}>
+                    Choose a State/UT
+                  </option>
+                  {INDIA_STATES.map((state) => (
+                    <option
+                      key={state.code}
+                      value={state.code}
+                      selected={values.place_of_supply_state_code === state.code}
+                    >
+                      {state.code} — {state.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label="Recipient GSTIN applicable"
+                error={firstIssue(issues, 'recipient_gstin_applicable')?.message}
+              >
+                <input
+                  type="checkbox"
+                  name="recipient_gstin_applicable"
+                  value="on"
+                  checked={values.recipient_gstin_applicable === 'on'}
+                />
+              </Field>
+            </div>
+          </section>
+        ) : null}
+
         <section aria-labelledby="invoice-lines-heading" mix={cardStyle}>
           <h2 id="invoice-lines-heading" mix={sectionHeadingStyle}>
             Service lines
@@ -280,6 +352,8 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               unit_price: '',
               discount_mode: '',
               discount_value: '',
+              tax_treatment: '',
+              gst_rate: '',
             };
             return (
               <div key={index} mix={lineRowStyle}>
@@ -349,6 +423,55 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                     aria-invalid={lineIssue(issues, index, 'discount_value') ? true : undefined}
                   />
                 </Field>
+                {gstRatePresets.length > 0 ? (
+                  <>
+                    <Field
+                      label={`GST treatment ${index + 1}`}
+                      error={lineIssue(issues, index, 'tax_treatment')?.message}
+                    >
+                      <select
+                        name="line_tax_treatment"
+                        aria-invalid={
+                          lineIssue(issues, index, 'tax_treatment') ? true : undefined
+                        }
+                      >
+                        <option value="" selected={line.tax_treatment === ''}>
+                          Choose treatment
+                        </option>
+                        <option value="taxable" selected={line.tax_treatment === 'taxable'}>
+                          Taxable
+                        </option>
+                        <option value="nil_rated" selected={line.tax_treatment === 'nil_rated'}>
+                          Nil-rated
+                        </option>
+                        <option value="exempt" selected={line.tax_treatment === 'exempt'}>
+                          Exempt
+                        </option>
+                        <option value="non_gst" selected={line.tax_treatment === 'non_gst'}>
+                          Non-GST
+                        </option>
+                      </select>
+                    </Field>
+                    <Field
+                      label={`GST rate ${index + 1}`}
+                      error={lineIssue(issues, index, 'gst_rate')?.message}
+                    >
+                      <select
+                        name="line_gst_rate"
+                        aria-invalid={lineIssue(issues, index, 'gst_rate') ? true : undefined}
+                      >
+                        <option value="" selected={line.gst_rate === ''}>
+                          Choose rate
+                        </option>
+                        {gstRatePresets.map((rate) => (
+                          <option key={rate} value={rate} selected={line.gst_rate === rate}>
+                            {rate}%
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                ) : null}
                 {lineIssue(issues, index, 'amount') ? (
                   <p role="alert">{lineIssue(issues, index, 'amount')?.message}</p>
                 ) : null}

@@ -25,6 +25,7 @@ export interface NewInvoicePageProps {
   selectedClient?: Client;
   values?: InvoiceFormValues;
   issues?: readonly Issue[];
+  gstRatePresets: readonly string[];
 }
 
 const cardStyle = css({
@@ -70,6 +71,7 @@ export function NewInvoicePage(handle: Handle<NewInvoicePageProps>) {
       selectedClient,
       values,
       issues,
+      gstRatePresets,
     } = handle.props;
 
     return (
@@ -96,6 +98,7 @@ export function NewInvoicePage(handle: Handle<NewInvoicePageProps>) {
             submitLabel="Create draft"
             values={values!}
             issues={issues}
+            gstRatePresets={gstRatePresets}
           >
             <p mix={hintStyle}>Bill to: {clientDisplayLabel(selectedClient)}</p>
           </InvoiceForm>
