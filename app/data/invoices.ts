@@ -4,6 +4,9 @@ import { db, invoiceLines, invoices } from './db.ts';
 import type { Invoice, InvoiceLine } from './db.ts';
 import type { InvoiceDraftChanges } from './invoice-draft.ts';
 
+/** User-facing label for the only status a Draft can have in this ticket. */
+export const DRAFT_STATUS_LABEL = 'Draft';
+
 export type InvoiceDirectoryItem = Pick<
   Invoice,
   'id' | 'recipient_legal_name' | 'status' | 'currency' | 'invoice_date' | 'total_minor' | 'created_at'

@@ -16,6 +16,7 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
+import { isAddLineIntent, withAdditionalLine } from '../form-intent.ts';
 import { draftFormValuesFor, readInvoiceFormValues } from '../form-values.ts';
 import { NewInvoicePage } from './page.tsx';
 
@@ -84,6 +85,19 @@ export default createController(routes.app.invoices.new, {
             ]}
           />,
           { status: 400 },
+        );
+      }
+
+      if (isAddLineIntent(context.formData)) {
+        return context.render(
+          <NewInvoicePage
+            csrfToken={csrfToken}
+            identity={identity}
+            organizationName={organization.name}
+            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            selectedClient={client}
+            values={withAdditionalLine(values)}
+          />,
         );
       }
 

@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { formatMoney } from '../../../data/invoice-calculation.ts';
+import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import type { InvoiceDirectoryItem } from '../../../data/invoices.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -120,7 +121,7 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
                 >
                   <span mix={itemHeadingStyle}>{invoice.recipient_legal_name}</span>
                   <span mix={itemMetaStyle}>
-                    {invoice.status} · {invoice.invoice_date} ·{' '}
+                    {DRAFT_STATUS_LABEL} · {invoice.invoice_date} ·{' '}
                     {formatMoney(BigInt(invoice.total_minor), invoice.currency)}
                   </span>
                 </a>

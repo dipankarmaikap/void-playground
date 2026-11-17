@@ -28,6 +28,8 @@ export interface InvoiceFormValues {
   recipient_tax_type: string;
   recipient_tax_value: string;
   recipient_tax_state_code: string;
+  /** Carried for redisplay only; the saved name is always derived from the State/UT code. */
+  recipient_tax_state_name: string;
   payment_instructions: string;
   customer_notes: string;
   internal_note: string;
@@ -54,6 +56,7 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
     recipient_tax_type: '',
     recipient_tax_value: '',
     recipient_tax_state_code: '',
+    recipient_tax_state_name: '',
     payment_instructions: '',
     customer_notes: '',
     internal_note: '',
@@ -85,6 +88,7 @@ export function draftFormValuesFor(
     recipient_tax_type: client.tax_type ?? '',
     recipient_tax_value: client.tax_value ?? '',
     recipient_tax_state_code: client.tax_state_code ?? '',
+    recipient_tax_state_name: client.tax_state_name ?? '',
     payment_instructions: view.payment_instructions ?? '',
     customer_notes: view.customer_notes ?? '',
     internal_note: '',
@@ -112,6 +116,7 @@ export function invoiceFormValuesOf(
     recipient_tax_type: invoice.recipient_tax_type ?? '',
     recipient_tax_value: invoice.recipient_tax_value ?? '',
     recipient_tax_state_code: invoice.recipient_tax_state_code ?? '',
+    recipient_tax_state_name: invoice.recipient_tax_state_name ?? '',
     payment_instructions: invoice.payment_instructions ?? '',
     customer_notes: invoice.customer_notes ?? '',
     internal_note: invoice.internal_note ?? '',
@@ -161,6 +166,7 @@ export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
     recipient_tax_type: readText(formData, 'recipient_tax_type'),
     recipient_tax_value: readText(formData, 'recipient_tax_value'),
     recipient_tax_state_code: readText(formData, 'recipient_tax_state_code'),
+    recipient_tax_state_name: readText(formData, 'recipient_tax_state_name'),
     payment_instructions: readText(formData, 'payment_instructions'),
     customer_notes: readText(formData, 'customer_notes'),
     internal_note: readText(formData, 'internal_note'),

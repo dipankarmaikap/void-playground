@@ -220,6 +220,38 @@ describe('draft invoices', () => {
     assert.match(html, /<option value="net_15"[^>]*selected/);
   });
 
+  it('preserves the Client India tax State/UT name on the Draft without trusting a forged value', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-tax-state',
+    );
+    let client = await makeClient(organizationId, { tax_state_name: 'Maharashtra' });
+
+    let page = await getHtml(router, newDraftPath(client.id), sessionCookie);
+    assert.match(
+      page,
+      /name="recipient_tax_state_name"[^>]*value="Maharashtra"/,
+      'the Client tax State/UT name should be prefilled',
+    );
+
+    let created = await createDraft(sessionCookie, client.id, {
+      recipient_tax_state_name: 'Forged State',
+      recipient_tax_state_code: '27',
+    });
+    assert.equal(created.status, 302);
+    let invoice = await db.find(invoices, draftIdFrom(created));
+    assert.equal(invoice?.recipient_tax_state_name, 'Maharashtra');
+    assert.equal(invoice?.recipient_tax_state_code, '27');
+
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: invoice!.id }),
+      sessionCookie,
+    );
+    assert.match(detail, /Tax State\/UT: Maharashtra/);
+    assert.ok(!detail.includes('Forged State'));
+  });
+
   it('falls back to Organization currency and term when the Client has no default currency', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
@@ -314,7 +346,7 @@ describe('draft invoices', () => {
     assert.ok(html.includes(client.legal_name));
     let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
     assert.match(directory, /Draft Recipient/);
-    assert.match(directory, /174\.69 INR/);
+    assert.match(directory, /Draft · 2026-11-17 · 174\.69 INR/);
   });
 
   it('applies ISO 4217 minor-unit precision for INR, USD, JPY, and KWD', async () => {
@@ -377,6 +409,79 @@ describe('draft invoices', () => {
     assert.equal(stored?.tax_value, '27AAPCS2319F1Z5');
   });
 
+  it('adds service lines through a no-JS server intent and saves four or more lines', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-add-line',
+    );
+    let client = await makeClient(organizationId);
+    let threeLines = {
+      line_description: ['First', 'Second', 'Third'],
+      line_quantity: ['1', '2', '3'],
+      line_unit_price: ['10.0000', '20.0000', '30.0000'],
+    };
+
+    let added = await submitDraft(
+      newDraftPath(client.id),
+      routes.app.invoices.new.action.href(),
+      draftFields(client.id, { ...threeLines, _intent: 'add_line' }),
+      sessionCookie,
+    );
+    assert.equal(added.status, 200, 'the add-line intent re-renders the form');
+    let addedHtml = await added.text();
+    assert.equal((addedHtml.match(/name="line_description"/g) ?? []).length, 4);
+    assert.match(addedHtml, /name="line_description"[^>]*value="First"/);
+    assert.match(addedHtml, /name="line_description"[^>]*value="Third"/);
+    assert.match(addedHtml, /name="_intent" value="add_line"[^>]*>Add another line</);
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+
+    let created = await createDraft(sessionCookie, client.id, {
+      line_description: ['First', 'Second', 'Third', 'Fourth'],
+      line_quantity: ['1', '2', '3', '4'],
+      line_unit_price: ['10.0000', '20.0000', '30.0000', '40.0000'],
+    });
+    assert.equal(created.status, 302);
+    let id = draftIdFrom(created);
+    let savedLines = await db.findMany(invoiceLines, {
+      where: { invoice_id: id },
+      orderBy: [['position', 'asc']],
+    });
+    assert.equal(savedLines.length, 4);
+    assert.deepEqual(
+      savedLines.map((line) => line.description),
+      ['First', 'Second', 'Third', 'Fourth'],
+    );
+    assert.equal((await db.find(invoices, id))?.total_minor, 30000);
+  });
+
+  it('adds a line while editing without mutating the Draft until saved', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-edit-add-line',
+    );
+    let client = await makeClient(organizationId);
+    let id = draftIdFrom(await createDraft(sessionCookie, client.id));
+    let before = await db.find(invoices, id);
+
+    let added = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      draftFields(client.id, {
+        _intent: 'add_line',
+        line_description: ['Consulting services', '', ''],
+        line_quantity: ['1.5', '', ''],
+        line_unit_price: ['100.0000', '', ''],
+      }),
+      sessionCookie,
+    );
+    assert.equal(added.status, 200);
+    let html = await added.text();
+    assert.equal((html.match(/name="line_description"/g) ?? []).length, 4);
+    assert.match(html, /name="line_description"[^>]*value="Consulting services"/);
+    assert.equal((await db.find(invoices, id))?.updated_at, before?.updated_at);
+    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
+  });
+
   it('rejects invalid lines with 400 responses that preserve what was submitted', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
@@ -430,6 +535,44 @@ describe('draft invoices', () => {
       assert.match(html, preserved);
     }
     assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+  });
+
+  it('rejects amounts outside the exact persisted numeric range without saving anything', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-money-range',
+    );
+    let client = await makeClient(organizationId);
+    let oversized = {
+      line_description: ['Huge line'],
+      line_quantity: ['100000000000.0000'],
+      line_unit_price: ['100000.0000'],
+    };
+
+    let created = await createDraft(sessionCookie, client.id, oversized);
+    assert.equal(created.status, 400);
+    assert.match(await created.text(), /too large to store exactly/i);
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+    assert.equal(
+      await db.count(invoiceLines, { where: { organization_id: organizationId } }),
+      0,
+    );
+
+    let valid = await createDraft(sessionCookie, client.id);
+    let id = draftIdFrom(valid);
+    let before = await db.find(invoices, id);
+    let edited = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      draftFields(client.id, oversized),
+      sessionCookie,
+    );
+    assert.equal(edited.status, 400);
+    assert.match(await edited.text(), /too large to store exactly/i);
+    let after = await db.find(invoices, id);
+    assert.equal(after?.total_minor, before?.total_minor);
+    assert.equal(after?.updated_at, before?.updated_at);
+    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
   });
 
   it('validates invoice dates, due dates, and currency codes', async () => {
@@ -528,7 +671,7 @@ describe('draft invoices', () => {
     let id = draftIdFrom(created);
 
     let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
-    assert.match(html, /Status: draft/i);
+    assert.match(html, /Status: Draft/);
     assert.doesNotMatch(html, /Invoice number:/i);
     assert.match(html, /Draft Recipient/);
     assert.match(html, /Consulting services/);
@@ -597,6 +740,38 @@ describe('draft invoices', () => {
     assert.equal(lines.length, 2);
     assert.equal(lines[0]?.description, 'rewritten line');
     assert.doesNotMatch(JSON.stringify(lines), /Consulting services/);
+  });
+
+  it('does not let another Organization view or edit a Draft', async () => {
+    let first = await createUserAndLoginWithOrganization(router, 'invoice-edit-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, 'invoice-edit-scope-other');
+    let client = await makeClient(first.organizationId);
+    let created = await createDraft(first.sessionCookie, client.id);
+    let id = draftIdFrom(created);
+    let before = await db.find(invoices, id);
+
+    let show = await router.fetch(new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin), {
+      headers: { Cookie: other.sessionCookie },
+    });
+    assert.equal(show.status, 404);
+    let showBody = await show.text();
+    assert.ok(!showBody.includes('Draft Recipient'));
+    assert.ok(!showBody.includes(id));
+
+    let edit = await submitDraft(
+      routes.app.dashboard.href(),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      draftFields(client.id, { recipient_legal_name: 'Hacked Recipient' }),
+      other.sessionCookie,
+    );
+    assert.equal(edit.status, 404);
+    assert.ok(!(await edit.text()).includes('Hacked Recipient'));
+
+    let after = await db.find(invoices, id);
+    assert.equal(after?.recipient_legal_name, before?.recipient_legal_name);
+    assert.equal(after?.total_minor, before?.total_minor);
+    assert.equal(after?.updated_at, before?.updated_at);
+    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
   });
 
   it('keeps an existing Draft accessible and editable after its Client is archived', async () => {

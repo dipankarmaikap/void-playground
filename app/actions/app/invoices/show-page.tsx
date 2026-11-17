@@ -5,6 +5,7 @@ import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
 import { formatMoney } from '../../../data/invoice-calculation.ts';
+import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -68,7 +69,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Invoice draft</h1>
           <p mix={pageIntroStyle}>
-            Status: {invoice.status}. Drafts have no final invoice number and can be edited or
+            Status: {DRAFT_STATUS_LABEL}. Drafts have no final invoice number and can be edited or
             discarded.
           </p>
         </header>
@@ -103,6 +104,9 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             <p mix={detailStyle}>
               Tax identifier: {clientTaxTypeLabel(invoice.recipient_tax_type)} {invoice.recipient_tax_value}
             </p>
+          ) : null}
+          {invoice.recipient_tax_state_name ? (
+            <p mix={detailStyle}>Tax State/UT: {invoice.recipient_tax_state_name}</p>
           ) : null}
         </div>
 

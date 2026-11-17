@@ -62,6 +62,17 @@ export function calculateLineAmountMinor(
   return (product + divisor / 2n) / divisor;
 }
 
+/**
+ * Largest minor-unit amount that survives a `Number()` conversion and SQLite INTEGER round trip
+ * without losing exactness. Amounts above this must be rejected before any conversion happens.
+ */
+export const MAX_EXACT_MINOR_UNITS = BigInt(Number.MAX_SAFE_INTEGER);
+
+/** Converts a minor-unit BigInt to a Number only when the value is exactly representable. */
+export function toExactMinorNumber(value: bigint): number | null {
+  return value >= 0n && value <= MAX_EXACT_MINOR_UNITS ? Number(value) : null;
+}
+
 /** Formats a minor-unit amount with the currency's own precision, without floating-point math. */
 export function formatMoney(minor: bigint, currency: string): string {
   let digits = currencyMinorDigits(currency);

@@ -8,6 +8,7 @@ import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+import { MIN_VISIBLE_LINES } from './form-intent.ts';
 import type { InvoiceFormValues } from './form-values.ts';
 
 export interface InvoiceFormProps {
@@ -63,6 +64,12 @@ const textAreaStyle = css({
   '&[aria-invalid="true"]': { borderColor: colors.danger },
 });
 
+const formActionsStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.75rem',
+});
+
 const sectionHeadingStyle = css({
   margin: 0,
   fontSize: '1.0625rem',
@@ -91,13 +98,18 @@ function lineIssue(
 export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
   return () => {
     let { csrfToken, action, submitLabel, values, issues = [], children } = handle.props;
-    let lineCount = Math.max(3, values.lines.length);
+    let lineCount = Math.max(MIN_VISIBLE_LINES, values.lines.length);
     let linesIssue = firstIssue(issues, 'lines');
 
     return (
       <form method="post" action={action} mix={formStyle}>
         <input type="hidden" name="_csrf" value={csrfToken} />
         <input type="hidden" name="client_id" value={values.client_id} />
+        <input
+          type="hidden"
+          name="recipient_tax_state_name"
+          value={values.recipient_tax_state_name}
+        />
         {children}
         {issues.length > 0 ? (
           <p role="alert">Please correct the fields below.</p>
@@ -257,6 +269,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           {linesIssue || firstIssue(issues, 'lines_count') ? (
             <p role="alert">{linesIssue?.message ?? firstIssue(issues, 'lines_count')?.message}</p>
           ) : null}
+          {firstIssue(issues, 'total') ? (
+            <p role="alert">{firstIssue(issues, 'total')?.message}</p>
+          ) : null}
           {Array.from({ length: lineCount }, (_, index) => {
             let line = values.lines[index] ?? {
               description: '',
@@ -302,6 +317,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                     aria-invalid={lineIssue(issues, index, 'unit_price') ? true : undefined}
                   />
                 </Field>
+                {lineIssue(issues, index, 'amount') ? (
+                  <p role="alert">{lineIssue(issues, index, 'amount')?.message}</p>
+                ) : null}
               </div>
             );
           })}
@@ -352,7 +370,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </Field>
         </section>
 
-        <Button type="submit">{submitLabel}</Button>
+        <div mix={formActionsStyle}>
+          <Button type="submit" name="_intent" value="add_line" variant="secondary">
+            Add another line
+          </Button>
+          <Button type="submit">{submitLabel}</Button>
+        </div>
       </form>
     );
   };

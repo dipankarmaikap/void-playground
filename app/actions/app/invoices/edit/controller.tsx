@@ -14,6 +14,7 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
+import { isAddLineIntent, withAdditionalLine } from '../form-intent.ts';
 import { invoiceFormValuesOf, readInvoiceFormValues } from '../form-values.ts';
 import { EditInvoicePage } from './page.tsx';
 
@@ -53,6 +54,19 @@ export default createController(routes.app.invoices.edit, {
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
       let values = readInvoiceFormValues(context.formData);
+      if (isAddLineIntent(context.formData)) {
+        return context.render(
+          <EditInvoicePage
+            csrfToken={csrfToken}
+            identity={identity}
+            organizationName={organization.name}
+            invoice={invoice}
+            client={await findClient(organization.id, invoice.client_id)}
+            values={withAdditionalLine(values)}
+          />,
+        );
+      }
+
       let parsed = parseInvoiceDraft(values);
       if (!parsed.ok) {
         let client = await findClient(organization.id, invoice.client_id);

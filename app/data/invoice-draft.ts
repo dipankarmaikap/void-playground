@@ -1,12 +1,14 @@
 import type { Issue } from 'remix/data-schema';
 
-import { normalizeTaxValue } from './client-tax.ts';
+import { isIndiaCountry, normalizeTaxValue } from './client-tax.ts';
 import { CLIENT_TEXT_LIMITS } from './client-text.ts';
+import { findIndiaStateByCode } from './india-states.ts';
 import { canonicalCountry } from './client-billing.ts';
 import {
   calculateLineAmountMinor,
   formatScaledDecimal,
   parseScaledDecimal,
+  toExactMinorNumber,
 } from './invoice-calculation.ts';
 import { isValidIsoDate } from './invoice-dates.ts';
 import { PAYMENT_TERMS } from './organization-invoicing.ts';
@@ -123,6 +125,7 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
 
   let lines: InvoiceLineChanges[] = [];
   let subtotalMinor = 0n;
+  let hasRangeIssue = false;
   let calculationCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'INR';
 
   form.lines.forEach((line, index) => {
@@ -155,25 +158,44 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
 
     if (quantity != null && quantity > 0n && unitPrice != null) {
       let amount = calculateLineAmountMinor(quantity, unitPrice, calculationCurrency);
-      subtotalMinor += amount;
-      lines.push({
-        position: lines.length,
-        description,
-        sac: optional(sac),
-        quantity: formatScaledDecimal(quantity),
-        unit_price: formatScaledDecimal(unitPrice),
-        amount_minor: Number(amount),
-      });
+      let amountMinor = toExactMinorNumber(amount);
+      if (amountMinor == null) {
+        hasRangeIssue = true;
+        lineIssue(
+          'amount',
+          'This line amount is too large to store exactly. Reduce the quantity or unit price.',
+        );
+      } else {
+        subtotalMinor += amount;
+        lines.push({
+          position: lines.length,
+          description,
+          sac: optional(sac),
+          quantity: formatScaledDecimal(quantity),
+          unit_price: formatScaledDecimal(unitPrice),
+          amount_minor: amountMinor,
+        });
+      }
     }
   });
 
-  if (lines.length === 0) {
+  if (lines.length === 0 && !hasRangeIssue) {
     push('lines', 'Add at least one service line.');
+  }
+  let subtotal = toExactMinorNumber(subtotalMinor);
+  if (subtotal == null) {
+    push('total', 'The invoice total is too large to store exactly.');
   }
 
   if (issues.length > 0) return { ok: false, issues };
 
   let taxState = form.recipient_tax_state_code.trim();
+  let taxCountry = optional(form.recipient_tax_country);
+  // The hidden name is never trusted: resolve the canonical name from the State/UT code instead.
+  let taxStateName =
+    taxState && (!taxCountry || isIndiaCountry(taxCountry))
+      ? (findIndiaStateByCode(taxState)?.name ?? null)
+      : null;
   return {
     ok: true,
     value: {
@@ -190,18 +212,18 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
       recipient_billing_country: form.recipient_billing_country.trim()
         ? canonicalCountry(form.recipient_billing_country)
         : null,
-      recipient_tax_country: optional(form.recipient_tax_country),
+      recipient_tax_country: taxCountry,
       recipient_tax_type: optional(form.recipient_tax_type)?.toLowerCase() ?? null,
       recipient_tax_value: form.recipient_tax_value.trim()
         ? normalizeTaxValue(form.recipient_tax_value)
         : null,
-      recipient_tax_state_name: null,
+      recipient_tax_state_name: taxStateName,
       recipient_tax_state_code: taxState || null,
       payment_instructions: optional(form.payment_instructions),
       customer_notes: optional(form.customer_notes),
       internal_note: optional(form.internal_note),
-      subtotal_minor: Number(subtotalMinor),
-      total_minor: Number(subtotalMinor),
+      subtotal_minor: subtotal!,
+      total_minor: subtotal!,
       lines,
     },
   };
