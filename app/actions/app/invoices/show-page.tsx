@@ -2,6 +2,7 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
+import { joinAddressParts } from '../../../data/address.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
 import { formatMoney, formatMoneySigned } from '../../../data/invoice-calculation.ts';
@@ -101,27 +102,20 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
     let taxSummary = groupedInvoiceTaxes(lines, invoice.currency);
     let displayStatus = invoiceDisplayStatus(invoice);
     let isDraft = invoice.status === 'draft';
-    let recipientAddress = [
+    let statusLabel = displayStatus === 'overdue' ? 'Overdue' : 'Sent';
+    let recipientAddress = joinAddressParts([
       invoice.recipient_billing_line1,
       invoice.recipient_billing_locality,
       invoice.recipient_billing_region,
       invoice.recipient_billing_postal_code,
-    ]
-      .filter((part): part is string => Boolean(part))
-      .join(', ');
-    let sellerAddress = [
+    ]);
+    let sellerAddress = joinAddressParts([
       invoice.seller_address_line1,
       invoice.seller_address_locality,
       invoice.seller_address_region,
       invoice.seller_address_postal_code,
-    ]
-      .filter((part): part is string => Boolean(part))
-      .join(', ');
-    let pageTitle = isDraft
-      ? 'Invoice draft'
-      : displayStatus === 'overdue'
-        ? 'Overdue invoice'
-        : 'Sent invoice';
+    ]);
+    let pageTitle = isDraft ? 'Invoice draft' : `${statusLabel} invoice`;
 
     return (
       <AppShell
@@ -130,12 +124,12 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
         organizationName={organizationName}
         section="invoices"
         title={pageTitle}
-        description={`${isDraft ? 'Draft' : displayStatus === 'overdue' ? 'Overdue' : 'Sent'} invoice for ${invoice.recipient_legal_name}.`}
+        description={`${isDraft ? 'Draft' : statusLabel} invoice for ${invoice.recipient_legal_name}.`}
       >
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>{pageTitle}</h1>
           <p mix={pageIntroStyle}>
-            Status: {isDraft ? DRAFT_STATUS_LABEL : displayStatus === 'overdue' ? 'Overdue' : 'Sent'}.
+            Status: {isDraft ? DRAFT_STATUS_LABEL : statusLabel}.
             {isDraft
               ? ' Drafts have no final invoice number and can be edited or discarded.'
               : ' Client-facing invoice details are locked after issue.'}

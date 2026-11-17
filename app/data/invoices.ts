@@ -62,6 +62,12 @@ export interface InvoiceListFilter {
 const LIKE_WILDCARDS = /[%_]/;
 
 /**
+ * Status value that can never match a stored invoice status. Raw lifecycle slugs such as `issued`
+ * must not bypass the derived display statuses, so unrecognized filters query against this instead.
+ */
+export const NO_DISPLAY_STATUS = '__no_display_status__';
+
+/**
  * Returns one stable, bounded page from the current Organization's invoice book.
  *
  * SQLite LIKE treats `%` and `_` as wildcards and the data-table driver does not add an ESCAPE
@@ -96,7 +102,7 @@ export async function listInvoices(
       .where(gt(invoices.total_minor, 0));
   } else if (status !== 'all') {
     // Raw lifecycle values such as `issued` are not display statuses and must not bypass derivation.
-    filteredQuery = filteredQuery.where({ status: '__no_display_status__' });
+    filteredQuery = filteredQuery.where({ status: NO_DISPLAY_STATUS });
   }
   if (filter.from && isValidIsoDate(filter.from)) {
     filteredQuery = filteredQuery.where(gte(invoices.invoice_date, filter.from));

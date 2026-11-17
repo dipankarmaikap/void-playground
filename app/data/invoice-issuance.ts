@@ -20,6 +20,8 @@ export function invoiceDisplayStatus(
   today = todayInKolkata(),
 ): InvoiceDisplayStatus {
   if (invoice.status === 'draft') return 'draft';
+  // The balance basis is the full invoice total until payments land in #38; until then an issued
+  // invoice is overdue purely by its due date.
   return invoice.total_minor > 0 && today > invoice.due_date ? 'overdue' : 'sent';
 }
 
@@ -70,7 +72,6 @@ function issueValidationErrors(
   invoice: Invoice,
   lines: readonly InvoiceLine[],
   seller: {
-    legalName: string;
     addressLine1: string | null;
     country: string | null;
     gstRegistered: boolean;
@@ -79,9 +80,6 @@ function issueValidationErrors(
   },
 ): string[] {
   let errors: string[] = [];
-  if (!seller.legalName.trim()) {
-    errors.push('Set the seller legal name in Invoicing settings before issuing this invoice.');
-  }
   if (!seller.addressLine1?.trim()) {
     errors.push('Set business address line 1 in Invoicing settings before issuing this invoice.');
   }
@@ -181,10 +179,11 @@ export async function issueDraftInvoice(
         orderBy: [['position', 'asc']],
       });
 
+      // Spec #30: the seller legal name defaults to the Organization name until it is overridden in
+      // Invoicing settings, so it is never blank here and needs no issue-time validation branch.
       let legalName = profile?.legal_name?.trim() || organization.name.trim();
       let state = findIndiaStateByCode(profile?.gst_state_code ?? '');
       let seller = {
-        legalName,
         addressLine1: profile?.address_line1 ?? null,
         country: profile?.address_country ?? null,
         gstRegistered: profile?.gst_registered ?? false,

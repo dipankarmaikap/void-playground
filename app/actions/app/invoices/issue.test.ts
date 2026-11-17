@@ -32,6 +32,7 @@ import {
   origin,
   submitForm,
 } from '../../../../test/http.ts';
+import { markAsSent } from '../../../../test/invoice-fixtures.ts';
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {
@@ -77,11 +78,6 @@ async function createDraft(
   let location = response.headers.get('Location');
   assert.ok(location, 'creation should redirect to the Draft');
   return new URL(location, origin).pathname.split('/').at(-1)!;
-}
-
-async function markAsSent(cookie: string, invoiceId: string): Promise<Response> {
-  let showPath = routes.app.invoices.show.href({ invoiceId });
-  return submitForm(router, showPath, `${showPath}/issue`, {}, cookie);
 }
 
 function invoiceDirectoryPath(params: Record<string, string>): string {
@@ -160,12 +156,13 @@ describe('invoice issue flow', () => {
     });
     let invoiceId = await createDraft(sessionCookie, client.id);
     let showPath = routes.app.invoices.show.href({ invoiceId });
+    let issueAction = routes.app.invoices.lifecycle.issue.href({ invoiceId });
     let detail = await getHtml(router, showPath, sessionCookie);
 
     assert.match(detail, /Mark as sent/);
-    assert.match(detail, new RegExp(`action="${showPath}/issue"`));
+    assert.match(detail, new RegExp(`action="${issueAction}"`));
 
-    let noCsrf = await router.fetch(new URL(`${showPath}/issue`, origin), {
+    let noCsrf = await router.fetch(new URL(issueAction, origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -175,13 +172,7 @@ describe('invoice issue flow', () => {
     });
     assert.equal(noCsrf.status, 403);
 
-    let response = await submitForm(
-      router,
-      showPath,
-      `${showPath}/issue`,
-      {},
-      sessionCookie,
-    );
+    let response = await submitForm(router, showPath, issueAction, {}, sessionCookie);
     assert.equal(response.status, 400);
     let issueHtml = await response.text();
     assert.match(issueHtml, /Business address line 1/i);
@@ -366,6 +357,28 @@ describe('invoice issue flow', () => {
     assert.match(detail, /Northstar Services Pvt Ltd/);
     assert.doesNotMatch(detail, /Edit draft|Discard draft|Mark as sent/);
     assert.match(detail, /name="internal_note"/);
+  });
+
+  it('defaults the seller legal name to the Organization name until it is overridden', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-issue-default-legal-name',
+    );
+    await setSellerProfile(organizationId);
+    let client = await createClient(organizationId, {
+      type: 'individual',
+      legal_name: `Default Legal Name Client ${crypto.randomUUID()}`,
+      status: 'active',
+    });
+
+    // No Invoicing-settings override: the profile legal name is cleared so issue must fall back to
+    // the Organization name (spec #30).
+    await db.update(organizationInvoicingProfiles, organizationId, { legal_name: null });
+    let invoiceId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
+    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+
+    let issued = await db.find(invoices, invoiceId);
+    assert.equal(issued?.seller_legal_name, `Test Organization ${organizationId}`);
   });
 
   it('derives Sent and Overdue at Kolkata date boundaries and filters/searches issued numbers', async () => {

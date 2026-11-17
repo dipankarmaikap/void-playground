@@ -23,6 +23,7 @@ import {
   origin,
   submitForm,
 } from '../../../../test/http.ts';
+import { markAsSent } from '../../../../test/invoice-fixtures.ts';
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {
@@ -69,11 +70,6 @@ async function createDraft(
   let location = response.headers.get('Location');
   assert.ok(location, 'creation should redirect to the Draft');
   return new URL(location, origin).pathname.split('/').at(-1)!;
-}
-
-async function markAsSent(cookie: string, invoiceId: string): Promise<Response> {
-  let showPath = routes.app.invoices.show.href({ invoiceId });
-  return submitForm(router, showPath, `${showPath}/issue`, {}, cookie);
 }
 
 async function fetchPdf(cookie: string | undefined, invoiceId: string): Promise<Response> {

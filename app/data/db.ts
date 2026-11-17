@@ -1249,6 +1249,11 @@ export async function migrateInvoiceTaxRateConstraints(database: typeof db = db)
   }
 }
 
+// The issue-time snapshot columns and their CHECK constraints are deliberately declared in three
+// places: this list (legacy ALTER TABLE backfills), `invoiceIssueChecks` (the legacy table rebuild
+// inside `migrateInvoiceIssueColumns`), and the fresh-install CREATE TABLE for `invoices` above.
+// The CHECKs encode cross-column lifecycle invariants rather than per-column types, so they cannot
+// be derived from the column list; keep all three declarations in sync when snapshot columns change.
 const invoiceIssueColumns: Array<[string, string]> = [
   ['issued_at', 'INTEGER'],
   ['seller_legal_name', 'TEXT'],
@@ -1316,7 +1321,9 @@ export async function migrateInvoiceIssueColumns(database: typeof db = db): Prom
   );
   let schemaRow = schemaResult.rows?.[0] as { sql?: unknown } | undefined;
   let schemaSql = typeof schemaRow?.sql === 'string' ? schemaRow.sql : '';
-  if (!schemaSql) throw new Error('Unable to read the invoice schema for issue-flow migration.');
+  if (!schemaSql) {
+    throw new Error('Unable to read the invoices table schema for the issue-flow migration.');
+  }
 
   if (!schemaSql.includes("status IN ('draft', 'issued')")) {
     let columnResult = await database.exec('PRAGMA table_info(invoices)');
@@ -1335,7 +1342,9 @@ export async function migrateInvoiceIssueColumns(database: typeof db = db): Prom
       "CHECK (status IN ('draft', 'issued'))",
     );
     if (statusSchema === renamedSchema || statusSchema === schemaSql) {
-      throw new Error('Unable to rebuild the invoice table for issued invoices.');
+      throw new Error(
+        'Unable to rebuild the invoices table for issued invoices: no legacy status CHECK matched.',
+      );
     }
 
     let issueColumnSchema = statusSchema;
@@ -1348,7 +1357,9 @@ export async function migrateInvoiceIssueColumns(database: typeof db = db): Prom
         `$1\n  ${definitions.join(',\n  ')},`,
       );
       if (updatedSchema === issueColumnSchema) {
-        throw new Error('Unable to add issue-time snapshot columns to the invoice table.');
+        throw new Error(
+          'Unable to add the issue-time seller snapshot columns to the invoices table.',
+        );
       }
       issueColumnSchema = updatedSchema;
     }
@@ -1357,7 +1368,7 @@ export async function migrateInvoiceIssueColumns(database: typeof db = db): Prom
       `${invoiceIssueChecks}$1`,
     );
     if (checkedSchema === issueColumnSchema) {
-      throw new Error('Unable to add issue-time invoice constraints.');
+      throw new Error('Unable to add the issue-flow CHECK constraints to the invoices table.');
     }
 
     let oldColumns = existingColumns.map(quoteSqlIdentifier).join(', ');

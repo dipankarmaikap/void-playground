@@ -1193,6 +1193,32 @@ describe('db', () => {
     await legacyDb.close();
   });
 
+  it('names the invoices table when the legacy schema cannot be rebuilt for issue state', async () => {
+    let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
+    await legacyDb.executeScript(`
+      CREATE TABLE organizations (
+        id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE invoices (
+        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, client_id TEXT NOT NULL,
+        status TEXT NOT NULL, updated_at INTEGER NOT NULL
+      );
+    `);
+
+    let rejected = false;
+    let message = '';
+    try {
+      await migrateInvoiceIssueColumns(legacyDb);
+    } catch (error) {
+      rejected = true;
+      message = error instanceof Error ? error.message : '';
+    }
+    assert.equal(rejected, true, 'an unexpected legacy DDL must fail closed');
+    assert.match(message, /invoices table/);
+    await legacyDb.close();
+  });
+
   it('rejects an incompatible old Client schema without serving or erasing it', async () => {
     let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
     await legacyDb.executeScript(`
