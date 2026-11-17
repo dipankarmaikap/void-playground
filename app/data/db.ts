@@ -64,6 +64,19 @@ export const organizationInvoicingProfiles = table({
     gstin: c.text().nullable(),
     gst_state_code: c.text().nullable(),
     gst_state_name: c.text().nullable(),
+    default_currency: c.text().notNull(),
+    payment_term: c.text().notNull(),
+    custom_payment_terms: c.text().nullable(),
+    payment_instructions: c.text().nullable(),
+    customer_notes: c.text().nullable(),
+    invoice_prefix: c.text().notNull(),
+    invoice_starting_number: c.integer().notNull(),
+    credit_note_prefix: c.text().notNull(),
+    credit_note_starting_number: c.integer().notNull(),
+    logo_data_url: c.text().nullable(),
+    signature_data_url: c.text().nullable(),
+    signatory_name: c.text().nullable(),
+    signatory_designation: c.text().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
@@ -230,6 +243,55 @@ CREATE TABLE IF NOT EXISTS organization_invoicing_profiles (
   gstin TEXT,
   gst_state_code TEXT,
   gst_state_name TEXT,
+  default_currency TEXT NOT NULL DEFAULT 'INR'
+    CHECK (default_currency GLOB '[A-Z][A-Z][A-Z]'),
+  payment_term TEXT NOT NULL DEFAULT 'due_on_receipt'
+    CHECK (payment_term IN (
+      'due_on_receipt', 'net_7', 'net_15', 'net_30', 'net_60', 'custom'
+    )),
+  custom_payment_terms TEXT CHECK (
+    custom_payment_terms IS NULL OR length(custom_payment_terms) <= 200
+  ),
+  payment_instructions TEXT CHECK (
+    payment_instructions IS NULL OR length(payment_instructions) <= 1000
+  ),
+  customer_notes TEXT CHECK (
+    customer_notes IS NULL OR length(customer_notes) <= 1000
+  ),
+  invoice_prefix TEXT NOT NULL DEFAULT 'INV' CHECK (
+    length(invoice_prefix) BETWEEN 1 AND 12
+    AND invoice_prefix NOT GLOB '*[/]*'
+    AND invoice_prefix NOT GLOB '*[^A-Z0-9_-]*'
+  ),
+  invoice_starting_number INTEGER NOT NULL DEFAULT 1 CHECK (invoice_starting_number >= 1),
+  credit_note_prefix TEXT NOT NULL DEFAULT 'CN' CHECK (
+    length(credit_note_prefix) BETWEEN 1 AND 12
+    AND credit_note_prefix NOT GLOB '*[/]*'
+    AND credit_note_prefix NOT GLOB '*[^A-Z0-9_-]*'
+  ),
+  credit_note_starting_number INTEGER NOT NULL DEFAULT 1 CHECK (credit_note_starting_number >= 1),
+  logo_data_url TEXT CHECK (
+    logo_data_url IS NULL OR (
+      length(logo_data_url) <= 175000 AND (
+        logo_data_url GLOB 'data:image/png;base64,*'
+        OR logo_data_url GLOB 'data:image/jpeg;base64,*'
+        OR logo_data_url GLOB 'data:image/webp;base64,*'
+      )
+    )
+  ),
+  signature_data_url TEXT CHECK (
+    signature_data_url IS NULL OR (
+      length(signature_data_url) <= 175000 AND (
+        signature_data_url GLOB 'data:image/png;base64,*'
+        OR signature_data_url GLOB 'data:image/jpeg;base64,*'
+        OR signature_data_url GLOB 'data:image/webp;base64,*'
+      )
+    )
+  ),
+  signatory_name TEXT CHECK (signatory_name IS NULL OR length(signatory_name) <= 120),
+  signatory_designation TEXT CHECK (
+    signatory_designation IS NULL OR length(signatory_designation) <= 100
+  ),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CHECK (
@@ -249,6 +311,7 @@ CREATE TABLE IF NOT EXISTS organization_invoicing_profiles (
   CHECK (gst_registered = 1 OR (
     gstin IS NULL AND gst_state_code IS NULL AND gst_state_name IS NULL
   )),
+  CHECK (invoice_prefix <> credit_note_prefix),
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
@@ -367,6 +430,49 @@ const invoicingExtraColumns: Array<[string, string]> = [
   ['gstin', 'TEXT'],
   ['gst_state_code', 'TEXT'],
   ['gst_state_name', 'TEXT'],
+  ['default_currency', "TEXT NOT NULL DEFAULT 'INR' CHECK (default_currency GLOB '[A-Z][A-Z][A-Z]')"],
+  [
+    'payment_term',
+    "TEXT NOT NULL DEFAULT 'due_on_receipt' CHECK (payment_term IN (" +
+      "'due_on_receipt', 'net_7', 'net_15', 'net_30', 'net_60', 'custom'))",
+  ],
+  ['custom_payment_terms', 'TEXT CHECK (custom_payment_terms IS NULL OR length(custom_payment_terms) <= 200)'],
+  ['payment_instructions', 'TEXT CHECK (payment_instructions IS NULL OR length(payment_instructions) <= 1000)'],
+  ['customer_notes', 'TEXT CHECK (customer_notes IS NULL OR length(customer_notes) <= 1000)'],
+  [
+    'invoice_prefix',
+    "TEXT NOT NULL DEFAULT 'INV' CHECK (length(invoice_prefix) BETWEEN 1 AND 12 " +
+      "AND invoice_prefix NOT GLOB '*[/]*' AND invoice_prefix NOT GLOB '*[^A-Z0-9_-]*')",
+  ],
+  ['invoice_starting_number', 'INTEGER NOT NULL DEFAULT 1 CHECK (invoice_starting_number >= 1)'],
+  [
+    'credit_note_prefix',
+    "TEXT NOT NULL DEFAULT 'CN' CHECK (length(credit_note_prefix) BETWEEN 1 AND 12 " +
+      "AND credit_note_prefix NOT GLOB '*[/]*' AND credit_note_prefix NOT GLOB '*[^A-Z0-9_-]*')",
+  ],
+  [
+    'credit_note_starting_number',
+    'INTEGER NOT NULL DEFAULT 1 CHECK (credit_note_starting_number >= 1)',
+  ],
+  [
+    'logo_data_url',
+    "TEXT CHECK (logo_data_url IS NULL OR (length(logo_data_url) <= 175000 AND (" +
+      "logo_data_url GLOB 'data:image/png;base64,*' OR " +
+      "logo_data_url GLOB 'data:image/jpeg;base64,*' OR " +
+      "logo_data_url GLOB 'data:image/webp;base64,*')))",
+  ],
+  [
+    'signature_data_url',
+    "TEXT CHECK (signature_data_url IS NULL OR (length(signature_data_url) <= 175000 AND (" +
+      "signature_data_url GLOB 'data:image/png;base64,*' OR " +
+      "signature_data_url GLOB 'data:image/jpeg;base64,*' OR " +
+      "signature_data_url GLOB 'data:image/webp;base64,*')))",
+  ],
+  ['signatory_name', 'TEXT CHECK (signatory_name IS NULL OR length(signatory_name) <= 120)'],
+  [
+    'signatory_designation',
+    'TEXT CHECK (signatory_designation IS NULL OR length(signatory_designation) <= 100)',
+  ],
 ];
 
 for (let [columnName, sqlType] of invoicingExtraColumns) {

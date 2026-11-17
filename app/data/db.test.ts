@@ -345,6 +345,110 @@ describe('db', () => {
     assert.equal(row.gstin, '27AAPCS2319F1Z5');
   });
 
+  it('defaults invoice preferences per Organization and rejects invalid values at the seam', async () => {
+    let organizationId = await createOrganization('Invoice Defaults Constraint Test');
+    let now = Date.now();
+    await db.create(organizationInvoicingProfiles, {
+      organization_id: organizationId,
+      created_at: now,
+      updated_at: now,
+    });
+    let row = await db.find(organizationInvoicingProfiles, organizationId);
+    assert.ok(row);
+    assert.equal(row.default_currency, 'INR');
+    assert.equal(row.payment_term, 'due_on_receipt');
+    assert.equal(row.invoice_prefix, 'INV');
+    assert.equal(row.invoice_starting_number, 1);
+    assert.equal(row.credit_note_prefix, 'CN');
+    assert.equal(row.credit_note_starting_number, 1);
+    assert.equal(row.logo_data_url, null);
+    assert.equal(row.signature_data_url, null);
+
+    let invalid = [
+      { default_currency: 'IN' },
+      { payment_term: 'net_45' },
+      { payment_instructions: 'I'.repeat(1001) },
+      { customer_notes: 'N'.repeat(1001) },
+      { invoice_prefix: '' },
+      { invoice_prefix: 'IN/V' },
+      { invoice_prefix: 'TOOLONGPREFIX1' },
+      { credit_note_prefix: 'CN/1' },
+      { invoice_starting_number: 0 },
+      { credit_note_starting_number: -3 },
+      { invoice_prefix: 'SAME', credit_note_prefix: 'SAME' },
+    ];
+    for (let values of invalid) {
+      let rejected = false;
+      try {
+        await db.create(organizationInvoicingProfiles, {
+          organization_id: await createOrganization('Rejected Invoice Defaults Test'),
+          ...values,
+          created_at: now,
+          updated_at: now,
+        });
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${JSON.stringify(values)}`);
+    }
+  });
+
+  it('enforces branding image and signatory constraints per Organization', async () => {
+    let organizationId = await createOrganization('Branding Constraint Test');
+    let otherOrganizationId = await createOrganization('Other Branding Constraint Test');
+    let now = Date.now();
+    let validLogo = `data:image/png;base64,${Buffer.from('a small png').toString('base64')}`;
+
+    let invalid = [
+      { logo_data_url: 'data:image/gif;base64,AAAA' },
+      { signature_data_url: 'data:text/html;base64,AAAA' },
+      { logo_data_url: `data:image/png;base64,${'A'.repeat(175000)}` },
+      { signatory_name: 'N'.repeat(121) },
+      { signatory_designation: 'D'.repeat(101) },
+    ];
+    for (let values of invalid) {
+      let rejected = false;
+      try {
+        await db.create(organizationInvoicingProfiles, {
+          organization_id: await createOrganization('Rejected Branding Test'),
+          ...values,
+          created_at: now,
+          updated_at: now,
+        });
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${Object.keys(values)[0]}`);
+    }
+
+    await db.create(organizationInvoicingProfiles, {
+      organization_id: organizationId,
+      logo_data_url: validLogo,
+      signatory_name: 'Jane Doe',
+      signatory_designation: 'Director',
+      invoice_prefix: 'ACME',
+      created_at: now,
+      updated_at: now,
+    });
+    await db.create(organizationInvoicingProfiles, {
+      organization_id: otherOrganizationId,
+      credit_note_prefix: 'REFUND',
+      created_at: now,
+      updated_at: now,
+    });
+
+    let first = await db.find(organizationInvoicingProfiles, organizationId);
+    let second = await db.find(organizationInvoicingProfiles, otherOrganizationId);
+    assert.ok(first);
+    assert.ok(second);
+    assert.equal(first.logo_data_url, validLogo);
+    assert.equal(first.invoice_prefix, 'ACME');
+    assert.equal(first.signatory_name, 'Jane Doe');
+    assert.equal(second.logo_data_url, null);
+    assert.equal(second.invoice_prefix, 'INV', 'the other Organization keeps its own defaults');
+    assert.equal(second.credit_note_prefix, 'REFUND');
+  });
+
   it('enforces Organization ownership and valid rates on GST presets', async () => {
     let organizationId = await createOrganization('Preset Constraint Test');
     let otherOrganizationId = await createOrganization('Other Preset Constraint Test');

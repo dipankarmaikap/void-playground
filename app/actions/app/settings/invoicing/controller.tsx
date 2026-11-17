@@ -115,7 +115,7 @@ export default createController(routes.app.settings.invoicing, {
 
       let submitted = readInvoicingFormValues(context.formData);
       let presets = await ensureGstPresets(organization.id);
-      let parsed = parseInvoicingProfile(submitted);
+      let parsed = parseInvoicingProfile(submitted, view);
 
       if (!parsed.ok) {
         return context.render(

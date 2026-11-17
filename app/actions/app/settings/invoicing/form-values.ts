@@ -1,3 +1,10 @@
+import {
+  DEFAULT_CREDIT_NOTE_PREFIX,
+  DEFAULT_CURRENCY,
+  DEFAULT_INVOICE_PREFIX,
+  DEFAULT_PAYMENT_TERM,
+  DEFAULT_STARTING_NUMBER,
+} from '../../../../data/organization-invoicing.ts';
 import type { InvoicingProfileInput, InvoicingProfileView } from '../../../../data/organization-invoicing.ts';
 
 /** The string values the Invoicing form submits, kept separate from normalized stored values. */
@@ -17,6 +24,21 @@ export function invoicingFormValuesOf(view: InvoicingProfileView): InvoicingForm
     gst_registered: view.gst_registered ? 'on' : '',
     gstin: view.gstin ?? '',
     gst_state_code: view.gst_state_code ?? '',
+    default_currency: view.default_currency,
+    payment_term: view.payment_term,
+    custom_payment_terms: view.custom_payment_terms ?? '',
+    payment_instructions: view.payment_instructions ?? '',
+    customer_notes: view.customer_notes ?? '',
+    invoice_prefix: view.invoice_prefix,
+    invoice_starting_number: String(view.invoice_starting_number),
+    credit_note_prefix: view.credit_note_prefix,
+    credit_note_starting_number: String(view.credit_note_starting_number),
+    logo: '',
+    remove_logo: '',
+    signature_image: '',
+    remove_signature_image: '',
+    signatory_name: view.signatory_name ?? '',
+    signatory_designation: view.signatory_designation ?? '',
   };
 }
 
@@ -35,10 +57,38 @@ export function readInvoicingFormValues(formData: FormData): InvoicingFormValues
     gst_registered: readText(formData, 'gst_registered'),
     gstin: readText(formData, 'gstin'),
     gst_state_code: readText(formData, 'gst_state_code'),
+    default_currency: readText(formData, 'default_currency', DEFAULT_CURRENCY),
+    payment_term: readText(formData, 'payment_term', DEFAULT_PAYMENT_TERM),
+    custom_payment_terms: readText(formData, 'custom_payment_terms'),
+    payment_instructions: readText(formData, 'payment_instructions'),
+    customer_notes: readText(formData, 'customer_notes'),
+    invoice_prefix: readText(formData, 'invoice_prefix', DEFAULT_INVOICE_PREFIX),
+    invoice_starting_number: readText(
+      formData,
+      'invoice_starting_number',
+      String(DEFAULT_STARTING_NUMBER),
+    ),
+    credit_note_prefix: readText(formData, 'credit_note_prefix', DEFAULT_CREDIT_NOTE_PREFIX),
+    credit_note_starting_number: readText(
+      formData,
+      'credit_note_starting_number',
+      String(DEFAULT_STARTING_NUMBER),
+    ),
+    logo: readText(formData, 'logo'),
+    remove_logo: readText(formData, 'remove_logo'),
+    signature_image: readText(formData, 'signature_image'),
+    remove_signature_image: readText(formData, 'remove_signature_image'),
+    signatory_name: readText(formData, 'signatory_name'),
+    signatory_designation: readText(formData, 'signatory_designation'),
   };
 }
 
-function readText(formData: FormData, name: string): string {
+/**
+ * Reads a submitted control. Older callers that omit a newly introduced control entirely get the
+ * documented default; a control that is present but blank is left blank so validation can reject it.
+ */
+function readText(formData: FormData, name: string, fallback = ''): string {
+  if (!formData.has(name)) return fallback;
   let value = formData.get(name);
-  return typeof value === 'string' ? value : '';
+  return typeof value === 'string' ? value : fallback;
 }
