@@ -141,6 +141,15 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
               : ' Client-facing invoice details are locked after issue.'}
           </p>
         </header>
+        <div mix={actionsStyle}>
+          <a
+            href={routes.app.invoices.pdf.href({ invoiceId: invoice.id })}
+            download
+            mix={linkButtonStyle}
+          >
+            Download PDF
+          </a>
+        </div>
         {message ? (
           <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
             {message}

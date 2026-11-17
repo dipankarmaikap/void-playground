@@ -7,6 +7,7 @@ import {
   db,
   documentSequences,
   invoiceLines,
+  invoicePdfArtifacts,
   invoices,
   organizationGstRatePresets,
   organizationInvoicingProfiles,
@@ -938,6 +939,100 @@ describe('db', () => {
       missingOrganizationRejected = true;
     }
     assert.equal(missingOrganizationRejected, true, 'sequences require an existing Organization');
+  });
+
+  it('keeps issued PDF artifacts bound to one invoice inside the same Organization', async () => {
+    let organizationId = await createOrganization('Invoice Pdf Artifact Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Pdf Artifact Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let now = Date.now();
+    let issuedInvoice = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      status: 'issued',
+      invoice_number: 'AA/26-27/0001',
+      issued_at: now,
+      seller_legal_name: 'Constraint Seller',
+      seller_address_line1: '1 Seller Road',
+      seller_country: 'IN',
+    });
+    await db.create(invoices, issuedInvoice);
+    let otherIssuedInvoice = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+      status: 'issued',
+      invoice_number: 'AA/26-27/0001',
+      issued_at: now,
+      seller_legal_name: 'Other Seller',
+      seller_address_line1: '2 Other Road',
+      seller_country: 'IN',
+    });
+    await db.create(invoices, otherIssuedInvoice);
+
+    let artifact = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: issuedInvoice.id,
+      data: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    await db.create(invoicePdfArtifacts, artifact());
+    let stored = await db.findOne(invoicePdfArtifacts, {
+      where: { organization_id: organizationId, invoice_id: issuedInvoice.id },
+    });
+    assert.ok(stored);
+    assert.deepEqual(
+      Array.from(stored.data as Uint8Array),
+      [0x25, 0x50, 0x44, 0x46, 0x2d],
+      'artifact bytes round-trip exactly',
+    );
+
+    let duplicateArtifactRejected = false;
+    try {
+      await db.create(invoicePdfArtifacts, artifact({ id: crypto.randomUUID() }));
+    } catch {
+      duplicateArtifactRejected = true;
+    }
+    assert.equal(duplicateArtifactRejected, true, 'one invoice has exactly one stored PDF');
+
+    let foreignArtifactRejected = false;
+    try {
+      await db.create(
+        invoicePdfArtifacts,
+        artifact({ id: crypto.randomUUID(), organization_id: otherOrganizationId }),
+      );
+    } catch {
+      foreignArtifactRejected = true;
+    }
+    assert.equal(
+      foreignArtifactRejected,
+      true,
+      'an artifact cannot claim an invoice owned by another Organization',
+    );
+
+    let missingArtifactDataRejected = false;
+    try {
+      await db.create(
+        invoicePdfArtifacts,
+        artifact({ id: crypto.randomUUID(), data: new Uint8Array() }),
+      );
+    } catch {
+      missingArtifactDataRejected = true;
+    }
+    assert.equal(missingArtifactDataRejected, true, 'an artifact must carry PDF bytes');
+
+    await db.delete(invoices, otherIssuedInvoice.id);
+    await db.delete(invoices, issuedInvoice.id);
+    assert.equal(
+      await db.count(invoicePdfArtifacts, {
+        where: { invoice_id: issuedInvoice.id },
+      }),
+      0,
+      'deleting an invoice cascades to its stored PDF artifact',
+    );
   });
 
   it('backfills net amounts when upgrading an existing #42 invoice schema', async () => {

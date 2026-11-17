@@ -281,6 +281,24 @@ export const documentSequences = table({
   primaryKey: 'id',
 });
 
+/**
+ * The immutable issued-PDF artifact stored for exactly one issued invoice. The composite foreign
+ * key and the `(organization_id, invoice_id)` unique constraint keep every artifact bound to a
+ * single invoice inside the same Organization.
+ */
+export const invoicePdfArtifacts = table({
+  name: 'invoice_pdf_artifacts',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    invoice_id: c.text().notNull(),
+    data: c.binary().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
 /** A free-form service line belonging to one invoice in the same Organization. */
 export const invoiceLines = table({
   name: 'invoice_lines',
@@ -771,6 +789,18 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
+
+CREATE TABLE IF NOT EXISTS invoice_pdf_artifacts (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  invoice_id TEXT NOT NULL,
+  data BLOB NOT NULL CHECK (length(data) > 0),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id, invoice_id) REFERENCES invoices(organization_id, id)
+    ON DELETE CASCADE,
+  UNIQUE (organization_id, invoice_id)
+);
 `);
 
 /**
@@ -1493,3 +1523,4 @@ export type SessionRow = TableRow<typeof sessions>;
 export type Client = TableRow<typeof clients>;
 export type Invoice = TableRow<typeof invoices>;
 export type InvoiceLine = TableRow<typeof invoiceLines>;
+export type InvoicePdfArtifact = TableRow<typeof invoicePdfArtifacts>;

@@ -8,6 +8,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { findClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
 import { issueDraftInvoice } from '../../../../data/invoice-issuance.ts';
+import { storeIssuedInvoicePdf } from '../../../../data/invoice-pdf-artifacts.ts';
 import {
   discardDraftInvoice,
   findInvoice,
@@ -29,7 +30,11 @@ export default createController(routes.app.invoices.lifecycle, {
   actions: {
     async issue(context) {
       let organization = context.get(CurrentOrganization);
-      let result = await issueDraftInvoice(organization.id, context.params.invoiceId);
+      let result = await issueDraftInvoice(
+        organization.id,
+        context.params.invoiceId,
+        storeIssuedInvoicePdf,
+      );
       if (!result.ok && result.kind === 'not_found') {
         return new Response('Invoice not found', { status: 404 });
       }
