@@ -12,12 +12,14 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import {
   db,
   organizationMemberships,
+  organizationGstRatePresets,
   organizations,
   users,
   userPasswords,
 } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { parseDisplayName } from '../../../data/display-name.ts';
+import { defaultGstPresetRows } from '../../../data/organization-gst-presets.ts';
 import { hashPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';
@@ -130,6 +132,9 @@ export default createController(routes.auth.register, {
             is_owner: true,
             created_at: now,
           });
+          for (let preset of defaultGstPresetRows(organizationId, now)) {
+            await tx.create(organizationGstRatePresets, preset);
+          }
         });
       } catch (error) {
         if (isDuplicateEmailViolation(error)) {

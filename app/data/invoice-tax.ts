@@ -7,6 +7,24 @@ export interface GroupedInvoiceTax {
   formattedAmount: string;
 }
 
+/** Formats persisted CGST, SGST, and IGST amounts consistently across Draft views. */
+export function invoiceLineGstComponents(
+  line: InvoiceLine,
+  currency: string,
+): string[] {
+  return [
+    line.cgst_rate != null
+      ? `CGST @ ${line.cgst_rate}%: ${formatMoney(BigInt(line.cgst_amount_minor), currency)}`
+      : null,
+    line.sgst_rate != null
+      ? `SGST @ ${line.sgst_rate}%: ${formatMoney(BigInt(line.sgst_amount_minor), currency)}`
+      : null,
+    line.igst_rate != null
+      ? `IGST @ ${line.igst_rate}%: ${formatMoney(BigInt(line.igst_amount_minor), currency)}`
+      : null,
+  ].filter((value): value is string => value != null);
+}
+
 /** Groups persisted line tax amounts by component and selected rate for Draft summaries. */
 export function groupedInvoiceTaxes(
   lines: readonly InvoiceLine[],

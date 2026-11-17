@@ -4,6 +4,16 @@ import type { OrganizationGstRatePreset } from './db.ts';
 /** Standard Indian service-tax slabs every Organization starts with, editable per Organization. */
 export const GST_RATE_SEED = ['0', '5', '12', '18', '28'] as const;
 
+export function defaultGstPresetRows(organizationId: string, now = Date.now()) {
+  return GST_RATE_SEED.map((rate) => ({
+    id: crypto.randomUUID(),
+    organization_id: organizationId,
+    rate,
+    created_at: now,
+    updated_at: now,
+  }));
+}
+
 export interface PresetRateResult {
   ok: boolean;
   value?: string;
@@ -32,23 +42,16 @@ export function parseGstRate(raw: string): PresetRateResult {
   return { ok: true, value: String(numeric) };
 }
 
-/** Reads the Organization's presets; an Organization with none is lazily seeded. */
+/** Ensures an Organization has its default presets. Call only from a mutation or initialization. */
 export async function ensureGstPresets(
   organizationId: string,
 ): Promise<OrganizationGstRatePreset[]> {
   let existing = await findGstPresets(organizationId);
   if (existing.length > 0) return existing;
 
-  let now = Date.now();
   await db.transaction(async (tx) => {
-    for (let rate of GST_RATE_SEED) {
-      await tx.create(organizationGstRatePresets, {
-        id: crypto.randomUUID(),
-        organization_id: organizationId,
-        rate,
-        created_at: now,
-        updated_at: now,
-      });
+    for (let preset of defaultGstPresetRows(organizationId)) {
+      await tx.create(organizationGstRatePresets, preset);
     }
   });
   return findGstPresets(organizationId);

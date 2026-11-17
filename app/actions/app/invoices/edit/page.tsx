@@ -6,7 +6,10 @@ import { clientDisplayLabel } from '../../../../data/client-names.ts';
 import type { Client, Invoice, InvoiceLine } from '../../../../data/db.ts';
 import { formatMoney } from '../../../../data/invoice-calculation.ts';
 import { countryName } from '../../../../data/client-billing.ts';
-import { groupedInvoiceTaxes } from '../../../../data/invoice-tax.ts';
+import {
+  groupedInvoiceTaxes,
+  invoiceLineGstComponents,
+} from '../../../../data/invoice-tax.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
@@ -84,17 +87,7 @@ export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
                 ) : null}
                 <ul>
                   {lines.map((line) => {
-                    let components = [
-                      line.cgst_rate != null
-                        ? `CGST @ ${line.cgst_rate}%: ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
-                        : null,
-                      line.sgst_rate != null
-                        ? `SGST @ ${line.sgst_rate}%: ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
-                        : null,
-                      line.igst_rate != null
-                        ? `IGST @ ${line.igst_rate}%: ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
-                        : null,
-                    ].filter((value): value is string => value != null);
+                    let components = invoiceLineGstComponents(line, invoice.currency);
                     return (
                       <li key={line.id}>
                         {line.description}: {line.tax_treatment?.replace('_', '-') ?? '—'}

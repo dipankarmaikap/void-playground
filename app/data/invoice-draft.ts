@@ -416,15 +416,18 @@ export function parseInvoiceDraft(
         parsedTreatment = treatment as NonNullable<InvoiceLineChanges['tax_treatment']>;
       }
       if (treatment === 'taxable') {
-        let rateScaled = parseScaledDecimal(line.gst_rate.trim());
-        let isPreset = taxConfig.gstRatePresets.some((presetRate) => {
-          let presetScaled = parseScaledDecimal(presetRate);
-          return presetScaled != null && presetScaled === rateScaled;
-        });
-        if (rateScaled == null || rateScaled > PERCENT_MAX_SCALED || !isPreset) {
-          lineIssue('gst_rate', 'Choose a GST rate preset configured for your Organization.');
-        } else {
-          parsedRate = formatScaledDecimal(rateScaled);
+        let rateInput = line.gst_rate.trim();
+        if (supplyType !== 'export_lut' || rateInput) {
+          let rateScaled = parseScaledDecimal(rateInput);
+          let isPreset = taxConfig.gstRatePresets.some((presetRate) => {
+            let presetScaled = parseScaledDecimal(presetRate);
+            return presetScaled != null && presetScaled === rateScaled;
+          });
+          if (rateScaled == null || rateScaled > PERCENT_MAX_SCALED || !isPreset) {
+            lineIssue('gst_rate', 'Choose a GST rate preset configured for your Organization.');
+          } else {
+            parsedRate = formatScaledDecimal(rateScaled);
+          }
         }
       }
     } else {

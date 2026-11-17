@@ -8,6 +8,7 @@ export interface FieldProps {
   hint?: string;
   children: RemixNode;
   error?: string;
+  errorId?: string;
 }
 
 const fieldStyle = css({
@@ -34,14 +35,18 @@ const errorStyle = css({
 
 export function Field(handle: Handle<FieldProps>) {
   return () => {
-    let { label, hint, children, error } = handle.props;
+    let { label, hint, children, error, errorId } = handle.props;
 
     return (
       <label mix={fieldStyle}>
         {label}
         {children}
         {hint ? <span mix={hintStyle}>{hint}</span> : null}
-        {error ? <span mix={errorStyle}>{error}</span> : null}
+        {error ? (
+          <span id={errorId} mix={errorStyle}>
+            {error}
+          </span>
+        ) : null}
       </label>
     );
   };

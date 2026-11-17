@@ -9,7 +9,7 @@ import { findClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../../data/invoice-draft.ts';
 import { findInvoice, findInvoiceLines, updateDraftInvoice } from '../../../../data/invoices.ts';
-import { ensureGstPresets } from '../../../../data/organization-gst-presets.ts';
+import { ensureGstPresets, findGstPresets } from '../../../../data/organization-gst-presets.ts';
 import { getInvoicingProfileView } from '../../../../data/organization-invoicing.ts';
 import {
   CurrentOrganization,
@@ -38,7 +38,7 @@ export default createController(routes.app.invoices.edit, {
       ]);
       let profile = await getInvoicingProfileView(organization);
       let gstRatePresets = profile.gst_registered
-        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
         : [];
       return context.render(
         <EditInvoicePage

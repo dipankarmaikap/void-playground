@@ -645,19 +645,23 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
     tax_treatment IN ('taxable', 'nil_rated', 'exempt', 'non_gst')
   ),
   gst_rate TEXT CHECK (
-    gst_rate IS NULL OR (length(gst_rate) > 0 AND gst_rate NOT GLOB '*[^0-9.]*'
+    gst_rate IS NULL OR (length(gst_rate) > 0 AND gst_rate GLOB '*[0-9]*'
+      AND gst_rate NOT GLOB '*[^0-9.]*'
       AND gst_rate NOT LIKE '%.%.%' AND CAST(gst_rate AS REAL) BETWEEN 0 AND 100)
   ),
   cgst_rate TEXT CHECK (cgst_rate IS NULL OR (
-    length(cgst_rate) > 0 AND cgst_rate NOT GLOB '*[^0-9.]*'
+    length(cgst_rate) > 0 AND cgst_rate GLOB '*[0-9]*'
+    AND cgst_rate NOT GLOB '*[^0-9.]*'
     AND cgst_rate NOT LIKE '%.%.%' AND CAST(cgst_rate AS REAL) BETWEEN 0 AND 100
   )),
   sgst_rate TEXT CHECK (sgst_rate IS NULL OR (
-    length(sgst_rate) > 0 AND sgst_rate NOT GLOB '*[^0-9.]*'
+    length(sgst_rate) > 0 AND sgst_rate GLOB '*[0-9]*'
+    AND sgst_rate NOT GLOB '*[^0-9.]*'
     AND sgst_rate NOT LIKE '%.%.%' AND CAST(sgst_rate AS REAL) BETWEEN 0 AND 100
   )),
   igst_rate TEXT CHECK (igst_rate IS NULL OR (
-    length(igst_rate) > 0 AND igst_rate NOT GLOB '*[^0-9.]*'
+    length(igst_rate) > 0 AND igst_rate GLOB '*[0-9]*'
+    AND igst_rate NOT GLOB '*[^0-9.]*'
     AND igst_rate NOT LIKE '%.%.%' AND CAST(igst_rate AS REAL) BETWEEN 0 AND 100
   )),
   cgst_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (cgst_amount_minor >= 0),
@@ -669,7 +673,8 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
   foreign_tax_mode TEXT CHECK (foreign_tax_mode IN ('percent', 'fixed')),
   foreign_tax_rate TEXT CHECK (
     foreign_tax_rate IS NULL OR (
-      length(foreign_tax_rate) > 0 AND foreign_tax_rate NOT GLOB '*[^0-9.]*'
+      length(foreign_tax_rate) > 0 AND foreign_tax_rate GLOB '*[0-9]*'
+      AND foreign_tax_rate NOT GLOB '*[^0-9.]*'
       AND foreign_tax_rate NOT LIKE '%.%.%'
       AND CAST(foreign_tax_rate AS REAL) BETWEEN 0 AND 100
     )
@@ -881,22 +886,26 @@ export async function migrateInvoiceTaxColumns(database: typeof db = db): Promis
     ['tax_treatment', "TEXT CHECK (tax_treatment IN ('taxable', 'nil_rated', 'exempt', 'non_gst'))"],
     [
       'gst_rate',
-      "TEXT CHECK (gst_rate IS NULL OR (length(gst_rate) > 0 AND gst_rate NOT GLOB '*[^0-9.]*' " +
+      "TEXT CHECK (gst_rate IS NULL OR (length(gst_rate) > 0 AND gst_rate GLOB '*[0-9]*' " +
+        "AND gst_rate NOT GLOB '*[^0-9.]*' " +
         "AND gst_rate NOT LIKE '%.%.%' AND CAST(gst_rate AS REAL) BETWEEN 0 AND 100))",
     ],
     [
       'cgst_rate',
-      "TEXT CHECK (cgst_rate IS NULL OR (length(cgst_rate) > 0 AND cgst_rate NOT GLOB '*[^0-9.]*' " +
+      "TEXT CHECK (cgst_rate IS NULL OR (length(cgst_rate) > 0 AND cgst_rate GLOB '*[0-9]*' " +
+        "AND cgst_rate NOT GLOB '*[^0-9.]*' " +
         "AND cgst_rate NOT LIKE '%.%.%' AND CAST(cgst_rate AS REAL) BETWEEN 0 AND 100))",
     ],
     [
       'sgst_rate',
-      "TEXT CHECK (sgst_rate IS NULL OR (length(sgst_rate) > 0 AND sgst_rate NOT GLOB '*[^0-9.]*' " +
+      "TEXT CHECK (sgst_rate IS NULL OR (length(sgst_rate) > 0 AND sgst_rate GLOB '*[0-9]*' " +
+        "AND sgst_rate NOT GLOB '*[^0-9.]*' " +
         "AND sgst_rate NOT LIKE '%.%.%' AND CAST(sgst_rate AS REAL) BETWEEN 0 AND 100))",
     ],
     [
       'igst_rate',
-      "TEXT CHECK (igst_rate IS NULL OR (length(igst_rate) > 0 AND igst_rate NOT GLOB '*[^0-9.]*' " +
+      "TEXT CHECK (igst_rate IS NULL OR (length(igst_rate) > 0 AND igst_rate GLOB '*[0-9]*' " +
+        "AND igst_rate NOT GLOB '*[^0-9.]*' " +
         "AND igst_rate NOT LIKE '%.%.%' AND CAST(igst_rate AS REAL) BETWEEN 0 AND 100))",
     ],
     ['cgst_amount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (cgst_amount_minor >= 0)'],
@@ -1054,7 +1063,8 @@ export async function migrateInvoiceExtendedTaxColumns(database: typeof db = db)
     [
       'foreign_tax_rate',
       "TEXT CHECK (foreign_tax_rate IS NULL OR (length(foreign_tax_rate) > 0 " +
-        "AND foreign_tax_rate NOT GLOB '*[^0-9.]*' AND foreign_tax_rate NOT LIKE '%.%.%' " +
+        "AND foreign_tax_rate GLOB '*[0-9]*' AND foreign_tax_rate NOT GLOB '*[^0-9.]*' " +
+        "AND foreign_tax_rate NOT LIKE '%.%.%' " +
         'AND CAST(foreign_tax_rate AS REAL) BETWEEN 0 AND 100))',
     ],
     ['foreign_tax_amount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (foreign_tax_amount_minor >= 0)'],
@@ -1066,7 +1076,71 @@ export async function migrateInvoiceExtendedTaxColumns(database: typeof db = db)
   }
 }
 
+/**
+ * Tightens the existing invoice-line rate CHECK constraints without discarding saved data. A lone
+ * decimal point was previously accepted and SQLite interpreted it as numeric zero; canonicalize
+ * only that malformed representation before copying so its prior numeric meaning is preserved.
+ */
+export async function migrateInvoiceTaxRateConstraints(database: typeof db = db): Promise<void> {
+  let result = await database.exec(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'invoice_lines'",
+  );
+  let row = result.rows?.[0] as { sql?: unknown } | undefined;
+  let schemaSql = typeof row?.sql === 'string' ? row.sql : '';
+  let rateColumns = ['gst_rate', 'cgst_rate', 'sgst_rate', 'igst_rate', 'foreign_tax_rate'];
+  if (rateColumns.every((column) => schemaSql.includes(`${column} GLOB '*[0-9]*'`))) return;
+
+  let strengthenedSchema = schemaSql.replace(
+    /^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["'`]?invoice_lines["'`]?\s*\(/i,
+    'CREATE TABLE invoice_lines_with_valid_tax_rates (',
+  );
+  if (strengthenedSchema === schemaSql) {
+    throw new Error('Unable to rebuild the invoice_lines table for tax-rate constraint migration.');
+  }
+  for (let column of rateColumns) {
+    if (strengthenedSchema.includes(`${column} GLOB '*[0-9]*'`)) continue;
+    let checkPattern = new RegExp(
+      `(length\\(${column}\\)\\s*>\\s*0\\s+AND\\s+)(${column}\\s+NOT\\s+GLOB)`,
+      'i',
+    );
+    let updatedSchema = strengthenedSchema.replace(
+      checkPattern,
+      `$1${column} GLOB '*[0-9]*' AND $2`,
+    );
+    if (updatedSchema === strengthenedSchema) {
+      throw new Error(`Unable to strengthen the ${column} CHECK constraint.`);
+    }
+    strengthenedSchema = updatedSchema;
+  }
+
+  await database.executeScript('BEGIN IMMEDIATE;');
+  try {
+    await database.executeScript(strengthenedSchema);
+    await database.executeScript(`
+      UPDATE invoice_lines
+      SET gst_rate = CASE WHEN gst_rate = '.' THEN '0' ELSE gst_rate END,
+          cgst_rate = CASE WHEN cgst_rate = '.' THEN '0' ELSE cgst_rate END,
+          sgst_rate = CASE WHEN sgst_rate = '.' THEN '0' ELSE sgst_rate END,
+          igst_rate = CASE WHEN igst_rate = '.' THEN '0' ELSE igst_rate END,
+          foreign_tax_rate = CASE
+            WHEN foreign_tax_rate = '.' THEN '0'
+            ELSE foreign_tax_rate
+          END;
+      INSERT INTO invoice_lines_with_valid_tax_rates
+        SELECT * FROM invoice_lines;
+      DROP TABLE invoice_lines;
+      ALTER TABLE invoice_lines_with_valid_tax_rates RENAME TO invoice_lines;
+      CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
+    `);
+    await database.executeScript('COMMIT;');
+  } catch (error) {
+    await database.executeScript('ROLLBACK;');
+    throw error;
+  }
+}
+
 await migrateInvoiceExtendedTaxColumns();
+await migrateInvoiceTaxRateConstraints();
 
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');

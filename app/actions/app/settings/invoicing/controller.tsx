@@ -9,6 +9,7 @@ import type { User } from '../../../../data/db.ts';
 import {
   addGstPreset,
   ensureGstPresets,
+  findGstPresets,
   removeGstPreset,
   updateGstPreset,
 } from '../../../../data/organization-gst-presets.ts';
@@ -40,7 +41,7 @@ export default createController(routes.app.settings.invoicing, {
       let organization = context.get(CurrentOrganization);
       let [view, presets] = await Promise.all([
         getInvoicingProfileView(organization),
-        ensureGstPresets(organization.id),
+        findGstPresets(organization.id),
       ]);
       let message = context.session.get('message');
 
@@ -85,6 +86,7 @@ export default createController(routes.app.settings.invoicing, {
         if (result.notFound) return new Response('GST rate preset not found', { status: 404 });
 
         if (result.ok) {
+          if (form === 'preset_remove') await ensureGstPresets(organization.id);
           context.session.flash(
             'message',
             form === 'preset_add'

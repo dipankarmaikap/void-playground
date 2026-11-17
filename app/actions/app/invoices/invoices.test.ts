@@ -2,6 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
+import { db, organizationGstRatePresets } from '../../../data/db.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
@@ -176,6 +177,46 @@ describe('draft invoices', () => {
     assert.match(html, /<a[^>]*href="\/app\/invoices"[^>]*aria-current="page"/);
   });
 
+  it('keeps invoice form GET requests read-only for GST presets', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-get-read-only',
+    );
+    await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+    });
+    let client = await makeClient(organizationId);
+    let created = await createDraft(sessionCookie, client.id);
+    assert.equal(created.status, 302);
+
+    let presets = await db.findMany(organizationGstRatePresets, {
+      where: { organization_id: organizationId },
+    });
+    for (let preset of presets) await db.delete(organizationGstRatePresets, preset.id);
+
+    for (let path of [
+      newDraftPath(client.id),
+      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(created) }),
+    ]) {
+      let response = await router.fetch(new URL(path, origin), {
+        headers: { Cookie: sessionCookie },
+      });
+      assert.equal(response.status, 200);
+      await response.text();
+      assert.equal(
+        await db.count(organizationGstRatePresets, {
+          where: { organization_id: organizationId },
+        }),
+        0,
+        `${path} must not seed GST presets while rendering`,
+      );
+    }
+  });
+
   it('redirects anonymous visitors from the invoice directory to login', async () => {
     let response = await router.fetch(new URL(routes.app.invoices.index.href(), origin));
     assert.equal(response.status, 302);
@@ -312,8 +353,16 @@ describe('draft invoices', () => {
     assert.match(detail, /CGST @ 9%/);
     assert.match(detail, /SGST @ 9%/);
     assert.match(detail, /12\.15 INR/);
+    let lineTable = detail.slice(detail.indexOf('<tbody>'), detail.indexOf('</tbody>'));
+    assert.match(lineTable, /CGST @ 9%: 12\.15 INR/);
     assert.match(detail, /Total tax: 24\.30 INR/);
     assert.match(detail, /Total: 159\.30 INR/);
+    let edit = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(edit, /CGST @ 9%: 12\.15 INR/);
   });
 
   it('gates GST for unregistered Organizations and allows no-tax Drafts', async () => {
@@ -1360,7 +1409,10 @@ describe('draft invoices', () => {
 
     assert.equal(rejected.status, 400);
     let html = await rejected.text();
-    assert.match(html, /role="alert"[^>]*>Please correct the fields below\.</);
+    assert.match(
+      html,
+      /id="invoice-error-summary"[^>]*tabindex="-1"[^>]*autofocus/,
+    );
     assert.match(html, /Enter a service description/);
     assert.match(html, /<option value="percent" selected>Percentage<\/option>/);
     assert.match(html, /name="line_discount_value"[^>]*value="12\.5"/);
@@ -1815,7 +1867,7 @@ describe('draft invoices', () => {
       place_of_supply_country: 'US',
       export_reference: 'LUT/2026-27/001',
       line_tax_treatment: ['taxable'],
-      line_gst_rate: ['18'],
+      line_gst_rate: [''],
     });
     assert.equal(lut.status, 302);
     let lutDetail = await getHtml(
@@ -1990,7 +2042,21 @@ describe('draft invoices', () => {
       line_foreign_tax_value: ['5'],
     });
     assert.equal(manualWithoutLabel.status, 400);
-    assert.match(await manualWithoutLabel.text(), /Enter a label for the manual foreign tax/i);
+    let manualTaxErrors = await manualWithoutLabel.text();
+    assert.match(manualTaxErrors, /Enter a label for the manual foreign tax/i);
+    assert.match(
+      manualTaxErrors,
+      /name="line_foreign_tax_label"[^>]*aria-invalid="true"[^>]*aria-describedby="line-0-foreign-tax-label-error"/,
+    );
+    assert.match(
+      manualTaxErrors,
+      /id="line-0-foreign-tax-label-error"[^>]*>Enter a label for the manual foreign tax\./,
+    );
+    assert.match(
+      manualTaxErrors,
+      /id="invoice-error-summary"[^>]*tabindex="-1"[^>]*autofocus/,
+    );
+    assert.match(manualTaxErrors, /<h2[^>]*>Please correct the fields below\.<\/h2>/);
   });
 
   it('calculates manual percentage tax on the post-discount line value', async () => {

@@ -97,6 +97,30 @@ describe('organization GST rate presets', () => {
     assert.deepEqual(await presetsFor(organizationId), ['0', '18', '28', '6'].sort());
   });
 
+  it('restores the standard presets when the last custom preset is removed', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'preset-remove-last',
+    );
+    let rows = await db.findMany(organizationGstRatePresets, {
+      where: { organization_id: organizationId },
+    });
+    for (let preset of rows) {
+      let removed = await postForm(
+        router,
+        routes.app.settings.invoicing.action.href(),
+        { _form: 'preset_remove', preset_id: preset.id },
+        sessionCookie,
+      );
+      assert.equal(removed.status, 302);
+    }
+    assert.deepEqual(
+      await presetsFor(organizationId),
+      SEED_RATES,
+      'default presets are restored in the removal mutation rather than a later GET',
+    );
+  });
+
   it('rejects invalid or duplicate rates with accessible 400s that preserve the draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,

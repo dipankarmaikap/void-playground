@@ -18,6 +18,7 @@ import {
   migrateInvoiceDiscountColumns,
   migrateInvoiceExtendedTaxColumns,
   migrateInvoiceTaxColumns,
+  migrateInvoiceTaxRateConstraints,
 } from './db.ts';
 
 async function createUser(): Promise<string> {
@@ -813,6 +814,11 @@ describe('db', () => {
     await lineRejects({ tax_treatment: 'manual_foreign' });
     await lineRejects({ cgst_amount_minor: -1 });
     await lineRejects({ igst_amount_minor: -1 });
+    await lineRejects({ gst_rate: '.' });
+    await lineRejects({ cgst_rate: '.' });
+    await lineRejects({ sgst_rate: '.' });
+    await lineRejects({ igst_rate: '.' });
+    await lineRejects({ foreign_tax_rate: '.' });
 
     let validLine = line({
       discount_mode: 'percent',
@@ -928,6 +934,53 @@ describe('db', () => {
       rejectedInvalidManualRate = true;
     }
     assert.equal(rejectedInvalidManualRate, true, 'the migrated schema rejects malformed tax rates');
+
+    let lineSchemaResult = await legacyDb.exec(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'invoice_lines'",
+    );
+    let lineSchema = (lineSchemaResult.rows?.[0] as { sql?: string } | undefined)?.sql;
+    assert.ok(lineSchema, 'the invoice line schema should exist');
+    let weakLineSchema = lineSchema.replace(
+      /^CREATE TABLE\s+invoice_lines\b/i,
+      'CREATE TABLE invoice_lines_with_weak_tax_rates',
+    );
+    for (let column of ['gst_rate', 'cgst_rate', 'sgst_rate', 'igst_rate', 'foreign_tax_rate']) {
+      weakLineSchema = weakLineSchema.replace(`${column} GLOB '*[0-9]*' AND `, '');
+    }
+    await legacyDb.executeScript(`
+      ${weakLineSchema};
+      INSERT INTO invoice_lines_with_weak_tax_rates SELECT * FROM invoice_lines;
+      DROP TABLE invoice_lines;
+      ALTER TABLE invoice_lines_with_weak_tax_rates RENAME TO invoice_lines;
+      CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
+    `);
+    await legacyDb.executeScript(`
+      UPDATE invoice_lines
+      SET gst_rate = '18', cgst_rate = '9', sgst_rate = '9', igst_rate = '0',
+          foreign_tax_rate = '.'
+      WHERE id = '${lineId}';
+    `);
+    await migrateInvoiceTaxRateConstraints(legacyDb);
+    let migratedLine = await legacyDb.find(invoiceLines, lineId);
+    assert.equal(migratedLine?.gst_rate, '18');
+    assert.equal(migratedLine?.cgst_rate, '9');
+    assert.equal(migratedLine?.sgst_rate, '9');
+    assert.equal(migratedLine?.igst_rate, '0');
+    assert.equal(migratedLine?.foreign_tax_rate, '0');
+    assert.equal(migratedLine?.amount_minor, 15000, 'migration preserves existing amounts');
+    assert.equal(migratedLine?.net_minor, 15000, 'migration preserves existing net values');
+
+    for (let column of ['gst_rate', 'cgst_rate', 'sgst_rate', 'igst_rate', 'foreign_tax_rate']) {
+      let rejectedDotRate = false;
+      try {
+        await legacyDb.executeScript(
+          `UPDATE invoice_lines SET ${column} = '.' WHERE id = '${lineId}';`,
+        );
+      } catch {
+        rejectedDotRate = true;
+      }
+      assert.equal(rejectedDotRate, true, `the upgraded schema rejects a lone ${column} point`);
+    }
 
     // A later startup must not overwrite a legitimate net value produced by #43 discounts.
     await legacyDb.executeScript(

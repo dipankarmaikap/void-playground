@@ -10,7 +10,7 @@ import type { User } from '../../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../../data/invoice-draft.ts';
 import { todayInKolkata } from '../../../../data/invoice-dates.ts';
 import { createDraftInvoice } from '../../../../data/invoices.ts';
-import { ensureGstPresets } from '../../../../data/organization-gst-presets.ts';
+import { ensureGstPresets, findGstPresets } from '../../../../data/organization-gst-presets.ts';
 import { getInvoicingProfileView } from '../../../../data/organization-invoicing.ts';
 import {
   CurrentOrganization,
@@ -42,7 +42,7 @@ export default createController(routes.app.invoices.new, {
       let profile = selectedClient ? await getInvoicingProfileView(organization) : null;
       let gstRatePresets =
         profile?.gst_registered
-          ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+          ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
           : [];
       let values = selectedClient && profile
         ? draftFormValuesFor(selectedClient, profile, todayInKolkata())

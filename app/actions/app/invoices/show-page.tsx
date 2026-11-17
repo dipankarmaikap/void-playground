@@ -5,7 +5,10 @@ import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
 import { formatMoney, formatMoneySigned } from '../../../data/invoice-calculation.ts';
-import { groupedInvoiceTaxes } from '../../../data/invoice-tax.ts';
+import {
+  groupedInvoiceTaxes,
+  invoiceLineGstComponents,
+} from '../../../data/invoice-tax.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
@@ -177,15 +180,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   </td>
                   <td mix={cellStyle}>
                     {[
-                      line.cgst_rate != null
-                        ? `CGST @ ${line.cgst_rate}% ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
-                        : null,
-                      line.sgst_rate != null
-                        ? `SGST @ ${line.sgst_rate}% ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
-                        : null,
-                      line.igst_rate != null
-                        ? `IGST @ ${line.igst_rate}% ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
-                        : null,
+                      ...invoiceLineGstComponents(line, invoice.currency),
                       line.foreign_tax_mode && line.foreign_tax_label
                         ? `${line.foreign_tax_label}${line.foreign_tax_mode === 'percent' ? ` @ ${line.foreign_tax_rate}%` : ''} ${formatMoney(BigInt(line.foreign_tax_amount_minor), invoice.currency)}`
                         : null,

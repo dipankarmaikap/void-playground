@@ -72,6 +72,17 @@ const formActionsStyle = css({
   gap: '0.75rem',
 });
 
+const errorSummaryStyle = css({
+  padding: '1rem',
+  border: `1px solid ${colors.danger}`,
+  borderRadius: radius.md,
+  background: colors.surface,
+  '&:focus': {
+    outline: `2px solid ${colors.danger}`,
+    outlineOffset: '2px',
+  },
+});
+
 const sectionHeadingStyle = css({
   margin: 0,
   fontSize: '1.0625rem',
@@ -122,7 +133,20 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
         />
         {children}
         {issues.length > 0 ? (
-          <p role="alert">Please correct the fields below.</p>
+          <section
+            id="invoice-error-summary"
+            tabIndex={-1}
+            autoFocus
+            aria-labelledby="invoice-error-heading"
+            mix={errorSummaryStyle}
+          >
+            <h2 id="invoice-error-heading">Please correct the fields below.</h2>
+            <ul>
+              {issues.map((issue, index) => (
+                <li key={index}>{issue.message}</li>
+              ))}
+            </ul>
+          </section>
         ) : null}
         {!gstRatePresets.length && firstIssue(issues, 'gst_mode') ? (
           <p role="alert">{firstIssue(issues, 'gst_mode')?.message}</p>
@@ -399,6 +423,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               foreign_tax_mode: '',
               foreign_tax_value: '',
             };
+            let foreignTaxLabelIssue = lineIssue(issues, index, 'foreign_tax_label');
+            let foreignTaxModeIssue = lineIssue(issues, index, 'foreign_tax_mode');
+            let foreignTaxValueIssue = lineIssue(issues, index, 'foreign_tax_value');
+            let foreignTaxLabelErrorId = `line-${index}-foreign-tax-label-error`;
+            let foreignTaxModeErrorId = `line-${index}-foreign-tax-mode-error`;
+            let foreignTaxValueErrorId = `line-${index}-foreign-tax-value-error`;
             return (
               <div key={index} mix={lineRowStyle}>
                 <Field
@@ -518,20 +548,30 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 ) : null}
                 <Field
                   label={`Manual tax label ${index + 1}`}
-                  error={lineIssue(issues, index, 'foreign_tax_label')?.message}
+                  error={foreignTaxLabelIssue?.message}
+                  errorId={foreignTaxLabelIssue ? foreignTaxLabelErrorId : undefined}
                 >
                   <Input
+                    id={`line-${index}-foreign-tax-label`}
                     name="line_foreign_tax_label"
                     maxLength={80}
                     defaultValue={line.foreign_tax_label}
-                    variant={lineIssue(issues, index, 'foreign_tax_label') ? 'error' : 'default'}
+                    variant={foreignTaxLabelIssue ? 'error' : 'default'}
+                    aria-invalid={foreignTaxLabelIssue ? true : undefined}
+                    aria-describedby={foreignTaxLabelIssue ? foreignTaxLabelErrorId : undefined}
                   />
                 </Field>
                 <Field
                   label={`Manual tax type ${index + 1}`}
-                  error={lineIssue(issues, index, 'foreign_tax_mode')?.message}
+                  error={foreignTaxModeIssue?.message}
+                  errorId={foreignTaxModeIssue ? foreignTaxModeErrorId : undefined}
                 >
-                  <select name="line_foreign_tax_mode">
+                  <select
+                    id={`line-${index}-foreign-tax-mode`}
+                    name="line_foreign_tax_mode"
+                    aria-invalid={foreignTaxModeIssue ? true : undefined}
+                    aria-describedby={foreignTaxModeIssue ? foreignTaxModeErrorId : undefined}
+                  >
                     <option value="" selected={line.foreign_tax_mode === ''}>No manual tax</option>
                     <option value="percent" selected={line.foreign_tax_mode === 'percent'}>Percentage</option>
                     <option value="fixed" selected={line.foreign_tax_mode === 'fixed'}>Fixed invoice-currency amount</option>
@@ -539,12 +579,16 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 </Field>
                 <Field
                   label={`Manual tax rate or amount ${index + 1}`}
-                  error={lineIssue(issues, index, 'foreign_tax_value')?.message}
+                  error={foreignTaxValueIssue?.message}
+                  errorId={foreignTaxValueIssue ? foreignTaxValueErrorId : undefined}
                 >
                   <Input
+                    id={`line-${index}-foreign-tax-value`}
                     name="line_foreign_tax_value"
                     defaultValue={line.foreign_tax_value}
-                    variant={lineIssue(issues, index, 'foreign_tax_value') ? 'error' : 'default'}
+                    variant={foreignTaxValueIssue ? 'error' : 'default'}
+                    aria-invalid={foreignTaxValueIssue ? true : undefined}
+                    aria-describedby={foreignTaxValueIssue ? foreignTaxValueErrorId : undefined}
                   />
                 </Field>
                 {lineIssue(issues, index, 'amount') ? (

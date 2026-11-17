@@ -3,11 +3,13 @@ import * as assert from 'remix/assert';
 import {
   db,
   organizationMemberships,
+  organizationGstRatePresets,
   organizations,
   users,
   userPasswords,
 } from '../app/data/db.ts';
 import { hashPassword } from '../app/data/password.ts';
+import { defaultGstPresetRows } from '../app/data/organization-gst-presets.ts';
 import { routes } from '../app/routes.ts';
 
 export const origin = 'http://localhost';
@@ -63,6 +65,9 @@ export async function createUser(
       is_owner: true,
       created_at: now,
     });
+    for (let preset of defaultGstPresetRows(organizationId, now)) {
+      await tx.create(organizationGstRatePresets, preset);
+    }
   });
   return id;
 }
