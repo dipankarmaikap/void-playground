@@ -216,6 +216,12 @@ export const invoices = table({
     customer_notes: c.text().nullable(),
     internal_note: c.text().nullable(),
     subtotal_minor: c.integer().notNull(),
+    line_discount_total_minor: c.integer().notNull(),
+    invoice_discount_mode: c.text().nullable(),
+    invoice_discount_value: c.text().nullable(),
+    invoice_discount_minor: c.integer().notNull(),
+    net_subtotal_minor: c.integer().notNull(),
+    round_off_minor: c.integer().notNull(),
     total_minor: c.integer().notNull(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
@@ -236,6 +242,11 @@ export const invoiceLines = table({
     quantity: c.text().notNull(),
     unit_price: c.text().notNull(),
     amount_minor: c.integer().notNull(),
+    discount_mode: c.text().nullable(),
+    discount_value: c.text().nullable(),
+    line_discount_minor: c.integer().notNull(),
+    allocated_invoice_discount_minor: c.integer().notNull(),
+    net_minor: c.integer().notNull(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
@@ -508,9 +519,27 @@ CREATE TABLE IF NOT EXISTS invoices (
   customer_notes TEXT CHECK (customer_notes IS NULL OR length(customer_notes) <= 1000),
   internal_note TEXT CHECK (internal_note IS NULL OR length(internal_note) <= 1000),
   subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+  line_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_total_minor >= 0),
+  invoice_discount_mode TEXT CHECK (invoice_discount_mode IN ('percent', 'fixed')),
+  invoice_discount_value TEXT CHECK (
+    invoice_discount_value IS NULL OR (
+      length(invoice_discount_value) > 0
+      AND invoice_discount_value GLOB '[0-9]*'
+      AND invoice_discount_value NOT GLOB '*[^0-9.]*'
+      AND invoice_discount_value NOT LIKE '%.%.%'
+    )
+  ),
+  invoice_discount_minor INTEGER NOT NULL DEFAULT 0 CHECK (invoice_discount_minor >= 0),
+  net_subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (net_subtotal_minor >= 0),
+  round_off_minor INTEGER NOT NULL DEFAULT 0,
   total_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_minor >= 0),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  CHECK (invoice_discount_mode IS NOT NULL OR (
+    invoice_discount_value IS NULL AND invoice_discount_minor = 0
+  )),
+  CHECK (subtotal_minor = line_discount_total_minor + invoice_discount_minor + net_subtotal_minor),
+  CHECK (total_minor = net_subtotal_minor + round_off_minor),
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
   FOREIGN KEY (organization_id, client_id) REFERENCES clients(organization_id, id)
 );
@@ -537,8 +566,23 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
     AND unit_price NOT GLOB '*[^0-9.]*' AND unit_price NOT LIKE '%.%.%'
   ),
   amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+  discount_mode TEXT CHECK (discount_mode IN ('percent', 'fixed')),
+  discount_value TEXT CHECK (
+    discount_value IS NULL OR (
+      length(discount_value) > 0
+      AND discount_value GLOB '[0-9]*'
+      AND discount_value NOT GLOB '*[^0-9.]*'
+      AND discount_value NOT LIKE '%.%.%'
+    )
+  ),
+  line_discount_minor INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_minor >= 0),
+  allocated_invoice_discount_minor INTEGER NOT NULL DEFAULT 0
+    CHECK (allocated_invoice_discount_minor >= 0),
+  net_minor INTEGER NOT NULL DEFAULT 0 CHECK (net_minor >= 0),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  CHECK (line_discount_minor + allocated_invoice_discount_minor <= amount_minor),
+  CHECK (discount_mode IS NOT NULL OR (discount_value IS NULL AND line_discount_minor = 0)),
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
   FOREIGN KEY (organization_id, invoice_id) REFERENCES invoices(organization_id, id) ON DELETE CASCADE,
   UNIQUE (invoice_id, position)
@@ -546,6 +590,50 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 
 CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
 `);
+
+// #43 adds discount and round-off columns. Guard each ALTER so a database created by #42 upgrades
+// in place; the CHECK constraints above apply to fresh databases.
+const invoiceExtraColumns: Array<[string, string]> = [
+  ['line_discount_total_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_total_minor >= 0)'],
+  ['invoice_discount_mode', "TEXT CHECK (invoice_discount_mode IN ('percent', 'fixed'))"],
+  [
+    'invoice_discount_value',
+    "TEXT CHECK (invoice_discount_value IS NULL OR (length(invoice_discount_value) > 0 " +
+      "AND invoice_discount_value GLOB '[0-9]*' AND invoice_discount_value NOT GLOB '*[^0-9.]*' " +
+      "AND invoice_discount_value NOT LIKE '%.%.%'))",
+  ],
+  ['invoice_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (invoice_discount_minor >= 0)'],
+  ['net_subtotal_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_subtotal_minor >= 0)'],
+  ['round_off_minor', 'INTEGER NOT NULL DEFAULT 0'],
+];
+
+for (let [columnName, sqlType] of invoiceExtraColumns) {
+  if (!(await db.hasColumn(getTableReference(invoices), columnName))) {
+    await db.executeScript(`ALTER TABLE invoices ADD COLUMN ${columnName} ${sqlType};`);
+  }
+}
+
+const invoiceLineExtraColumns: Array<[string, string]> = [
+  ['discount_mode', "TEXT CHECK (discount_mode IN ('percent', 'fixed'))"],
+  [
+    'discount_value',
+    "TEXT CHECK (discount_value IS NULL OR (length(discount_value) > 0 " +
+      "AND discount_value GLOB '[0-9]*' AND discount_value NOT GLOB '*[^0-9.]*' " +
+      "AND discount_value NOT LIKE '%.%.%'))",
+  ],
+  ['line_discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (line_discount_minor >= 0)'],
+  [
+    'allocated_invoice_discount_minor',
+    'INTEGER NOT NULL DEFAULT 0 CHECK (allocated_invoice_discount_minor >= 0)',
+  ],
+  ['net_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (net_minor >= 0)'],
+];
+
+for (let [columnName, sqlType] of invoiceLineExtraColumns) {
+  if (!(await db.hasColumn(getTableReference(invoiceLines), columnName))) {
+    await db.executeScript(`ALTER TABLE invoice_lines ADD COLUMN ${columnName} ${sqlType};`);
+  }
+}
 
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');

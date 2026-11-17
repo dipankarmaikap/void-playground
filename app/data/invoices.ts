@@ -83,6 +83,11 @@ export async function createDraftInvoice(
         quantity: line.quantity,
         unit_price: line.unit_price,
         amount_minor: line.amount_minor,
+        discount_mode: line.discount_mode,
+        discount_value: line.discount_value,
+        line_discount_minor: line.line_discount_minor,
+        allocated_invoice_discount_minor: line.allocated_invoice_discount_minor,
+        net_minor: line.net_minor,
         created_at: now,
         updated_at: now,
       });
@@ -118,6 +123,11 @@ export async function updateDraftInvoice(
         quantity: line.quantity,
         unit_price: line.unit_price,
         amount_minor: line.amount_minor,
+        discount_mode: line.discount_mode,
+        discount_value: line.discount_value,
+        line_discount_minor: line.line_discount_minor,
+        allocated_invoice_discount_minor: line.allocated_invoice_discount_minor,
+        net_minor: line.net_minor,
         created_at: now,
         updated_at: now,
       });

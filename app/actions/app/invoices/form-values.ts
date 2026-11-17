@@ -1,4 +1,5 @@
 import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
+import { formatMinorInput } from '../../../data/invoice-calculation.ts';
 import { suggestDueDate } from '../../../data/invoice-dates.ts';
 import type { InvoicingProfileView } from '../../../data/organization-invoicing.ts';
 
@@ -8,6 +9,8 @@ export interface InvoiceLineFormValue {
   sac: string;
   quantity: string;
   unit_price: string;
+  discount_mode: string;
+  discount_value: string;
 }
 
 /** The string snapshot a Draft invoice form submits or re-renders after validation fails. */
@@ -33,10 +36,20 @@ export interface InvoiceFormValues {
   payment_instructions: string;
   customer_notes: string;
   internal_note: string;
+  invoice_discount_mode: string;
+  invoice_discount_value: string;
+  round_off: string;
   lines: InvoiceLineFormValue[];
 }
 
-const LINE_FIELDS = ['description', 'sac', 'quantity', 'unit_price'] as const;
+const LINE_FIELDS = [
+  'description',
+  'sac',
+  'quantity',
+  'unit_price',
+  'discount_mode',
+  'discount_value',
+] as const;
 
 export function emptyInvoiceFormValues(): InvoiceFormValues {
   return {
@@ -60,7 +73,19 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
     payment_instructions: '',
     customer_notes: '',
     internal_note: '',
-    lines: [{ description: '', sac: '', quantity: '', unit_price: '' }],
+    invoice_discount_mode: '',
+    invoice_discount_value: '',
+    round_off: '',
+    lines: [
+      {
+        description: '',
+        sac: '',
+        quantity: '',
+        unit_price: '',
+        discount_mode: '',
+        discount_value: '',
+      },
+    ],
   };
 }
 
@@ -120,11 +145,19 @@ export function invoiceFormValuesOf(
     payment_instructions: invoice.payment_instructions ?? '',
     customer_notes: invoice.customer_notes ?? '',
     internal_note: invoice.internal_note ?? '',
+    invoice_discount_mode: invoice.invoice_discount_mode ?? '',
+    invoice_discount_value: invoice.invoice_discount_value ?? '',
+    round_off:
+      invoice.round_off_minor === 0
+        ? ''
+        : formatMinorInput(BigInt(invoice.round_off_minor), invoice.currency),
     lines: lines.map((line) => ({
       description: line.description,
       sac: line.sac ?? '',
       quantity: line.quantity,
       unit_price: line.unit_price,
+      discount_mode: line.discount_mode ?? '',
+      discount_value: line.discount_value ?? '',
     })),
   };
 }
@@ -170,6 +203,9 @@ export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
     payment_instructions: readText(formData, 'payment_instructions'),
     customer_notes: readText(formData, 'customer_notes'),
     internal_note: readText(formData, 'internal_note'),
+    invoice_discount_mode: readText(formData, 'invoice_discount_mode'),
+    invoice_discount_value: readText(formData, 'invoice_discount_value'),
+    round_off: readText(formData, 'round_off'),
     lines,
   };
 }

@@ -278,6 +278,8 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               sac: '',
               quantity: '',
               unit_price: '',
+              discount_mode: '',
+              discount_value: '',
             };
             return (
               <div key={index} mix={lineRowStyle}>
@@ -317,12 +319,92 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                     aria-invalid={lineIssue(issues, index, 'unit_price') ? true : undefined}
                   />
                 </Field>
+                <Field
+                  label={`Discount type ${index + 1}`}
+                  error={lineIssue(issues, index, 'discount_mode')?.message}
+                >
+                  <select
+                    name="line_discount_mode"
+                    aria-invalid={lineIssue(issues, index, 'discount_mode') ? true : undefined}
+                  >
+                    <option value="" selected={line.discount_mode === ''}>
+                      No discount
+                    </option>
+                    <option value="percent" selected={line.discount_mode === 'percent'}>
+                      Percentage
+                    </option>
+                    <option value="fixed" selected={line.discount_mode === 'fixed'}>
+                      Fixed amount
+                    </option>
+                  </select>
+                </Field>
+                <Field
+                  label={`Discount ${index + 1}`}
+                  error={lineIssue(issues, index, 'discount_value')?.message}
+                >
+                  <Input
+                    name="line_discount_value"
+                    defaultValue={line.discount_value}
+                    variant={lineIssue(issues, index, 'discount_value') ? 'error' : 'default'}
+                    aria-invalid={lineIssue(issues, index, 'discount_value') ? true : undefined}
+                  />
+                </Field>
                 {lineIssue(issues, index, 'amount') ? (
                   <p role="alert">{lineIssue(issues, index, 'amount')?.message}</p>
                 ) : null}
               </div>
             );
           })}
+        </section>
+
+        <section aria-labelledby="invoice-discount-heading" mix={cardStyle}>
+          <h2 id="invoice-discount-heading" mix={sectionHeadingStyle}>
+            Invoice discount and round-off
+          </h2>
+          <p mix={hintStyle}>
+            An invoice-wide discount is allocated proportionally across each line's value after
+            line discounts. Round-off is a signed adjustment that reconciles the net total.
+          </p>
+          <div mix={gridStyle}>
+            <Field
+              label="Invoice discount type"
+              error={firstIssue(issues, 'invoice_discount_mode')?.message}
+            >
+              <select
+                name="invoice_discount_mode"
+                aria-invalid={firstIssue(issues, 'invoice_discount_mode') ? true : undefined}
+              >
+                <option value="" selected={values.invoice_discount_mode === ''}>
+                  No discount
+                </option>
+                <option value="percent" selected={values.invoice_discount_mode === 'percent'}>
+                  Percentage
+                </option>
+                <option value="fixed" selected={values.invoice_discount_mode === 'fixed'}>
+                  Fixed amount
+                </option>
+              </select>
+            </Field>
+            <Field
+              label="Invoice discount value"
+              error={firstIssue(issues, 'invoice_discount_value')?.message}
+            >
+              <Input
+                name="invoice_discount_value"
+                defaultValue={values.invoice_discount_value}
+                variant={firstIssue(issues, 'invoice_discount_value') ? 'error' : 'default'}
+                aria-invalid={firstIssue(issues, 'invoice_discount_value') ? true : undefined}
+              />
+            </Field>
+            <Field label="Round-off" error={firstIssue(issues, 'round_off')?.message}>
+              <Input
+                name="round_off"
+                defaultValue={values.round_off}
+                variant={firstIssue(issues, 'round_off') ? 'error' : 'default'}
+                aria-invalid={firstIssue(issues, 'round_off') ? true : undefined}
+              />
+            </Field>
+          </div>
         </section>
 
         <section aria-labelledby="invoice-notes-heading" mix={cardStyle}>

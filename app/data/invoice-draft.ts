@@ -5,10 +5,16 @@ import { CLIENT_TEXT_LIMITS } from './client-text.ts';
 import { findIndiaStateByCode } from './india-states.ts';
 import { canonicalCountry } from './client-billing.ts';
 import {
+  allocateProportionally,
   calculateLineAmountMinor,
   formatScaledDecimal,
   parseScaledDecimal,
+  parseSignedScaledDecimal,
+  percentOfMinor,
+  PERCENT_MAX_SCALED,
+  roundScaledToMinor,
   toExactMinorNumber,
+  toExactSignedMinorNumber,
 } from './invoice-calculation.ts';
 import { isValidIsoDate } from './invoice-dates.ts';
 import { PAYMENT_TERMS } from './organization-invoicing.ts';
@@ -21,6 +27,11 @@ export interface InvoiceLineChanges {
   quantity: string;
   unit_price: string;
   amount_minor: number;
+  discount_mode: string | null;
+  discount_value: string | null;
+  line_discount_minor: number;
+  allocated_invoice_discount_minor: number;
+  net_minor: number;
 }
 
 /** The invoice-row plus line-row changes a valid Draft form submission produces. */
@@ -45,6 +56,12 @@ export interface InvoiceDraftChanges {
   customer_notes: string | null;
   internal_note: string | null;
   subtotal_minor: number;
+  line_discount_total_minor: number;
+  invoice_discount_mode: string | null;
+  invoice_discount_value: string | null;
+  invoice_discount_minor: number;
+  net_subtotal_minor: number;
+  round_off_minor: number;
   total_minor: number;
   lines: InvoiceLineChanges[];
 }
@@ -71,6 +88,44 @@ const SAC_MAX_LENGTH = 64;
 function optional(value: string): string | null {
   let trimmed = value.trim();
   return trimmed || null;
+}
+
+interface DiscountInput {
+  mode: 'percent' | 'fixed';
+  value: string;
+  scaled: bigint;
+}
+
+/**
+ * Parses one optional discount entry. A blank mode and value mean no discount; a percentage must
+ * be between 0 and 100. Callers map `mode`/`value` issues to their own form field names.
+ */
+function parseDiscountInput(
+  modeRaw: string,
+  valueRaw: string,
+  issue: (field: 'mode' | 'value', message: string) => void,
+): DiscountInput | null | undefined {
+  let mode = modeRaw.trim().toLowerCase();
+  let raw = valueRaw.trim();
+  if (!mode && !raw) return null;
+  if (mode !== 'percent' && mode !== 'fixed') {
+    issue('mode', 'Choose a valid discount type.');
+    return undefined;
+  }
+  if (!raw) {
+    issue('value', 'Enter a discount value.');
+    return undefined;
+  }
+  let scaled = parseScaledDecimal(raw);
+  if (scaled == null) {
+    issue('value', 'Enter a non-negative discount with at most 4 decimal places.');
+    return undefined;
+  }
+  if (mode === 'percent' && scaled > PERCENT_MAX_SCALED) {
+    issue('value', 'A percentage discount cannot exceed 100%.');
+    return undefined;
+  }
+  return { mode, value: formatScaledDecimal(scaled), scaled };
 }
 
 /**
@@ -124,7 +179,9 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
   }
 
   let lines: InvoiceLineChanges[] = [];
+  let linePostValues: bigint[] = [];
   let subtotalMinor = 0n;
+  let lineDiscountTotalMinor = 0n;
   let hasRangeIssue = false;
   let calculationCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'INR';
 
@@ -155,6 +212,10 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
     if (unitPrice == null) {
       lineIssue('unit_price', 'Enter a non-negative unit price with at most 4 decimal places.');
     }
+    let discount = parseDiscountInput(line.discount_mode, line.discount_value, (field, message) =>
+      lineIssue(`discount_${field}`, message),
+    );
+    if (discount === undefined) return;
 
     if (quantity != null && quantity > 0n && unitPrice != null) {
       let amount = calculateLineAmountMinor(quantity, unitPrice, calculationCurrency);
@@ -166,7 +227,19 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
           'This line amount is too large to store exactly. Reduce the quantity or unit price.',
         );
       } else {
+        let lineDiscountMinor = 0n;
+        if (discount?.mode === 'percent') {
+          lineDiscountMinor = percentOfMinor(amount, discount.scaled);
+        } else if (discount?.mode === 'fixed') {
+          lineDiscountMinor = roundScaledToMinor(discount.scaled, calculationCurrency);
+        }
+        if (lineDiscountMinor > amount) {
+          lineIssue('discount_value', 'The line discount cannot exceed the line amount.');
+          return;
+        }
+        let net = amount - lineDiscountMinor;
         subtotalMinor += amount;
+        lineDiscountTotalMinor += lineDiscountMinor;
         lines.push({
           position: lines.length,
           description,
@@ -174,20 +247,79 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
           quantity: formatScaledDecimal(quantity),
           unit_price: formatScaledDecimal(unitPrice),
           amount_minor: amountMinor,
+          discount_mode: discount?.mode ?? null,
+          discount_value: discount?.value ?? null,
+          line_discount_minor: toExactMinorNumber(lineDiscountMinor)!,
+          allocated_invoice_discount_minor: 0,
+          net_minor: toExactMinorNumber(net)!,
         });
+        linePostValues.push(net);
       }
     }
   });
+
+  let invoiceDiscount = parseDiscountInput(
+    form.invoice_discount_mode,
+    form.invoice_discount_value,
+    (field, message) => push(`invoice_discount_${field}`, message),
+  );
+  if (invoiceDiscount === undefined) invoiceDiscount = null;
+
+  let postLineSubtotal = subtotalMinor - lineDiscountTotalMinor;
+  let invoiceDiscountMinor = 0n;
+  if (invoiceDiscount?.mode === 'percent') {
+    invoiceDiscountMinor = percentOfMinor(postLineSubtotal, invoiceDiscount.scaled);
+  } else if (invoiceDiscount?.mode === 'fixed') {
+    invoiceDiscountMinor = roundScaledToMinor(invoiceDiscount.scaled, calculationCurrency);
+  }
+  if (invoiceDiscountMinor > postLineSubtotal) {
+    push('invoice_discount_value', 'The invoice discount cannot exceed the post-discount subtotal.');
+  }
+
+  let roundOffRaw = form.round_off.trim();
+  let roundOffScaled = roundOffRaw ? parseSignedScaledDecimal(roundOffRaw) : 0n;
+  if (roundOffScaled == null) {
+    push('round_off', 'Enter a signed round-off amount with at most 4 decimal places.');
+  }
+  let roundOffMinor =
+    roundOffScaled == null ? 0n : roundScaledToMinor(roundOffScaled, calculationCurrency);
+  let roundOffAmount = toExactSignedMinorNumber(roundOffMinor);
+  if (roundOffAmount == null) {
+    push('round_off', 'The round-off amount is too large to store exactly.');
+  }
 
   if (lines.length === 0 && !hasRangeIssue) {
     push('lines', 'Add at least one service line.');
   }
   let subtotal = toExactMinorNumber(subtotalMinor);
-  if (subtotal == null) {
+  let lineDiscountTotal = toExactMinorNumber(lineDiscountTotalMinor);
+  let netSubtotalMinor = postLineSubtotal - invoiceDiscountMinor;
+  let netSubtotal = toExactMinorNumber(netSubtotalMinor);
+  let invoiceDiscountAmount = toExactMinorNumber(invoiceDiscountMinor);
+  let totalMinor = netSubtotalMinor + roundOffMinor;
+  let total = toExactMinorNumber(totalMinor);
+  if (
+    subtotal == null ||
+    lineDiscountTotal == null ||
+    netSubtotal == null ||
+    invoiceDiscountAmount == null
+  ) {
+    push('total', 'The invoice total is too large to store exactly.');
+  }
+  if (totalMinor < 0n) {
+    push('round_off', 'Round-off cannot make the total negative.');
+  } else if (total == null) {
     push('total', 'The invoice total is too large to store exactly.');
   }
 
   if (issues.length > 0) return { ok: false, issues };
+
+  let allocation = allocateProportionally(invoiceDiscountMinor, linePostValues);
+  lines.forEach((line, index) => {
+    let allocated = allocation[index];
+    line.allocated_invoice_discount_minor = toExactMinorNumber(allocated)!;
+    line.net_minor -= Number(allocated);
+  });
 
   let taxState = form.recipient_tax_state_code.trim();
   let taxCountry = optional(form.recipient_tax_country);
@@ -223,7 +355,13 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
       customer_notes: optional(form.customer_notes),
       internal_note: optional(form.internal_note),
       subtotal_minor: subtotal!,
-      total_minor: subtotal!,
+      line_discount_total_minor: lineDiscountTotal!,
+      invoice_discount_mode: invoiceDiscount?.mode ?? null,
+      invoice_discount_value: invoiceDiscount?.value ?? null,
+      invoice_discount_minor: invoiceDiscountAmount!,
+      net_subtotal_minor: netSubtotal!,
+      round_off_minor: roundOffAmount!,
+      total_minor: total!,
       lines,
     },
   };

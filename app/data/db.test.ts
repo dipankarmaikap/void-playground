@@ -658,6 +658,116 @@ describe('db', () => {
     assert.ok(await db.find(invoices, otherInvoice.id), 'the other Organization is untouched');
   });
 
+  it('enforces discount and round-off integrity on invoices and invoice lines', async () => {
+    let organizationId = await createOrganization('Invoice Discount Constraint Test');
+    let clientId = await createClientIn(organizationId);
+
+    let invoiceRejects = async (overrides: Record<string, unknown>) => {
+      let rejected = false;
+      try {
+        await db.create(
+          invoices,
+          validInvoice({ organization_id: organizationId, client_id: clientId, ...overrides }),
+        );
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${JSON.stringify(overrides)}`);
+    };
+
+    await invoiceRejects({ line_discount_total_minor: -1 });
+    await invoiceRejects({ invoice_discount_mode: 'flat' });
+    await invoiceRejects({ invoice_discount_value: 'abc' });
+    await invoiceRejects({ invoice_discount_minor: -1 });
+    await invoiceRejects({ net_subtotal_minor: -1 });
+    await invoiceRejects({ invoice_discount_minor: 10 });
+    await invoiceRejects({ subtotal_minor: 100 });
+    await invoiceRejects({ total_minor: 1 });
+
+    let invoice = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      subtotal_minor: 10000,
+      line_discount_total_minor: 1000,
+      invoice_discount_mode: 'fixed',
+      invoice_discount_value: '5.00',
+      invoice_discount_minor: 500,
+      net_subtotal_minor: 8500,
+      round_off_minor: 100,
+      total_minor: 8600,
+    });
+    await db.create(invoices, invoice);
+    assert.equal((await db.find(invoices, invoice.id))?.round_off_minor, 100);
+
+    let negativeRoundOff = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      subtotal_minor: 10000,
+      net_subtotal_minor: 10000,
+      round_off_minor: -50,
+      total_minor: 9950,
+    });
+    await db.create(invoices, negativeRoundOff);
+    assert.equal((await db.find(invoices, negativeRoundOff.id))?.round_off_minor, -50);
+    await invoiceRejects({
+      subtotal_minor: 10000,
+      net_subtotal_minor: 10000,
+      round_off_minor: -20000,
+      total_minor: -10000,
+    });
+
+    let now = Date.now();
+    let nextPosition = 0;
+    let line = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      position: nextPosition++,
+      description: 'Consulting',
+      quantity: '1.0000',
+      unit_price: '100.0000',
+      amount_minor: 10000,
+      line_discount_minor: 0,
+      allocated_invoice_discount_minor: 0,
+      net_minor: 10000,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let lineRejects = async (overrides: Record<string, unknown>) => {
+      let rejected = false;
+      try {
+        await db.create(invoiceLines, line(overrides));
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${JSON.stringify(overrides)}`);
+    };
+
+    await lineRejects({ discount_mode: 'flat' });
+    await lineRejects({ discount_value: 'abc' });
+    await lineRejects({ line_discount_minor: -1 });
+    await lineRejects({ allocated_invoice_discount_minor: -1 });
+    await lineRejects({ net_minor: -1 });
+    await lineRejects({ line_discount_minor: 10001 });
+    await lineRejects({ line_discount_minor: 6000, allocated_invoice_discount_minor: 5000 });
+    await lineRejects({ line_discount_minor: 100 });
+
+    let validLine = line({
+      discount_mode: 'percent',
+      discount_value: '10',
+      line_discount_minor: 1000,
+      allocated_invoice_discount_minor: 500,
+      net_minor: 8500,
+    });
+    await db.create(invoiceLines, validLine);
+    assert.equal((await db.find(invoiceLines, validLine.id))?.line_discount_minor, 1000);
+    assert.equal(
+      (await db.find(invoiceLines, validLine.id))?.allocated_invoice_discount_minor,
+      500,
+    );
+  });
+
   it('rejects an incompatible old Client schema without serving or erasing it', async () => {
     let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
     await legacyDb.executeScript(`

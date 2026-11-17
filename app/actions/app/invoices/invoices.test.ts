@@ -349,6 +349,474 @@ describe('draft invoices', () => {
     assert.match(directory, /Draft · 2026-11-17 · 174\.69 INR/);
   });
 
+  it('applies a per-line percentage discount and reconciles the subtotal breakdown', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-line-percent',
+    );
+    let client = await makeClient(organizationId);
+
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Consulting', 'Support'],
+      line_sac: ['998313', ''],
+      line_quantity: ['1.5', '2'],
+      line_unit_price: ['100.0000', '12.3456'],
+      line_discount_mode: ['percent', ''],
+      line_discount_value: ['10', ''],
+    });
+
+    assert.equal(response.status, 302);
+    let id = draftIdFrom(response);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.subtotal_minor, 17469);
+    assert.equal(invoice?.line_discount_total_minor, 1500, '10% of 150.00 is 15.00');
+    assert.equal(invoice?.invoice_discount_minor, 0);
+    assert.equal(invoice?.net_subtotal_minor, 15969);
+    assert.equal(invoice?.round_off_minor, 0);
+    assert.equal(invoice?.total_minor, 15969);
+
+    let lines = await db.findMany(invoiceLines, {
+      where: { invoice_id: id },
+      orderBy: [['position', 'asc']],
+    });
+    assert.equal(lines[0]?.amount_minor, 15000, 'amount stays the pre-discount gross');
+    assert.equal(lines[0]?.discount_mode, 'percent');
+    assert.equal(lines[0]?.discount_value, '10');
+    assert.equal(lines[0]?.line_discount_minor, 1500);
+    assert.equal(lines[0]?.net_minor, 13500);
+    assert.equal(lines[1]?.line_discount_minor, 0);
+    assert.equal(lines[1]?.net_minor, 2469);
+
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Subtotal: 174\.69 INR/);
+    assert.match(html, /Line discounts: 15\.00 INR/);
+    assert.match(html, /Net taxable subtotal: 159\.69 INR/);
+    assert.match(html, /Total: 159\.69 INR/);
+  });
+
+  it('applies a fixed per-line discount and rejects discounts above the line gross', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-line-fixed',
+    );
+    let client = await makeClient(organizationId);
+
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Consulting', 'Support'],
+      line_quantity: ['2', '1'],
+      line_unit_price: ['50.0000', '10.0000'],
+      line_discount_mode: ['fixed', ''],
+      line_discount_value: ['25.50', ''],
+    });
+    assert.equal(response.status, 302);
+    let id = draftIdFrom(response);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.subtotal_minor, 11000);
+    assert.equal(invoice?.line_discount_total_minor, 2550);
+    assert.equal(invoice?.net_subtotal_minor, 8450);
+    assert.equal(invoice?.total_minor, 8450);
+    let lines = await db.findMany(invoiceLines, {
+      where: { invoice_id: id },
+      orderBy: [['position', 'asc']],
+    });
+    assert.equal(lines[0]?.discount_mode, 'fixed');
+    assert.equal(lines[0]?.discount_value, '25.5');
+    assert.equal(lines[0]?.line_discount_minor, 2550);
+    assert.equal(lines[0]?.net_minor, 7450);
+    assert.equal(lines[1]?.net_minor, 1000);
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Line discounts: 25\.50 INR/);
+
+    let invalid = [
+      {
+        mode: 'fixed',
+        value: '100.01',
+        message: /discount cannot exceed the line amount/i,
+        preserved: /name="line_discount_value"[^>]*value="100\.01"/,
+      },
+      {
+        mode: 'percent',
+        value: '100.01',
+        message: /cannot exceed 100%/i,
+        preserved: /name="line_discount_value"[^>]*value="100\.01"/,
+      },
+      {
+        mode: 'fixed',
+        value: '-1',
+        message: /non-negative discount/i,
+        preserved: /name="line_discount_value"[^>]*value="-1"/,
+      },
+    ];
+    for (let { mode, value, message, preserved } of invalid) {
+      let rejected = await createDraft(sessionCookie, client.id, {
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['50.0000'],
+        line_discount_mode: [mode],
+        line_discount_value: [value],
+      });
+      assert.equal(rejected.status, 400);
+      let rejectedHtml = await rejected.text();
+      assert.match(rejectedHtml, /Please correct the fields below\./);
+      assert.match(rejectedHtml, message);
+      assert.match(rejectedHtml, preserved);
+    }
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 1);
+  });
+
+  it('allocates an invoice-wide percentage discount across uneven lines by largest remainder', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-percent-allocate',
+    );
+    let client = await makeClient(organizationId);
+
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Large', 'Medium', 'Small'],
+      line_quantity: ['1', '1', '1'],
+      line_unit_price: ['100.0000', '50.0000', '0.0300'],
+      invoice_discount_mode: ['percent'],
+      invoice_discount_value: ['33.3333'],
+    });
+    assert.equal(response.status, 302);
+    let id = draftIdFrom(response);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.subtotal_minor, 15003);
+    assert.equal(invoice?.line_discount_total_minor, 0);
+    assert.equal(invoice?.invoice_discount_mode, 'percent');
+    assert.equal(invoice?.invoice_discount_value, '33.3333');
+    assert.equal(invoice?.invoice_discount_minor, 5001, '33.3333% of 15003 minor rounds to 5001');
+    assert.equal(invoice?.net_subtotal_minor, 10002);
+    assert.equal(invoice?.total_minor, 10002);
+
+    let lines = await db.findMany(invoiceLines, {
+      where: { invoice_id: id },
+      orderBy: [['position', 'asc']],
+    });
+    assert.deepEqual(
+      lines.map((line) => line.allocated_invoice_discount_minor),
+      [3333, 1667, 1],
+      'the leftover minor unit goes to the largest remainder (the medium line)',
+    );
+    assert.deepEqual(
+      lines.map((line) => line.line_discount_minor),
+      [0, 0, 0],
+      'per-line discounts stay separate from the allocated invoice discount',
+    );
+    assert.deepEqual(
+      lines.map((line) => line.net_minor),
+      [6667, 3333, 2],
+    );
+    assert.equal(
+      lines.reduce((sum, line) => sum + line.allocated_invoice_discount_minor, 0),
+      invoice!.invoice_discount_minor,
+      'allocated line discounts sum exactly to the invoice-wide discount',
+    );
+
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Invoice discount \(percent\): 50\.01 INR/);
+    assert.match(html, /Net taxable subtotal: 100\.02 INR/);
+    assert.match(html, /Total: 100\.02 INR/);
+  });
+
+  it('applies a fixed invoice discount on post-line-discount values and rejects over-discounts', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-fixed-allocate',
+    );
+    let client = await makeClient(organizationId);
+    let fields = {
+      line_description: ['Consulting', 'Support'],
+      line_quantity: ['2', '1'],
+      line_unit_price: ['100.0000', '50.0000'],
+      line_discount_mode: ['percent', 'fixed'],
+      line_discount_value: ['25', '5.00'],
+      invoice_discount_mode: ['fixed'],
+      invoice_discount_value: ['12.34'],
+    };
+
+    let response = await createDraft(sessionCookie, client.id, fields);
+    assert.equal(response.status, 302);
+    let id = draftIdFrom(response);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.subtotal_minor, 25000);
+    assert.equal(invoice?.line_discount_total_minor, 5500, '5000 line percent + 500 line fixed');
+    assert.equal(invoice?.invoice_discount_mode, 'fixed');
+    assert.equal(invoice?.invoice_discount_value, '12.34');
+    assert.equal(invoice?.invoice_discount_minor, 1234);
+    assert.equal(invoice?.net_subtotal_minor, 18266, '19500 post-line subtotal − 1234');
+    assert.equal(invoice?.total_minor, 18266);
+
+    let lines = await db.findMany(invoiceLines, {
+      where: { invoice_id: id },
+      orderBy: [['position', 'asc']],
+    });
+    assert.deepEqual(
+      lines.map((line) => line.net_minor),
+      [14051, 4215],
+      'allocation is proportional to post-line-discount values, not gross values',
+    );
+    assert.deepEqual(
+      lines.map((line) => line.allocated_invoice_discount_minor),
+      [949, 285],
+    );
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Line discounts: 55\.00 INR/);
+    assert.match(html, /Invoice discount \(fixed\): 12\.34 INR/);
+    assert.match(html, /Net taxable subtotal: 182\.66 INR/);
+
+    let tooLarge = await createDraft(sessionCookie, client.id, {
+      ...fields,
+      invoice_discount_value: ['200.00'],
+    });
+    assert.equal(tooLarge.status, 400);
+    let rejectedHtml = await tooLarge.text();
+    assert.match(rejectedHtml, /discount cannot exceed the post-discount subtotal/i);
+    assert.match(rejectedHtml, /name="invoice_discount_value"[^>]*value="200\.00"/);
+
+    let badPercent = await createDraft(sessionCookie, client.id, {
+      ...fields,
+      invoice_discount_mode: ['percent'],
+      invoice_discount_value: ['101'],
+    });
+    assert.equal(badPercent.status, 400);
+    assert.match(await badPercent.text(), /cannot exceed 100%/);
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 1);
+  });
+
+  it('applies an explicit round-off adjustment that reconciles to the final total', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-round-off',
+    );
+    let client = await makeClient(organizationId);
+    let fields = {
+      line_description: ['Consulting'],
+      line_quantity: ['1.5'],
+      line_unit_price: ['100.0000'],
+      invoice_discount_mode: ['fixed'],
+      invoice_discount_value: ['0.05'],
+    };
+
+    let positive = await createDraft(sessionCookie, client.id, {
+      ...fields,
+      round_off: ['0.05'],
+    });
+    assert.equal(positive.status, 302);
+    let id = draftIdFrom(positive);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.net_subtotal_minor, 14995);
+    assert.equal(invoice?.round_off_minor, 5);
+    assert.equal(invoice?.total_minor, 15000);
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Net taxable subtotal: 149\.95 INR/);
+    assert.match(html, /Round-off: 0\.05 INR/);
+    assert.match(html, /Total: 150\.00 INR/);
+
+    let negative = await createDraft(sessionCookie, client.id, {
+      ...fields,
+      round_off: ['-0.07'],
+    });
+    assert.equal(negative.status, 302);
+    let negativeInvoice = await db.find(invoices, draftIdFrom(negative));
+    assert.equal(negativeInvoice?.round_off_minor, -7);
+    assert.equal(negativeInvoice?.total_minor, 14988);
+    assert.match(
+      await getHtml(
+        router,
+        routes.app.invoices.show.href({ invoiceId: negativeInvoice!.id }),
+        sessionCookie,
+      ),
+      /Round-off: -0\.07 INR/,
+    );
+
+    let cases = [
+      {
+        roundOff: '-200',
+        message: /round-off cannot make the total negative/i,
+      },
+      {
+        roundOff: 'abc',
+        message: /signed round-off amount/i,
+      },
+    ];
+    for (let { roundOff, message } of cases) {
+      let rejected = await createDraft(sessionCookie, client.id, { ...fields, round_off: [roundOff] });
+      assert.equal(rejected.status, 400);
+      let rejectedHtml = await rejected.text();
+      assert.match(rejectedHtml, message);
+      assert.match(rejectedHtml, new RegExp(`name="round_off"[^>]*value="${roundOff.replace('-', '\\-')}"`));
+    }
+    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 2);
+  });
+
+  it('round-trips discounts and round-off through edit and preserves them on add-line and errors', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-edit',
+    );
+    let client = await makeClient(organizationId);
+    let id = draftIdFrom(
+      await createDraft(sessionCookie, client.id, {
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['100.0000'],
+        line_discount_mode: ['percent'],
+        line_discount_value: ['10'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['5.00'],
+        round_off: ['0.05'],
+      }),
+    );
+
+    let editPage = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(
+      editPage,
+      /name="line_discount_mode"[^>]*>[\s\S]*?<option value="percent" selected/,
+    );
+    assert.match(editPage, /name="line_discount_value"[^>]*value="10"/);
+    assert.match(
+      editPage,
+      /name="invoice_discount_mode"[^>]*>[\s\S]*?<option value="fixed" selected/,
+    );
+    assert.match(editPage, /name="invoice_discount_value"[^>]*value="5"/);
+    assert.match(editPage, /name="round_off"[^>]*value="0\.05"/);
+
+    let fields = draftFields(client.id, {
+      line_description: ['Consulting', ''],
+      line_quantity: ['2', ''],
+      line_unit_price: ['100.0000', ''],
+      line_discount_mode: ['fixed', ''],
+      line_discount_value: ['7.50', ''],
+      invoice_discount_mode: ['percent'],
+      invoice_discount_value: ['10'],
+      round_off: ['-1.25'],
+    });
+    let added = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      { ...fields, _intent: 'add_line' },
+      sessionCookie,
+    );
+    assert.equal(added.status, 200);
+    let addedHtml = await added.text();
+    assert.equal((addedHtml.match(/name="line_description"/g) ?? []).length, 3);
+    assert.match(addedHtml, /name="line_discount_value"[^>]*value="7\.50"/);
+    assert.match(addedHtml, /name="invoice_discount_value"[^>]*value="10"/);
+    assert.match(addedHtml, /name="round_off"[^>]*value="-1\.25"/);
+    assert.equal((await db.find(invoices, id))?.line_discount_total_minor, 2000);
+
+    let invalid = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      {
+        ...fields,
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['100.0000'],
+        line_discount_mode: ['fixed'],
+        line_discount_value: ['201'],
+      },
+      sessionCookie,
+    );
+    assert.equal(invalid.status, 400);
+    let invalidHtml = await invalid.text();
+    assert.match(invalidHtml, /discount cannot exceed the line amount/i);
+    assert.match(invalidHtml, /name="line_discount_value"[^>]*value="201"/);
+    assert.match(invalidHtml, /name="round_off"[^>]*value="-1\.25"/);
+
+    let updated = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      {
+        ...fields,
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['100.0000'],
+      },
+      sessionCookie,
+    );
+    assert.equal(updated.status, 302);
+    let invoice = await db.find(invoices, id);
+    assert.equal(invoice?.line_discount_total_minor, 750);
+    assert.equal(invoice?.invoice_discount_mode, 'percent');
+    assert.equal(invoice?.invoice_discount_value, '10');
+    assert.equal(invoice?.invoice_discount_minor, 1925, '10% of 19250 is 1925');
+    assert.equal(invoice?.net_subtotal_minor, 17325);
+    assert.equal(invoice?.round_off_minor, -125);
+    assert.equal(invoice?.total_minor, 17200);
+    let lines = await db.findMany(invoiceLines, { where: { invoice_id: id } });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]?.discount_mode, 'fixed');
+    assert.equal(lines[0]?.line_discount_minor, 750);
+    assert.equal(lines[0]?.net_minor, 17325);
+  });
+
+  it('keeps discount fields scoped to the Organization and protected by CSRF', async () => {
+    let first = await createUserAndLoginWithOrganization(router, 'invoice-discount-scope-first');
+    let other = await createUserAndLoginWithOrganization(router, 'invoice-discount-scope-other');
+    let ownClient = await makeClient(first.organizationId);
+    let id = draftIdFrom(
+      await createDraft(first.sessionCookie, ownClient.id, {
+        line_description: ['Consulting'],
+        line_quantity: ['1'],
+        line_unit_price: ['100.0000'],
+        line_discount_mode: ['percent'],
+        line_discount_value: ['10'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['5.00'],
+        round_off: ['0.05'],
+      }),
+    );
+    let before = await db.find(invoices, id);
+
+    let foreignEdit = await submitDraft(
+      routes.app.dashboard.href(),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      draftFields(ownClient.id, {
+        line_discount_mode: ['fixed'],
+        line_discount_value: ['99'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['99'],
+        round_off: ['99'],
+      }),
+      other.sessionCookie,
+    );
+    assert.equal(foreignEdit.status, 404);
+    let after = await db.find(invoices, id);
+    assert.equal(after?.line_discount_total_minor, before?.line_discount_total_minor);
+    assert.equal(after?.invoice_discount_minor, before?.invoice_discount_minor);
+    assert.equal(after?.round_off_minor, before?.round_off_minor);
+    assert.equal(after?.updated_at, before?.updated_at);
+
+    let csrfFields = draftFields(ownClient.id, {
+      line_discount_mode: 'percent',
+      line_discount_value: '10',
+      invoice_discount_mode: 'fixed',
+      invoice_discount_value: '5.00',
+      round_off: '0.05',
+    });
+    let body = new URLSearchParams();
+    for (let [name, value] of Object.entries(csrfFields)) {
+      if (Array.isArray(value)) value.forEach((entry) => body.append(name, entry));
+      else if (value != null) body.append(name, value);
+    }
+    let noCsrf = await router.fetch(new URL(routes.app.invoices.new.action.href(), origin), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: first.sessionCookie,
+      },
+      body: body.toString(),
+    });
+    assert.equal(noCsrf.status, 403);
+    assert.equal(await db.count(invoices, { where: { organization_id: first.organizationId } }), 1);
+  });
+
   it('applies ISO 4217 minor-unit precision for INR, USD, JPY, and KWD', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
@@ -374,6 +842,92 @@ describe('draft invoices', () => {
       assert.equal(invoice?.total_minor, minor, `${currency} minor units`);
       let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
       assert.ok(html.includes(text), `${currency} should render ${text}`);
+    }
+  });
+
+  it('respects 0, 2, and 3 minor-unit currencies for discounts and round-off', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-precision',
+    );
+    let client = await makeClient(organizationId);
+    let cases = [
+      {
+        currency: 'INR',
+        price: '1.2345',
+        invoiceDiscount: '0.01',
+        roundOff: '0.01',
+        subtotal: 123,
+        lineDiscount: 62,
+        invoiceDiscountMinor: 1,
+        netSubtotal: 60,
+        total: 61,
+        text: '0.61 INR',
+      },
+      {
+        currency: 'USD',
+        price: '1.2345',
+        invoiceDiscount: '0.01',
+        roundOff: '0.01',
+        subtotal: 123,
+        lineDiscount: 62,
+        invoiceDiscountMinor: 1,
+        netSubtotal: 60,
+        total: 61,
+        text: '0.61 USD',
+      },
+      {
+        currency: 'JPY',
+        price: '3.0000',
+        invoiceDiscount: '1',
+        roundOff: '1',
+        subtotal: 3,
+        lineDiscount: 2,
+        invoiceDiscountMinor: 1,
+        netSubtotal: 0,
+        total: 1,
+        text: '1 JPY',
+      },
+      {
+        currency: 'KWD',
+        price: '1.2345',
+        invoiceDiscount: '0.001',
+        roundOff: '0.001',
+        subtotal: 1235,
+        lineDiscount: 618,
+        invoiceDiscountMinor: 1,
+        netSubtotal: 616,
+        total: 617,
+        text: '0.617 KWD',
+      },
+    ];
+
+    for (let item of cases) {
+      let response = await createDraft(sessionCookie, client.id, {
+        currency: item.currency,
+        line_description: ['Precision line'],
+        line_quantity: ['1'],
+        line_unit_price: [item.price],
+        line_discount_mode: ['percent'],
+        line_discount_value: ['50'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: [item.invoiceDiscount],
+        round_off: [item.roundOff],
+      });
+      assert.equal(response.status, 302, `${item.currency} draft should be accepted`);
+      let id = draftIdFrom(response);
+      let invoice = await db.find(invoices, id);
+      assert.equal(invoice?.subtotal_minor, item.subtotal, `${item.currency} gross`);
+      assert.equal(invoice?.line_discount_total_minor, item.lineDiscount, `${item.currency} line discount`);
+      assert.equal(
+        invoice?.invoice_discount_minor,
+        item.invoiceDiscountMinor,
+        `${item.currency} invoice discount`,
+      );
+      assert.equal(invoice?.net_subtotal_minor, item.netSubtotal, `${item.currency} net subtotal`);
+      assert.equal(invoice?.total_minor, item.total, `${item.currency} total`);
+      let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+      assert.ok(html.includes(item.text), `${item.currency} should render ${item.text}`);
     }
   });
 

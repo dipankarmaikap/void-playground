@@ -10,6 +10,13 @@ export function isAddLineIntent(formData: FormData): boolean {
 
 /** Returns the submitted snapshot with one more blank line, without saving anything. */
 export function withAdditionalLine(values: InvoiceFormValues): InvoiceFormValues {
-  let blank: InvoiceLineFormValue = { description: '', sac: '', quantity: '', unit_price: '' };
+  let blank: InvoiceLineFormValue = {
+    description: '',
+    sac: '',
+    quantity: '',
+    unit_price: '',
+    discount_mode: '',
+    discount_value: '',
+  };
   return { ...values, lines: [...values.lines, blank] };
 }

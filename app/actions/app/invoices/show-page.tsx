@@ -4,7 +4,7 @@ import { css } from 'remix/component';
 import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
-import { formatMoney } from '../../../data/invoice-calculation.ts';
+import { formatMoney, formatMoneySigned } from '../../../data/invoice-calculation.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
@@ -50,6 +50,7 @@ const cellStyle = css({
   textAlign: 'left',
 });
 const amountCellStyle = css({ padding: '0.5rem 0.625rem', textAlign: 'right' });
+const breakdownStyle = css({ margin: 0, fontSize: '0.9375rem', lineHeight: 1.6 });
 const totalStyle = css({ margin: 0, textAlign: 'right', fontSize: '1.0625rem', fontWeight: 700 });
 const actionsStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.25rem' });
 
@@ -120,6 +121,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                 <th mix={cellStyle}>Quantity</th>
                 <th mix={cellStyle}>Unit price</th>
                 <th mix={amountCellStyle}>Amount</th>
+                <th mix={amountCellStyle}>Line discount</th>
+                <th mix={amountCellStyle}>Net</th>
               </tr>
             </thead>
             <tbody>
@@ -132,10 +135,38 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   <td mix={amountCellStyle}>
                     {formatMoney(BigInt(line.amount_minor), invoice.currency)}
                   </td>
+                  <td mix={amountCellStyle}>
+                    {line.line_discount_minor === 0
+                      ? '—'
+                      : `${line.discount_mode === 'percent' ? `${line.discount_value}% · ` : ''}${formatMoney(BigInt(line.line_discount_minor), invoice.currency)}`}
+                  </td>
+                  <td mix={amountCellStyle}>
+                    {formatMoney(BigInt(line.net_minor), invoice.currency)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div mix={cardStyle}>
+          <h2 mix={headingStyle}>Amount breakdown</h2>
+          <p mix={breakdownStyle}>
+            Subtotal: {formatMoney(BigInt(invoice.subtotal_minor), invoice.currency)}
+          </p>
+          <p mix={breakdownStyle}>
+            Line discounts: {formatMoney(BigInt(invoice.line_discount_total_minor), invoice.currency)}
+          </p>
+          <p mix={breakdownStyle}>
+            Invoice discount ({invoice.invoice_discount_mode ?? 'none'}):{' '}
+            {formatMoney(BigInt(invoice.invoice_discount_minor), invoice.currency)}
+          </p>
+          <p mix={breakdownStyle}>
+            Net taxable subtotal: {formatMoney(BigInt(invoice.net_subtotal_minor), invoice.currency)}
+          </p>
+          <p mix={breakdownStyle}>
+            Round-off: {formatMoneySigned(BigInt(invoice.round_off_minor), invoice.currency)}
+          </p>
           <p mix={totalStyle}>Total: {formatMoney(BigInt(invoice.total_minor), invoice.currency)}</p>
         </div>
 

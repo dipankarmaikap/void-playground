@@ -8,6 +8,9 @@
 export const LINE_DECIMAL_PLACES = 4;
 const LINE_SCALE = 10n ** BigInt(LINE_DECIMAL_PLACES);
 
+/** A four-place percentage of 100, the largest percentage discount that can be applied. */
+export const PERCENT_MAX_SCALED = 100n * LINE_SCALE;
+
 /** ISO 4217 currencies with other than two minor units, used when Intl has no metadata. */
 const ZERO_MINOR_UNITS = new Set([
   'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
@@ -71,6 +74,79 @@ export const MAX_EXACT_MINOR_UNITS = BigInt(Number.MAX_SAFE_INTEGER);
 /** Converts a minor-unit BigInt to a Number only when the value is exactly representable. */
 export function toExactMinorNumber(value: bigint): number | null {
   return value >= 0n && value <= MAX_EXACT_MINOR_UNITS ? Number(value) : null;
+}
+
+/** Parses a signed decimal with at most four places into a fixed-point BigInt. */
+export function parseSignedScaledDecimal(raw: string): bigint | null {
+  let match = /^(-?)(\d+(?:\.\d{1,4})?)$/.exec(raw.trim());
+  if (!match) return null;
+  let magnitude = parseScaledDecimal(match[2]);
+  if (magnitude == null) return null;
+  return match[1] === '-' ? -magnitude : magnitude;
+}
+
+/**
+ * Rounds a four-place fixed-point value to the currency's minor unit, half away from zero. The
+ * sign is preserved so signed round-off adjustments round symmetrically.
+ */
+export function roundScaledToMinor(scaled: bigint, currency: string): bigint {
+  let digits = Math.min(currencyMinorDigits(currency), LINE_DECIMAL_PLACES);
+  let divisor = 10n ** BigInt(LINE_DECIMAL_PLACES - digits);
+  let negative = scaled < 0n;
+  let magnitude = negative ? -scaled : scaled;
+  let rounded = (magnitude + divisor / 2n) / divisor;
+  return negative ? -rounded : rounded;
+}
+
+/**
+ * Applies a four-place percentage in the 0–100 range to a minor-unit amount, rounding half-up.
+ * `percentScaled` is the entered percentage scaled by 10^4, so 10% is 100000 and the divisor is
+ * 100 × 10^4.
+ */
+export function percentOfMinor(amountMinor: bigint, percentScaled: bigint): bigint {
+  let divisor = PERCENT_MAX_SCALED;
+  return (amountMinor * percentScaled + divisor / 2n) / divisor;
+}
+
+/**
+ * Allocates `total` minor units across proportional weights using the largest-remainder method.
+ * Leftover units go to the largest fractional remainders, ties to the lowest index, so a saved
+ * Draft always splits an invoice-wide discount the same way.
+ */
+export function allocateProportionally(total: bigint, weights: readonly bigint[]): bigint[] {
+  let sum = weights.reduce((acc, weight) => acc + weight, 0n);
+  if (sum === 0n || total === 0n) return weights.map(() => 0n);
+  let allocation = weights.map((weight) => (total * weight) / sum);
+  let remainder = weights.map((weight, index) => total * weight - allocation[index] * sum);
+  let leftover = total - allocation.reduce((acc, value) => acc + value, 0n);
+  let order = weights
+    .map((_, index) => index)
+    .sort((a, b) => (remainder[b] === remainder[a] ? a - b : remainder[b] > remainder[a] ? 1 : -1));
+  for (let index = 0; index < Number(leftover); index += 1) {
+    allocation[order[index]] += 1n;
+  }
+  return allocation;
+}
+
+/** Formats a minor-unit amount, including a negative round-off adjustment. */
+export function formatMoneySigned(minor: bigint, currency: string): string {
+  return minor < 0n ? `-${formatMoney(-minor, currency)}` : formatMoney(minor, currency);
+}
+
+/** Renders a signed minor-unit amount as a plain decimal for a form input. */
+export function formatMinorInput(minor: bigint, currency: string): string {
+  let digits = currencyMinorDigits(currency);
+  let negative = minor < 0n;
+  let magnitude = negative ? -minor : minor;
+  let sign = negative ? '-' : '';
+  if (digits === 0) return `${sign}${magnitude}`;
+  let factor = 10n ** BigInt(digits);
+  return `${sign}${magnitude / factor}.${(magnitude % factor).toString().padStart(digits, '0')}`;
+}
+
+/** Converts a signed minor-unit BigInt to a Number only when it is exactly representable. */
+export function toExactSignedMinorNumber(value: bigint): number | null {
+  return value >= -MAX_EXACT_MINOR_UNITS && value <= MAX_EXACT_MINOR_UNITS ? Number(value) : null;
 }
 
 /** Formats a minor-unit amount with the currency's own precision, without floating-point math. */
