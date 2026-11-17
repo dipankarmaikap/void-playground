@@ -7,7 +7,14 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { findClient } from '../../../data/clients.ts';
 import type { User } from '../../../data/db.ts';
-import { findInvoice, findInvoiceLines, listInvoices } from '../../../data/invoices.ts';
+import {
+  findInvoice,
+  findInvoiceLines,
+  listInvoices,
+  parseInvoiceDirectoryDateFilter,
+  parseInvoiceDirectoryPage,
+  parseInvoiceStatusFilter,
+} from '../../../data/invoices.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -25,7 +32,20 @@ export default createController(routes.app.invoices, {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoices = await listInvoices(organization.id);
+      let query = (context.url.searchParams.get('q') ?? '').trim();
+      let clientId = (context.url.searchParams.get('clientId') ?? '').trim();
+      let filteredClient = clientId ? await findClient(organization.id, clientId) : null;
+      let status = parseInvoiceStatusFilter(context.url.searchParams.get('status'));
+      let from = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('from'));
+      let to = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('to'));
+      let directory = await listInvoices(organization.id, {
+        q: query,
+        clientId,
+        status,
+        from,
+        to,
+        page: parseInvoiceDirectoryPage(context.url.searchParams.get('page')),
+      });
       let message = context.session.get('message');
 
       return context.render(
@@ -33,7 +53,16 @@ export default createController(routes.app.invoices, {
           csrfToken={getCsrfToken(context)}
           identity={{ email: auth.identity.email, displayName: auth.identity.display_name }}
           organizationName={organization.name}
-          invoices={invoices}
+          invoices={directory.invoices}
+          clientId={clientId}
+          clientName={filteredClient?.legal_name}
+          query={query}
+          status={status}
+          from={from}
+          to={to}
+          page={directory.page}
+          hasPrevious={directory.hasPrevious}
+          hasNext={directory.hasNext}
           message={typeof message === 'string' ? message : undefined}
         />,
       );

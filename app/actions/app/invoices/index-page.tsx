@@ -6,13 +6,16 @@ import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
 import type { InvoiceDirectoryItem } from '../../../data/invoices.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
-import { linkButtonStyle } from '../../../ui/button.tsx';
+import { Button, linkButtonStyle } from '../../../ui/button.tsx';
+import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
+import { Input } from '../../../ui/input.tsx';
 import {
   pageHeaderStyle,
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../ui/page-styles.ts';
+import { Select } from '../../../ui/select.tsx';
 import { colors, radius, shadow } from '../../../ui/theme.ts';
 
 export interface InvoicesIndexPageProps {
@@ -20,7 +23,39 @@ export interface InvoicesIndexPageProps {
   identity: UserIdentity;
   organizationName?: string;
   invoices: InvoiceDirectoryItem[];
+  clientId: string;
+  clientName?: string;
+  query: string;
+  status: string;
+  from: string;
+  to: string;
+  page: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
   message?: string;
+}
+
+interface DirectoryFilters {
+  clientId: string;
+  query: string;
+  status: string;
+  from: string;
+  to: string;
+  page?: number;
+}
+
+function directoryHref({ clientId, query, status, from, to, page }: DirectoryFilters): string {
+  let searchParams: Record<string, string> = {};
+  if (clientId) searchParams.clientId = clientId;
+  if (query) searchParams.q = query;
+  if (status !== 'all') searchParams.status = status;
+  if (from) searchParams.from = from;
+  if (to) searchParams.to = to;
+  if (page && page > 1) searchParams.page = String(page);
+
+  return Object.keys(searchParams).length === 0
+    ? routes.app.invoices.index.href()
+    : routes.app.invoices.index.href({}, { searchParams });
 }
 
 const toolbarStyle = css({
@@ -30,6 +65,24 @@ const toolbarStyle = css({
   justifyContent: 'space-between',
   gap: '0.75rem',
   marginBottom: '1.25rem',
+});
+
+const filterFormStyle = css({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))',
+  alignItems: 'end',
+  gap: '0.75rem',
+  marginBottom: '1.25rem',
+  padding: '1rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.lg,
+  background: colors.surface,
+});
+
+const filterActionsStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.5rem',
 });
 
 const listStyle = css({
@@ -76,9 +129,51 @@ const emptyStyle = css({
   fontSize: '0.9375rem',
 });
 
+const paginationStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.75rem',
+  marginTop: '1.5rem',
+});
+
+const pageNumberStyle = css({
+  color: colors.muted,
+  fontSize: '0.875rem',
+  fontWeight: 600,
+});
+
+function statusLabel(status: string): string {
+  return status
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
   return () => {
-    let { csrfToken, identity, organizationName, invoices, message } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      invoices,
+      clientId,
+      clientName,
+      query,
+      status,
+      from,
+      to,
+      page,
+      hasPrevious,
+      hasNext,
+      message,
+    } = handle.props;
+    let hasFilters =
+      clientId !== '' || query !== '' || status !== 'all' || from !== '' || to !== '';
+    let filters = { clientId, query, status, from, to };
+    let previousHref = directoryHref({ ...filters, page: page - 1 });
+    let nextHref = directoryHref({ ...filters, page: page + 1 });
 
     return (
       <AppShell
@@ -92,8 +187,9 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
         <header mix={pageHeaderStyle}>
           <h1 mix={pageHeadingStyle}>Invoices</h1>
           <p mix={pageIntroStyle}>
-            Create drafts for Active Clients in your Organization. Search, filters, and issuing arrive
-            in later releases.
+            {clientName
+              ? `Invoices for ${clientName}.`
+              : 'Browse invoices prepared for Active Clients in your Organization.'}
           </p>
         </header>
         {message ? (
@@ -106,10 +202,57 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
             New invoice draft
           </a>
         </div>
+        <form
+          method="get"
+          action={routes.app.invoices.index.href()}
+          role="search"
+          aria-label="Search and filter invoices"
+          mix={filterFormStyle}
+        >
+          {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
+          <Field label="Search invoices" hint="Search recipient names or invoice numbers.">
+            <Input name="q" type="search" defaultValue={query} />
+          </Field>
+          <Field label="Status">
+            <Select name="status">
+              <option value="all" selected={status === 'all'}>
+                All statuses
+              </option>
+              <option value="draft" selected={status === 'draft'}>
+                Draft
+              </option>
+              {status !== 'all' && status !== 'draft' ? (
+                <option value={status} selected>
+                  {statusLabel(status)}
+                </option>
+              ) : null}
+            </Select>
+          </Field>
+          <Field label="Invoice date from">
+            <Input name="from" type="date" defaultValue={from} />
+          </Field>
+          <Field label="Invoice date to">
+            <Input name="to" type="date" defaultValue={to} />
+          </Field>
+          <div mix={filterActionsStyle}>
+            <Button type="submit">Apply filters</Button>
+            <a
+              href={directoryHref({ ...filters, query: '', status: 'all', from: '', to: '' })}
+              data-variant="secondary"
+              mix={linkButtonStyle}
+            >
+              Reset
+            </a>
+          </div>
+        </form>
         {invoices.length === 0 ? (
           <div mix={emptyStyle}>
-            <p>No invoices yet.</p>
-            <span mix={itemMetaStyle}>Start a draft for one of your Active Clients.</span>
+            <p>{hasFilters ? 'No invoices match your search and filters.' : 'No invoices yet.'}</p>
+            <span mix={itemMetaStyle}>
+              {hasFilters
+                ? 'Try a different search, change the filters, or reset them.'
+                : 'Start a draft for one of your Active Clients.'}
+            </span>
           </div>
         ) : (
           <ul mix={listStyle}>
@@ -119,9 +262,13 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
                   href={routes.app.invoices.show.href({ invoiceId: invoice.id })}
                   mix={itemStyle}
                 >
-                  <span mix={itemHeadingStyle}>{invoice.recipient_legal_name}</span>
+                  <span mix={itemHeadingStyle}>
+                    {invoice.invoice_number ? `${invoice.invoice_number} · ` : ''}
+                    {invoice.recipient_legal_name}
+                  </span>
                   <span mix={itemMetaStyle}>
-                    {DRAFT_STATUS_LABEL} · {invoice.invoice_date} ·{' '}
+                    {invoice.status === 'draft' ? DRAFT_STATUS_LABEL : statusLabel(invoice.status)} ·{' '}
+                    {invoice.invoice_date} ·{' '}
                     {formatMoney(BigInt(invoice.total_minor), invoice.currency)}
                   </span>
                 </a>
@@ -129,6 +276,19 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
             ))}
           </ul>
         )}
+        {hasPrevious || hasNext ? (
+          <nav aria-label="Invoice pages" mix={paginationStyle}>
+            {hasPrevious ? (
+              <a href={previousHref} data-variant="secondary" mix={linkButtonStyle}>
+                Previous
+              </a>
+            ) : null}
+            <span aria-current="page" mix={pageNumberStyle}>
+              Page {page}
+            </span>
+            {hasNext ? <a href={nextHref} mix={linkButtonStyle}>Next</a> : null}
+          </nav>
+        ) : null}
       </AppShell>
     );
   };

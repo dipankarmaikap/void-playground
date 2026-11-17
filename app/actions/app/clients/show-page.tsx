@@ -26,6 +26,7 @@ export interface ClientProfilePageProps {
   identity: UserIdentity;
   organizationName?: string;
   client: Client;
+  invoiceCount: number;
   error?: string;
   message?: string;
 }
@@ -83,9 +84,25 @@ const backLinkStyle = css({
 
 export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
   return () => {
-    let { csrfToken, identity, organizationName, client, error, message } = handle.props;
+    let {
+      csrfToken,
+      identity,
+      organizationName,
+      client,
+      invoiceCount,
+      error,
+      message,
+    } = handle.props;
     let label = clientDisplayLabel(client);
     let isBusiness = client.type === 'business';
+    let invoiceDirectoryHref = routes.app.invoices.index.href(
+      {},
+      { searchParams: { clientId: client.id } },
+    );
+    let newInvoiceHref = routes.app.invoices.new.index.href(
+      {},
+      { searchParams: { clientId: client.id } },
+    );
 
     return (
       <AppShell
@@ -150,6 +167,24 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
         <ClientContactSummary client={client} />
         {client.tax_value ? <ClientTaxSummary client={client} /> : null}
         <ClientBillingSummary client={client} />
+        <section aria-labelledby="client-invoices-heading" mix={cardStyle}>
+          <h2 id="client-invoices-heading" mix={cardHeadingStyle}>
+            Invoices
+          </h2>
+          <p mix={detailStyle}>
+            {invoiceCount} {invoiceCount === 1 ? 'invoice' : 'invoices'}
+          </p>
+          <div mix={actionsStyle}>
+            <a href={invoiceDirectoryHref} mix={linkButtonStyle}>
+              View invoices
+            </a>
+            {client.status === 'active' ? (
+              <a href={newInvoiceHref} data-variant="secondary" mix={linkButtonStyle}>
+                New invoice draft
+              </a>
+            ) : null}
+          </div>
+        </section>
         <div mix={actionsStyle}>
           <a
             href={routes.app.clients.edit.index.href({ clientId: client.id })}

@@ -14,6 +14,7 @@ import {
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
+import { countClientInvoices } from '../../../data/invoices.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -63,6 +64,7 @@ export default createController(routes.app.clients, {
       let organization = context.get(CurrentOrganization);
       let client = await findClient(organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
+      let invoiceCount = await countClientInvoices(organization.id, client.id);
 
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;
@@ -75,6 +77,7 @@ export default createController(routes.app.clients, {
           identity={{ email: identity.email, displayName: identity.display_name }}
           organizationName={organization.name}
           client={client}
+          invoiceCount={invoiceCount}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,
