@@ -3,6 +3,7 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import { db, organizationGstRatePresets } from '../../../data/db.ts';
+import { todayInKolkata } from '../../../data/invoice-dates.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
@@ -599,7 +600,10 @@ describe('draft invoices', () => {
     assert.ok(html.includes(client.legal_name));
     let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
     assert.match(directory, /Draft Recipient/);
-    assert.match(directory, /Draft · 2026-11-17 · 174\.69 INR/);
+    assert.match(
+      directory,
+      new RegExp(`Draft · ${todayInKolkata()} · 174\\.69 INR`),
+    );
     assert.ok(directory.includes(id), 'the Draft is visible in the invoice directory');
   });
 

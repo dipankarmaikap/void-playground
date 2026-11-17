@@ -15,4 +15,21 @@ export const invoiceRoutes = route({
     discard: post('/discard'),
     internalNote: post('/internal-note'),
   }),
+  payments: route('/:invoiceId/payments', {
+    record: post('/'),
+    void: post('/:paymentId/void'),
+  }),
+  refunds: route('/:invoiceId/refunds', {
+    record: post('/'),
+    void: post('/:refundId/void'),
+  }),
+  creditNotes: route('/:invoiceId/credit-notes', {
+    new: form('/new'),
+    edit: form('/:creditNoteId/edit'),
+    pdf: get('/:creditNoteId/pdf'),
+    lifecycle: route('/:creditNoteId', {
+      issue: post('/issue'),
+      discard: post('/discard'),
+    }),
+  }),
 });

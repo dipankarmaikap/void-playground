@@ -1,9 +1,12 @@
-import { gt, gte, ilike, lt, lte, or } from 'remix/data-table';
+import { gte, ilike, lte, or } from 'remix/data-table';
 
 import { db, invoiceLines, invoices } from './db.ts';
 import type { Invoice, InvoiceLine } from './db.ts';
 import { invoiceDisplayStatus } from './invoice-issuance.ts';
 import type { InvoiceDisplayStatus } from './invoice-issuance.ts';
+import { activeInvoicePaymentTotals } from './invoice-payments.ts';
+import { activeInvoiceRefundTotals, invoiceFinancialBalances } from './invoice-refunds.ts';
+import { activeInvoiceCreditNoteTotals, invoiceCreditNoteLabels } from './credit-notes.ts';
 import type { InvoiceDraftChanges, InvoiceLineChanges } from './invoice-draft.ts';
 import { isValidIsoDate, todayInKolkata } from './invoice-dates.ts';
 
@@ -22,7 +25,15 @@ export type InvoiceDirectoryItem = Pick<
   | 'invoice_date'
   | 'total_minor'
   | 'created_at'
-> & { status: InvoiceDisplayStatus };
+> & {
+  status: InvoiceDisplayStatus;
+  amount_paid_minor: number;
+  credited_total_minor: number;
+  revised_total_minor: number;
+  balance_due_minor: number;
+  refund_due_minor: number;
+  credit_note_numbers: string[];
+};
 
 type InvoiceDirectoryRow = Pick<
   Invoice,
@@ -49,7 +60,7 @@ export interface InvoiceListFilter {
   q?: string;
   /** Optional Client scope used by the Client profile's invoice link. */
   clientId?: string;
-  /** Derived display status (`draft`, `sent`, `overdue`), or `all`. */
+  /** Derived display status (`draft`, `sent`, `partially_paid`, `paid`, `overdue`, `cancelled`), or `all`. */
   status?: string;
   /** Inclusive invoice-date lower bound. Invalid dates are ignored. */
   from?: string;
@@ -85,21 +96,18 @@ export async function listInvoices(
   let offset = (page - 1) * INVOICE_DIRECTORY_PAGE_SIZE;
   let literalSearch = q !== '' && LIKE_WILDCARDS.test(q);
   let today = todayInKolkata();
+  let isDerivedStatusFilter = ['sent', 'partially_paid', 'paid', 'overdue', 'cancelled'].includes(
+    status,
+  );
   let filteredQuery = db
     .query(invoices)
     .where({ organization_id: organizationId, document_type: 'invoice' });
   if (filter.clientId) filteredQuery = filteredQuery.where({ client_id: filter.clientId });
   if (status === 'draft') {
     filteredQuery = filteredQuery.where({ status: 'draft' });
-  } else if (status === 'sent') {
-    filteredQuery = filteredQuery
-      .where({ status: 'issued' })
-      .where(or(gte(invoices.due_date, today), lte(invoices.total_minor, 0)));
-  } else if (status === 'overdue') {
-    filteredQuery = filteredQuery
-      .where({ status: 'issued' })
-      .where(lt(invoices.due_date, today))
-      .where(gt(invoices.total_minor, 0));
+  } else if (isDerivedStatusFilter) {
+    // Payment states are derived from the current payment history, not stored invoice columns.
+    filteredQuery = filteredQuery.where({ status: 'issued' });
   } else if (status !== 'all') {
     // Raw lifecycle values such as `issued` are not display statuses and must not bypass derivation.
     filteredQuery = filteredQuery.where({ status: NO_DISPLAY_STATUS });
@@ -136,21 +144,35 @@ export async function listInvoices(
     .orderBy('created_at', 'desc')
     .orderBy('id', 'asc');
 
-  if (!literalSearch) {
+  if (!literalSearch && !isDerivedStatusFilter) {
     let rows = await query
       .limit(INVOICE_DIRECTORY_PAGE_SIZE + 1)
       .offset(offset)
       .all();
+    let [paymentTotals, creditTotals, refundTotals, creditNoteLabels] = await Promise.all([
+      activeInvoicePaymentTotals(organizationId),
+      activeInvoiceCreditNoteTotals(organizationId),
+      activeInvoiceRefundTotals(organizationId),
+      invoiceCreditNoteLabels(organizationId),
+    ]);
     return {
       invoices: rows
         .slice(0, INVOICE_DIRECTORY_PAGE_SIZE)
-        .map((row) => invoiceDirectoryItem(row, today)),
+        .map((row) =>
+          invoiceDirectoryItem(row, today, paymentTotals, creditTotals, refundTotals, creditNoteLabels),
+        ),
       page,
       hasPrevious: page > 1,
       hasNext: rows.length > INVOICE_DIRECTORY_PAGE_SIZE,
     };
   }
 
+  let [paymentTotals, creditTotals, refundTotals, creditNoteLabels] = await Promise.all([
+    activeInvoicePaymentTotals(organizationId),
+    activeInvoiceCreditNoteTotals(organizationId),
+    activeInvoiceRefundTotals(organizationId),
+    invoiceCreditNoteLabels(organizationId),
+  ]);
   let matches: InvoiceDirectoryItem[] = [];
   let scanned = 0;
   let matchingCount = 0;
@@ -162,9 +184,18 @@ export async function listInvoices(
     if (batch.length === 0) break;
 
     for (let invoice of batch) {
-      if (!matchesInvoiceQuery(invoice, q)) continue;
+      if (literalSearch && !matchesInvoiceQuery(invoice, q)) continue;
+      let item = invoiceDirectoryItem(
+        invoice,
+        today,
+        paymentTotals,
+        creditTotals,
+        refundTotals,
+        creditNoteLabels,
+      );
+      if (isDerivedStatusFilter && item.status !== status) continue;
       if (matchingCount >= offset) {
-        matches.push(invoiceDirectoryItem(invoice, today));
+        matches.push(item);
       }
       matchingCount += 1;
       if (matches.length >= INVOICE_DIRECTORY_PAGE_SIZE + 1) break;
@@ -210,9 +241,34 @@ function normalizePage(page: number | undefined): number {
   return page;
 }
 
-function invoiceDirectoryItem(row: InvoiceDirectoryRow, today: string): InvoiceDirectoryItem {
+function invoiceDirectoryItem(
+  row: InvoiceDirectoryRow,
+  today: string,
+  paymentTotals: ReadonlyMap<string, number>,
+  creditTotals: ReadonlyMap<string, number>,
+  refundTotals: ReadonlyMap<string, number>,
+  creditNoteLabels: ReadonlyMap<string, string[]>,
+): InvoiceDirectoryItem {
   let { due_date: _dueDate, status: _storedStatus, ...item } = row;
-  return { ...item, status: invoiceDisplayStatus(row, today) };
+  let amountPaidMinor = paymentTotals.get(row.id) ?? 0;
+  let creditedTotalMinor = creditTotals.get(row.id) ?? 0;
+  let activeRefundedMinor = refundTotals.get(row.id) ?? 0;
+  let balances = invoiceFinancialBalances(
+    row.total_minor,
+    creditedTotalMinor,
+    amountPaidMinor,
+    activeRefundedMinor,
+  );
+  return {
+    ...item,
+    status: invoiceDisplayStatus(row, balances.netPaidMinor, today, creditedTotalMinor),
+    amount_paid_minor: amountPaidMinor,
+    credited_total_minor: creditedTotalMinor,
+    revised_total_minor: balances.revisedTotalMinor,
+    balance_due_minor: balances.balanceDueMinor,
+    refund_due_minor: balances.refundDueMinor,
+    credit_note_numbers: creditNoteLabels.get(row.id) ?? [],
+  };
 }
 
 function matchesInvoiceQuery(invoice: InvoiceDirectoryRow, q: string): boolean {

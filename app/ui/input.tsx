@@ -13,14 +13,15 @@ export type InputProps = Props<'input'> & {
 const baseStyle = css({
   padding: '10px 12px',
   width: '100%',
+  minHeight: '48px',
   boxSizing: 'border-box',
   border: `1px solid ${colors.border}`,
   borderRadius: radius.sm,
   background: colors.surface,
   color: colors.text,
   fontFamily,
-  fontSize: '0.9375rem',
-  '&:focus': {
+  fontSize: 'max(1rem, 1em)',
+  '&:focus-visible': {
     outline: `2px solid ${colors.accent}`,
     outlineOffset: '1px',
     borderColor: colors.accent,

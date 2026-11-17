@@ -4,9 +4,14 @@ import { createSqliteDatabase } from 'remix/data-table/sqlite';
 
 import {
   clients,
+  creditNoteLines,
+  creditNotePdfArtifacts,
+  creditNotes,
   db,
   documentSequences,
   invoiceLines,
+  invoicePayments,
+  invoiceRefunds,
   invoicePdfArtifacts,
   invoices,
   organizationGstRatePresets,
@@ -716,6 +721,367 @@ describe('db', () => {
     await db.delete(invoices, invoice.id);
     assert.equal(await db.find(invoiceLines, validLine.id), null, 'lines cascade with their invoice');
     assert.ok(await db.find(invoices, otherInvoice.id), 'the other Organization is untouched');
+  });
+
+  it('requires invoice payments to reference an invoice in the same Organization', async () => {
+    let organizationId = await createOrganization('Invoice Payment Ownership Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Payment Ownership Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let invoice = validInvoice({ organization_id: organizationId, client_id: clientId });
+    let otherInvoice = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+    });
+    await db.create(invoices, invoice);
+    await db.create(invoices, otherInvoice);
+
+    let now = Date.now();
+    let payment = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      payment_date: '2026-11-17',
+      amount_minor: 500,
+      payment_method: 'upi',
+      reference: 'PAYMENT-REF',
+      voided_at: null,
+      void_reason: null,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let rejected = async (values: Record<string, unknown>) => {
+      let didReject = false;
+      try {
+        await db.create(invoicePayments, payment(values));
+      } catch {
+        didReject = true;
+      }
+      assert.equal(didReject, true, `the database must reject ${JSON.stringify(values)}`);
+    };
+
+    await rejected({ organization_id: crypto.randomUUID() });
+    await rejected({ organization_id: otherOrganizationId, invoice_id: invoice.id });
+    await rejected({ organization_id: organizationId, invoice_id: otherInvoice.id });
+    await rejected({ invoice_id: crypto.randomUUID() });
+    await rejected({ amount_minor: 0 });
+    await rejected({ payment_method: 'cryptocurrency' });
+    await rejected({ voided_at: now, void_reason: ' \t ' });
+    await rejected({ void_reason: 'Reason without a void timestamp' });
+
+    let validPayment = payment();
+    await db.create(invoicePayments, validPayment);
+    assert.equal((await db.find(invoicePayments, validPayment.id))?.invoice_id, invoice.id);
+
+    await db.delete(invoices, invoice.id);
+    assert.equal(
+      await db.find(invoicePayments, validPayment.id),
+      null,
+      'payment history cascades only with its owning invoice',
+    );
+    assert.ok(await db.find(invoices, otherInvoice.id));
+  });
+
+  it('requires invoice refunds to reference an invoice in the same Organization', async () => {
+    let organizationId = await createOrganization('Invoice Refund Ownership Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Refund Ownership Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let invoice = validInvoice({ organization_id: organizationId, client_id: clientId });
+    let otherInvoice = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+    });
+    await db.create(invoices, invoice);
+    await db.create(invoices, otherInvoice);
+
+    let now = Date.now();
+    let refund = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      refund_date: '2026-11-17',
+      amount_minor: 500,
+      refund_method: 'upi',
+      reference: 'REFUND-REF',
+      voided_at: null,
+      void_reason: null,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let rejected = async (values: Record<string, unknown>) => {
+      let didReject = false;
+      try {
+        await db.create(invoiceRefunds, refund(values));
+      } catch {
+        didReject = true;
+      }
+      assert.equal(didReject, true, `the database must reject ${JSON.stringify(values)}`);
+    };
+
+    await rejected({ organization_id: crypto.randomUUID() });
+    await rejected({ organization_id: otherOrganizationId, invoice_id: invoice.id });
+    await rejected({ organization_id: organizationId, invoice_id: otherInvoice.id });
+    await rejected({ invoice_id: crypto.randomUUID() });
+    await rejected({ amount_minor: 0 });
+    await rejected({ refund_method: 'cryptocurrency' });
+    await rejected({ refund_date: '17-11-2026' });
+    await rejected({ voided_at: now, void_reason: ' \t ' });
+    await rejected({ void_reason: 'Reason without a void timestamp' });
+
+    let validRefund = refund();
+    await db.create(invoiceRefunds, validRefund);
+    assert.equal((await db.find(invoiceRefunds, validRefund.id))?.invoice_id, invoice.id);
+
+    await db.delete(invoices, invoice.id);
+    assert.equal(
+      await db.find(invoiceRefunds, validRefund.id),
+      null,
+      'refund history cascades only with its owning invoice',
+    );
+    assert.ok(await db.find(invoices, otherInvoice.id));
+  });
+
+  it('enforces Organization and invoice composite keys for Credit Notes, lines, and PDF artifacts', async () => {
+    let organizationId = await createOrganization('Credit Note Constraint Test');
+    let otherOrganizationId = await createOrganization('Other Credit Note Constraint Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let now = Date.now();
+    let invoice = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      subtotal_minor: 1000,
+      net_subtotal_minor: 1000,
+      total_minor: 1000,
+    });
+    let otherInvoice = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+      subtotal_minor: 1000,
+      net_subtotal_minor: 1000,
+      total_minor: 1000,
+    });
+    await db.create(invoices, invoice);
+    await db.create(invoices, otherInvoice);
+
+    let sourceLine = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      position: 0,
+      description: 'Creditable service',
+      sac: '998314',
+      quantity: '1.0000',
+      unit_price: '10.0000',
+      amount_minor: 1000,
+      discount_mode: null,
+      discount_value: null,
+      line_discount_minor: 0,
+      allocated_invoice_discount_minor: 0,
+      net_minor: 1000,
+      tax_treatment: null,
+      gst_rate: null,
+      cgst_rate: null,
+      sgst_rate: null,
+      igst_rate: null,
+      cgst_amount_minor: 0,
+      sgst_amount_minor: 0,
+      igst_amount_minor: 0,
+      foreign_tax_label: null,
+      foreign_tax_mode: null,
+      foreign_tax_rate: null,
+      foreign_tax_amount_minor: 0,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let line = sourceLine();
+    let otherLine = sourceLine({
+      id: crypto.randomUUID(),
+      organization_id: otherOrganizationId,
+      invoice_id: otherInvoice.id,
+    });
+    await db.create(invoiceLines, line);
+    await db.create(invoiceLines, otherLine);
+
+    let creditNote = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      status: 'draft',
+      credit_note_number: null,
+      credit_date: '2026-11-17',
+      reason: 'Scope reduced',
+      issued_at: null,
+      subtotal_minor: 500,
+      line_discount_total_minor: 0,
+      invoice_discount_mode: null,
+      invoice_discount_minor: 0,
+      net_subtotal_minor: 500,
+      tax_total_minor: 0,
+      round_off_minor: 0,
+      total_minor: 500,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let rejectCreditNote = async (values: Record<string, unknown>) => {
+      let rejected = false;
+      try {
+        await db.create(creditNotes, creditNote(values));
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${JSON.stringify(values)}`);
+    };
+
+    await rejectCreditNote({ organization_id: crypto.randomUUID() });
+    await rejectCreditNote({ organization_id: otherOrganizationId, invoice_id: invoice.id });
+    await rejectCreditNote({ organization_id: organizationId, invoice_id: otherInvoice.id });
+    await rejectCreditNote({ invoice_id: crypto.randomUUID() });
+    await rejectCreditNote({ reason: ' \t ' });
+    await rejectCreditNote({ total_minor: 0 });
+
+    let issued = creditNote({
+      status: 'issued',
+      credit_note_number: 'CN/26-27/0001',
+      issued_at: now,
+    });
+    await db.create(creditNotes, issued);
+    let duplicateNumberRejected = false;
+    try {
+      await db.create(
+        creditNotes,
+        creditNote({
+          status: 'issued',
+          credit_note_number: 'CN/26-27/0001',
+          issued_at: now,
+        }),
+      );
+    } catch {
+      duplicateNumberRejected = true;
+    }
+    assert.equal(duplicateNumberRejected, true, 'Credit Note numbers are unique per Organization');
+
+    let otherOrganizationNumber = creditNote({
+      id: crypto.randomUUID(),
+      organization_id: otherOrganizationId,
+      invoice_id: otherInvoice.id,
+      status: 'issued',
+      credit_note_number: 'CN/26-27/0001',
+      issued_at: now,
+    });
+    await db.create(creditNotes, otherOrganizationNumber);
+
+    let draft = creditNote();
+    await db.create(creditNotes, draft);
+    let noteLine = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      credit_note_id: draft.id,
+      invoice_id: invoice.id,
+      invoice_line_id: line.id,
+      position: 0,
+      description: 'Credited service',
+      sac: '998314',
+      quantity: '0.5000',
+      unit_price: '10.0000',
+      amount_minor: 500,
+      discount_mode: null,
+      discount_value: null,
+      line_discount_minor: 0,
+      allocated_invoice_discount_minor: 0,
+      net_minor: 500,
+      tax_treatment: null,
+      gst_rate: null,
+      cgst_rate: null,
+      sgst_rate: null,
+      igst_rate: null,
+      cgst_amount_minor: 0,
+      sgst_amount_minor: 0,
+      igst_amount_minor: 0,
+      foreign_tax_label: null,
+      foreign_tax_mode: null,
+      foreign_tax_rate: null,
+      foreign_tax_amount_minor: 0,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let rejectCreditNoteLine = async (values: Record<string, unknown>) => {
+      let rejected = false;
+      try {
+        await db.create(creditNoteLines, noteLine(values));
+      } catch {
+        rejected = true;
+      }
+      assert.equal(rejected, true, `the database must reject ${JSON.stringify(values)}`);
+    };
+    await rejectCreditNoteLine({ organization_id: otherOrganizationId });
+    await rejectCreditNoteLine({ credit_note_id: crypto.randomUUID() });
+    await rejectCreditNoteLine({ invoice_id: otherInvoice.id });
+    await rejectCreditNoteLine({ invoice_line_id: otherLine.id });
+    await rejectCreditNoteLine({ quantity: '' });
+    await rejectCreditNoteLine({ line_discount_minor: 501 });
+
+    let validNoteLine = noteLine();
+    await db.create(creditNoteLines, validNoteLine);
+    let duplicateSourceLineRejected = false;
+    try {
+      await db.create(creditNoteLines, noteLine({ id: crypto.randomUUID() }));
+    } catch {
+      duplicateSourceLineRejected = true;
+    }
+    assert.equal(duplicateSourceLineRejected, true, 'one Draft cannot repeat an original service line');
+
+    let artifact = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoice.id,
+      credit_note_id: issued.id,
+      data: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+    let validArtifact = artifact();
+    await db.create(creditNotePdfArtifacts, validArtifact);
+    let storedArtifact = await db.findOne(creditNotePdfArtifacts, {
+      where: { organization_id: organizationId, credit_note_id: issued.id },
+    });
+    assert.deepEqual(
+      Array.from(storedArtifact?.data as Uint8Array),
+      [0x25, 0x50, 0x44, 0x46, 0x2d],
+      'Credit Note PDF bytes round-trip exactly',
+    );
+
+    let crossOrganizationArtifactRejected = false;
+    try {
+      await db.create(
+        creditNotePdfArtifacts,
+        artifact({ organization_id: otherOrganizationId }),
+      );
+    } catch {
+      crossOrganizationArtifactRejected = true;
+    }
+    assert.equal(crossOrganizationArtifactRejected, true);
+    let crossInvoiceArtifactRejected = false;
+    try {
+      await db.create(creditNotePdfArtifacts, artifact({ invoice_id: otherInvoice.id }));
+    } catch {
+      crossInvoiceArtifactRejected = true;
+    }
+    assert.equal(crossInvoiceArtifactRejected, true);
+    let duplicateArtifactRejected = false;
+    try {
+      await db.create(creditNotePdfArtifacts, artifact({ id: crypto.randomUUID() }));
+    } catch {
+      duplicateArtifactRejected = true;
+    }
+    assert.equal(duplicateArtifactRejected, true, 'one Credit Note has one immutable PDF artifact');
   });
 
   it('enforces discount and round-off integrity on invoices and invoice lines', async () => {

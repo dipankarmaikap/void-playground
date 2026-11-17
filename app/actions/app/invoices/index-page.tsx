@@ -224,13 +224,25 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
                 <option value="sent" selected={status === 'sent'}>
                   Sent
                 </option>
+                <option value="partially_paid" selected={status === 'partially_paid'}>
+                  Partially Paid
+                </option>
+                <option value="paid" selected={status === 'paid'}>
+                  Paid
+                </option>
                 <option value="overdue" selected={status === 'overdue'}>
                   Overdue
+                </option>
+                <option value="cancelled" selected={status === 'cancelled'}>
+                  Cancelled
                 </option>
                 {status !== 'all' &&
                 status !== 'draft' &&
                 status !== 'sent' &&
-                status !== 'overdue' ? (
+                status !== 'partially_paid' &&
+                status !== 'paid' &&
+                status !== 'overdue' &&
+                status !== 'cancelled' ? (
                   <option value={status} selected>
                     {statusLabel(status)}
                   </option>
@@ -280,6 +292,18 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
                     {invoice.status === 'draft' ? DRAFT_STATUS_LABEL : statusLabel(invoice.status)} ·{' '}
                     {invoice.invoice_date} ·{' '}
                     {formatMoney(BigInt(invoice.total_minor), invoice.currency)}
+                    {invoice.credited_total_minor > 0
+                      ? ` · Credited: ${formatMoney(BigInt(invoice.credited_total_minor), invoice.currency)} · Revised total: ${formatMoney(BigInt(invoice.revised_total_minor), invoice.currency)}`
+                      : ''}
+                    {invoice.status === 'draft'
+                      ? ''
+                      : ` · Balance due: ${formatMoney(BigInt(invoice.balance_due_minor), invoice.currency)}`}
+                    {invoice.refund_due_minor > 0
+                      ? ` · Refund due: ${formatMoney(BigInt(invoice.refund_due_minor), invoice.currency)}`
+                      : ''}
+                    {invoice.credit_note_numbers.length > 0
+                      ? ` · Credit notes: ${invoice.credit_note_numbers.join(', ')}`
+                      : ''}
                   </span>
                 </a>
               </li>

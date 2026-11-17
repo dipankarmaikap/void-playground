@@ -1,22 +1,43 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
+import type {
+  Client,
+  CreditNote,
+  Invoice,
+  InvoiceLine,
+  InvoicePayment,
+  InvoiceRefund,
+} from '../../../data/db.ts';
 import { joinAddressParts } from '../../../data/address.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
-import { formatMoney, formatMoneySigned } from '../../../data/invoice-calculation.ts';
+import {
+  currencyMinorDigits,
+  formatMinorInput,
+  formatMoney,
+  formatMoneySigned,
+} from '../../../data/invoice-calculation.ts';
 import {
   groupedInvoiceTaxes,
   invoiceLineGstComponents,
 } from '../../../data/invoice-tax.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
+import {
+  INVOICE_PAYMENT_METHODS,
+  invoicePaymentMethodLabel,
+} from '../../../data/invoice-payments.ts';
+import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoice-refunds.ts';
+import type { InvoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
 import { invoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
+import { todayInKolkata } from '../../../data/invoice-dates.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';
+import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
+import { Input } from '../../../ui/input.tsx';
 import {
   noticeSpacingStyle,
   noticeStatusStyle,
@@ -24,7 +45,22 @@ import {
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../ui/page-styles.ts';
+import { Select } from '../../../ui/select.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+
+export interface PaymentFormValues {
+  amount: string;
+  payment_date: string;
+  payment_method: string;
+  reference: string;
+}
+
+export interface RefundFormValues {
+  amount: string;
+  refund_date: string;
+  refund_method: string;
+  reference: string;
+}
 
 export interface InvoiceShowPageProps {
   csrfToken: string;
@@ -33,10 +69,36 @@ export interface InvoiceShowPageProps {
   invoice: Invoice;
   lines: InvoiceLine[];
   client: Client | null;
+  payments: InvoicePayment[];
+  amountPaidMinor: number;
+  refunds: InvoiceRefund[];
+  activeRefundedMinor: number;
+  netPaidMinor: number;
+  refundDueMinor: number;
+  creditNotes: CreditNote[];
+  creditedTotalMinor: number;
+  revisedTotalMinor: number;
+  balanceDueMinor: number;
   message?: string;
   validationErrors?: readonly string[];
   internalNoteValue?: string;
   internalNoteError?: string;
+  paymentFormValues?: PaymentFormValues;
+  paymentFieldErrors?: Partial<Record<keyof PaymentFormValues, string>>;
+  paymentActionError?: string;
+  voidPaymentError?: {
+    paymentId: string;
+    reason: string;
+    message: string;
+  };
+  refundFormValues?: RefundFormValues;
+  refundFieldErrors?: Partial<Record<keyof RefundFormValues, string>>;
+  refundActionError?: string;
+  voidRefundError?: {
+    refundId: string;
+    reason: string;
+    message: string;
+  };
 }
 
 const cardStyle = css({
@@ -62,6 +124,35 @@ const amountCellStyle = css({ padding: '0.5rem 0.625rem', textAlign: 'right' });
 const breakdownStyle = css({ margin: 0, fontSize: '0.9375rem', lineHeight: 1.6 });
 const totalStyle = css({ margin: 0, textAlign: 'right', fontSize: '1.0625rem', fontWeight: 700 });
 const actionsStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.25rem' });
+const paymentHistoryStyle = css({ display: 'grid', gap: '0.75rem', margin: 0, padding: 0, listStyle: 'none' });
+const paymentEntryStyle = css({
+  display: 'grid',
+  gap: '0.5rem',
+  padding: '1rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.md,
+});
+const creditNoteHistoryStyle = css({
+  display: 'grid',
+  gap: '0.75rem',
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+});
+const creditNoteEntryStyle = css({
+  display: 'grid',
+  gap: '0.5rem',
+  padding: '1rem',
+  border: `1px solid ${colors.border}`,
+  borderRadius: radius.md,
+});
+const paymentFormStyle = css({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))',
+  alignItems: 'end',
+  gap: '0.75rem',
+});
+const paymentSubmitStyle = css({ alignSelf: 'end' });
 const errorStyle = css({
   margin: 0,
   padding: '1rem',
@@ -85,6 +176,18 @@ const textAreaStyle = css({
 const noteFieldStyle = css({ display: 'grid', gap: '0.375rem', marginBottom: '0.75rem' });
 const snapshotImageStyle = css({ display: 'block', maxWidth: '12rem', maxHeight: '8rem' });
 
+function invoiceStatusLabel(status: InvoiceDisplayStatus): string {
+  if (status === 'partially_paid') return 'Partially Paid';
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function paymentStep(currency: string): string {
+  let digits = currencyMinorDigits(currency);
+  return digits === 0 ? '1' : `0.${'0'.repeat(digits - 1)}1`;
+}
+
+const refundStep = paymentStep;
+
 export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
   return () => {
     let {
@@ -94,15 +197,39 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
       invoice,
       lines,
       client,
+      payments,
+      amountPaidMinor,
+      refunds,
+      activeRefundedMinor,
+      netPaidMinor,
+      refundDueMinor,
+      creditNotes,
+      creditedTotalMinor,
+      revisedTotalMinor,
+      balanceDueMinor,
       message,
       validationErrors = [],
       internalNoteValue,
       internalNoteError,
+      paymentFormValues,
+      paymentFieldErrors = {},
+      paymentActionError,
+      voidPaymentError,
+      refundFormValues,
+      refundFieldErrors = {},
+      refundActionError,
+      voidRefundError,
     } = handle.props;
     let taxSummary = groupedInvoiceTaxes(lines, invoice.currency);
-    let displayStatus = invoiceDisplayStatus(invoice);
+    let displayStatus = invoiceDisplayStatus(
+      invoice,
+      netPaidMinor,
+      todayInKolkata(),
+      creditedTotalMinor,
+    );
     let isDraft = invoice.status === 'draft';
-    let statusLabel = displayStatus === 'overdue' ? 'Overdue' : 'Sent';
+    let isInvoice = invoice.document_type === 'invoice';
+    let statusLabel = invoiceStatusLabel(displayStatus);
     let recipientAddress = joinAddressParts([
       invoice.recipient_billing_line1,
       invoice.recipient_billing_locality,
@@ -116,6 +243,24 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
       invoice.seller_address_postal_code,
     ]);
     let pageTitle = isDraft ? 'Invoice draft' : `${statusLabel} invoice`;
+    let amountError = paymentFieldErrors.amount;
+    let dateError = paymentFieldErrors.payment_date;
+    let methodError = paymentFieldErrors.payment_method;
+    let referenceError = paymentFieldErrors.reference;
+    let amountDescriptionId = amountError
+      ? 'invoice-payment-amount-error'
+      : paymentActionError
+        ? 'invoice-payment-action-error'
+        : undefined;
+    let refundAmountError = refundFieldErrors.amount;
+    let refundDateError = refundFieldErrors.refund_date;
+    let refundMethodError = refundFieldErrors.refund_method;
+    let refundReferenceError = refundFieldErrors.reference;
+    let refundAmountDescriptionId = refundAmountError
+      ? 'invoice-refund-amount-error'
+      : refundActionError
+        ? 'invoice-refund-action-error'
+        : undefined;
 
     return (
       <AppShell
@@ -158,6 +303,16 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
               ))}
             </ul>
           </div>
+        ) : null}
+        {paymentActionError ? (
+          <p id="invoice-payment-action-error" role="alert" mix={errorStyle}>
+            {paymentActionError}
+          </p>
+        ) : null}
+        {refundActionError ? (
+          <p id="invoice-refund-action-error" role="alert" mix={errorStyle}>
+            {refundActionError}
+          </p>
         ) : null}
         <div mix={cardStyle}>
           <h2 mix={headingStyle}>{isDraft ? 'Draft details' : 'Issued invoice details'}</h2>
@@ -358,6 +513,488 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           </p>
           <p mix={totalStyle}>Total: {formatMoney(BigInt(invoice.total_minor), invoice.currency)}</p>
         </div>
+
+        {!isDraft && isInvoice ? (
+          <div mix={cardStyle}>
+            <h2 mix={headingStyle}>Payments</h2>
+            <p mix={detailStyle}>
+              Amount paid: {formatMoney(BigInt(amountPaidMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Credited amount: {formatMoney(BigInt(creditedTotalMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Revised total: {formatMoney(BigInt(revisedTotalMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Balance due: {formatMoney(BigInt(balanceDueMinor), invoice.currency)}
+            </p>
+            {refundDueMinor > 0 ? (
+              <p mix={detailStyle}>
+                Refund due: {formatMoney(BigInt(refundDueMinor), invoice.currency)}
+              </p>
+            ) : null}
+            {payments.length > 0 ? (
+              <ol role="list" mix={paymentHistoryStyle}>
+                {payments.map((payment) => {
+                  let voidError =
+                    voidPaymentError?.paymentId === payment.id ? voidPaymentError : undefined;
+                  let voidReasonId = `invoice-payment-${payment.id}-void-reason`;
+                  let voidErrorId = `${voidReasonId}-error`;
+                  let voidAction = routes.app.invoices.payments.void.href({
+                    invoiceId: invoice.id,
+                    paymentId: payment.id,
+                  });
+                  return (
+                    <li key={payment.id} mix={paymentEntryStyle}>
+                      <h3 id={`invoice-payment-${payment.id}-heading`} mix={headingStyle}>
+                        {invoicePaymentMethodLabel(payment.payment_method)} · {payment.payment_date}
+                      </h3>
+                      <p mix={detailStyle}>
+                        Amount: {formatMoney(BigInt(payment.amount_minor), invoice.currency)}
+                      </p>
+                      {payment.reference ? (
+                        <p mix={detailStyle}>Reference: {payment.reference}</p>
+                      ) : null}
+                      {payment.voided_at !== null ? (
+                        <>
+                          <p mix={detailStyle}>
+                            Voided on:{' '}
+                            <time dateTime={new Date(payment.voided_at).toISOString()}>
+                              {new Date(payment.voided_at).toLocaleString('en-IN', {
+                                timeZone: 'Asia/Kolkata',
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}{' '}
+                              IST
+                            </time>
+                          </p>
+                          <p mix={detailStyle}>Void reason: {payment.void_reason}</p>
+                        </>
+                      ) : (
+                        <form
+                          method="post"
+                          action={voidAction}
+                          aria-labelledby={`invoice-payment-${payment.id}-heading`}
+                        >
+                          <input type="hidden" name="_csrf" value={csrfToken} />
+                          <label htmlFor={voidReasonId}>Reason for voiding this payment</label>
+                          <textarea
+                            id={voidReasonId}
+                            name="reason"
+                            required
+                            maxLength={1000}
+                            autoFocus={Boolean(voidError)}
+                            defaultValue={voidError?.reason ?? ''}
+                            aria-invalid={voidError ? true : undefined}
+                            aria-describedby={voidError ? voidErrorId : undefined}
+                            mix={textAreaStyle}
+                          />
+                          {voidError ? (
+                            <p id={voidErrorId} role="alert" mix={errorStyle}>
+                              {voidError.message}
+                            </p>
+                          ) : null}
+                          <Button type="submit" variant="danger">
+                            Void payment
+                          </Button>
+                        </form>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p mix={detailStyle}>No payments recorded.</p>
+            )}
+            {balanceDueMinor > 0 ? (
+              <>
+                <h3 id="record-invoice-payment-heading" mix={headingStyle}>
+                  Record a payment
+                </h3>
+                <form
+                  method="post"
+                  action={routes.app.invoices.payments.record.href({ invoiceId: invoice.id })}
+                  aria-labelledby="record-invoice-payment-heading"
+                  mix={paymentFormStyle}
+                >
+                  <input type="hidden" name="_csrf" value={csrfToken} />
+                  <Field
+                    label={`Amount received (${invoice.currency})`}
+                    error={amountError}
+                    errorId={amountError ? 'invoice-payment-amount-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-payment-amount"
+                      name="amount"
+                      type="number"
+                      min={paymentStep(invoice.currency)}
+                      max={formatMinorInput(BigInt(balanceDueMinor), invoice.currency)}
+                      step={paymentStep(invoice.currency)}
+                      required
+                      autoFocus={Boolean(amountError || paymentActionError)}
+                      defaultValue={paymentFormValues?.amount ?? ''}
+                      aria-invalid={amountDescriptionId ? true : undefined}
+                      aria-describedby={amountDescriptionId}
+                    />
+                  </Field>
+                  <Field
+                    label="Payment date"
+                    error={dateError}
+                    errorId={dateError ? 'invoice-payment-date-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-payment-date"
+                      name="payment_date"
+                      type="date"
+                      required
+                      autoFocus={Boolean(!amountError && dateError)}
+                      defaultValue={paymentFormValues?.payment_date ?? todayInKolkata()}
+                      aria-invalid={dateError ? true : undefined}
+                      aria-describedby={dateError ? 'invoice-payment-date-error' : undefined}
+                    />
+                  </Field>
+                  <Field
+                    label="Payment method"
+                    error={methodError}
+                    errorId={methodError ? 'invoice-payment-method-error' : undefined}
+                  >
+                    <Select
+                      id="invoice-payment-method"
+                      name="payment_method"
+                      required
+                      autoFocus={Boolean(
+                        !amountError && !dateError && methodError,
+                      )}
+                      aria-invalid={methodError ? true : undefined}
+                      aria-describedby={methodError ? 'invoice-payment-method-error' : undefined}
+                    >
+                      <option value="" selected={!paymentFormValues?.payment_method}>
+                        Choose a payment method
+                      </option>
+                      {INVOICE_PAYMENT_METHODS.map((method) => (
+                        <option
+                          key={method.value}
+                          value={method.value}
+                          selected={paymentFormValues?.payment_method === method.value}
+                        >
+                          {method.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Reference (optional)"
+                    error={referenceError}
+                    errorId={referenceError ? 'invoice-payment-reference-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-payment-reference"
+                      name="reference"
+                      maxLength={200}
+                      autoFocus={Boolean(
+                        !amountError && !dateError && !methodError && referenceError,
+                      )}
+                      defaultValue={paymentFormValues?.reference ?? ''}
+                      aria-invalid={referenceError ? true : undefined}
+                      aria-describedby={
+                        referenceError ? 'invoice-payment-reference-error' : undefined
+                      }
+                    />
+                  </Field>
+                  <div mix={paymentSubmitStyle}>
+                    <Button type="submit">Record payment</Button>
+                  </div>
+                </form>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isDraft && isInvoice ? (
+          <section aria-labelledby="invoice-refunds-heading" mix={cardStyle}>
+            <h2 id="invoice-refunds-heading" mix={headingStyle}>
+              Refunds
+            </h2>
+            <p mix={detailStyle}>
+              Refunded: {formatMoney(BigInt(activeRefundedMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Net paid: {formatMoneySigned(BigInt(netPaidMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Refund due: {formatMoney(BigInt(refundDueMinor), invoice.currency)}
+            </p>
+            {refunds.length > 0 ? (
+              <ol role="list" mix={paymentHistoryStyle}>
+                {refunds.map((refund) => {
+                  let voidError =
+                    voidRefundError?.refundId === refund.id ? voidRefundError : undefined;
+                  let voidReasonId = `invoice-refund-${refund.id}-void-reason`;
+                  let voidErrorId = `${voidReasonId}-error`;
+                  return (
+                    <li key={refund.id} mix={paymentEntryStyle}>
+                      <h3 id={`invoice-refund-${refund.id}-heading`} mix={headingStyle}>
+                        {refundMethodLabel(refund.refund_method)} · {refund.refund_date}
+                      </h3>
+                      <p mix={detailStyle}>
+                        Amount: {formatMoney(BigInt(refund.amount_minor), invoice.currency)}
+                      </p>
+                      {refund.reference ? (
+                        <p mix={detailStyle}>Reference: {refund.reference}</p>
+                      ) : null}
+                      {refund.voided_at !== null ? (
+                        <>
+                          <p mix={detailStyle}>
+                            Voided on:{' '}
+                            <time dateTime={new Date(refund.voided_at).toISOString()}>
+                              {new Date(refund.voided_at).toLocaleString('en-IN', {
+                                timeZone: 'Asia/Kolkata',
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}{' '}
+                              IST
+                            </time>
+                          </p>
+                          <p mix={detailStyle}>Void reason: {refund.void_reason}</p>
+                        </>
+                      ) : (
+                        <form
+                          method="post"
+                          action={routes.app.invoices.refunds.void.href({
+                            invoiceId: invoice.id,
+                            refundId: refund.id,
+                          })}
+                          aria-labelledby={`invoice-refund-${refund.id}-heading`}
+                        >
+                          <input type="hidden" name="_csrf" value={csrfToken} />
+                          <label htmlFor={voidReasonId}>Reason for voiding this refund</label>
+                          <textarea
+                            id={voidReasonId}
+                            name="reason"
+                            required
+                            maxLength={1000}
+                            autoFocus={Boolean(voidError)}
+                            defaultValue={voidError?.reason ?? ''}
+                            aria-invalid={voidError ? true : undefined}
+                            aria-describedby={voidError ? voidErrorId : undefined}
+                            mix={textAreaStyle}
+                          />
+                          {voidError ? (
+                            <p id={voidErrorId} role="alert" mix={errorStyle}>
+                              {voidError.message}
+                            </p>
+                          ) : null}
+                          <Button type="submit" variant="danger">
+                            Void refund
+                          </Button>
+                        </form>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p mix={detailStyle}>No refunds recorded.</p>
+            )}
+            {refundDueMinor > 0 ? (
+              <>
+                <h3 id="record-invoice-refund-heading" mix={headingStyle}>
+                  Record refund
+                </h3>
+                <form
+                  method="post"
+                  action={routes.app.invoices.refunds.record.href({ invoiceId: invoice.id })}
+                  aria-labelledby="record-invoice-refund-heading"
+                  mix={paymentFormStyle}
+                >
+                  <input type="hidden" name="_csrf" value={csrfToken} />
+                  <Field
+                    label={`Refund amount (${invoice.currency})`}
+                    error={refundAmountError}
+                    errorId={refundAmountError ? 'invoice-refund-amount-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-refund-amount"
+                      name="amount"
+                      type="number"
+                      min={refundStep(invoice.currency)}
+                      max={formatMinorInput(BigInt(refundDueMinor), invoice.currency)}
+                      step={refundStep(invoice.currency)}
+                      required
+                      autoFocus={Boolean(refundAmountError || refundActionError)}
+                      defaultValue={refundFormValues?.amount ?? ''}
+                      aria-invalid={refundAmountDescriptionId ? true : undefined}
+                      aria-describedby={refundAmountDescriptionId}
+                    />
+                  </Field>
+                  <Field
+                    label="Refund date"
+                    error={refundDateError}
+                    errorId={refundDateError ? 'invoice-refund-date-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-refund-date"
+                      name="refund_date"
+                      type="date"
+                      required
+                      autoFocus={Boolean(!refundAmountError && refundDateError)}
+                      defaultValue={refundFormValues?.refund_date ?? todayInKolkata()}
+                      aria-invalid={refundDateError ? true : undefined}
+                      aria-describedby={refundDateError ? 'invoice-refund-date-error' : undefined}
+                    />
+                  </Field>
+                  <Field
+                    label="Refund method"
+                    error={refundMethodError}
+                    errorId={refundMethodError ? 'invoice-refund-method-error' : undefined}
+                  >
+                    <Select
+                      id="invoice-refund-method"
+                      name="refund_method"
+                      required
+                      autoFocus={Boolean(!refundAmountError && !refundDateError && refundMethodError)}
+                      aria-invalid={refundMethodError ? true : undefined}
+                      aria-describedby={refundMethodError ? 'invoice-refund-method-error' : undefined}
+                    >
+                      <option value="" selected={!refundFormValues?.refund_method}>
+                        Choose a refund method
+                      </option>
+                      {INVOICE_REFUND_METHODS.map((method) => (
+                        <option
+                          key={method.value}
+                          value={method.value}
+                          selected={refundFormValues?.refund_method === method.value}
+                        >
+                          {method.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Reference (optional)"
+                    error={refundReferenceError}
+                    errorId={refundReferenceError ? 'invoice-refund-reference-error' : undefined}
+                  >
+                    <Input
+                      id="invoice-refund-reference"
+                      name="reference"
+                      maxLength={200}
+                      autoFocus={Boolean(
+                        !refundAmountError &&
+                          !refundDateError &&
+                          !refundMethodError &&
+                          refundReferenceError,
+                      )}
+                      defaultValue={refundFormValues?.reference ?? ''}
+                      aria-invalid={refundReferenceError ? true : undefined}
+                      aria-describedby={
+                        refundReferenceError ? 'invoice-refund-reference-error' : undefined
+                      }
+                    />
+                  </Field>
+                  <div mix={paymentSubmitStyle}>
+                    <Button type="submit">Record refund</Button>
+                  </div>
+                </form>
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
+        {!isDraft && isInvoice ? (
+          <section aria-labelledby="invoice-credit-notes-heading" mix={cardStyle}>
+            <h2 id="invoice-credit-notes-heading" mix={headingStyle}>
+              Credit notes
+            </h2>
+            <p mix={detailStyle}>
+              Credited amount: {formatMoney(BigInt(creditedTotalMinor), invoice.currency)}
+            </p>
+            <p mix={detailStyle}>
+              Revised total: {formatMoney(BigInt(revisedTotalMinor), invoice.currency)}
+            </p>
+            {creditNotes.length > 0 ? (
+              <ol role="list" mix={creditNoteHistoryStyle}>
+                {creditNotes.map((creditNote) => {
+                  let draft = creditNote.status === 'draft';
+                  return (
+                    <li key={creditNote.id} mix={creditNoteEntryStyle}>
+                      <h3 mix={headingStyle}>
+                        {draft ? 'Credit note Draft' : `Credit note ${creditNote.credit_note_number}`}
+                      </h3>
+                      <p mix={detailStyle}>Credit note date: {creditNote.credit_date}</p>
+                      <p mix={detailStyle}>Reason: {creditNote.reason}</p>
+                      <p mix={detailStyle}>
+                        Amount: {formatMoney(BigInt(creditNote.total_minor), invoice.currency)}
+                      </p>
+                      <div mix={actionsStyle}>
+                        {draft ? (
+                          <>
+                            <a
+                              href={routes.app.invoices.creditNotes.edit.index.href({
+                                invoiceId: invoice.id,
+                                creditNoteId: creditNote.id,
+                              })}
+                              mix={linkButtonStyle}
+                            >
+                              Edit credit note draft
+                            </a>
+                            <a
+                              href={routes.app.invoices.creditNotes.pdf.href({
+                                invoiceId: invoice.id,
+                                creditNoteId: creditNote.id,
+                              })}
+                              download
+                              mix={linkButtonStyle}
+                            >
+                              Preview Draft PDF
+                            </a>
+                            <form
+                              method="post"
+                              action={routes.app.invoices.creditNotes.lifecycle.discard.href({
+                                invoiceId: invoice.id,
+                                creditNoteId: creditNote.id,
+                              })}
+                              aria-label={`Discard credit note draft ${creditNote.id}`}
+                            >
+                              <input type="hidden" name="_csrf" value={csrfToken} />
+                              <Button type="submit" variant="danger">
+                                Discard draft
+                              </Button>
+                            </form>
+                          </>
+                        ) : (
+                          <a
+                            href={routes.app.invoices.creditNotes.pdf.href({
+                              invoiceId: invoice.id,
+                              creditNoteId: creditNote.id,
+                            })}
+                            download
+                            mix={linkButtonStyle}
+                          >
+                            Download Credit Note PDF
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p mix={detailStyle}>No credit notes recorded.</p>
+            )}
+            {revisedTotalMinor > 0 ? (
+              <a
+                href={routes.app.invoices.creditNotes.new.index.href({
+                  invoiceId: invoice.id,
+                })}
+                mix={linkButtonStyle}
+              >
+                Create credit note
+              </a>
+            ) : null}
+          </section>
+        ) : null}
 
         <div mix={cardStyle}>
           <h2 mix={headingStyle}>Notes</h2>

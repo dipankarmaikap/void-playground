@@ -103,12 +103,44 @@ The lifecycle state of an Invoice that has been marked as sent. Issuing allocate
 _Avoid_: finalized, posted, completed
 
 **Sent**:
-The derived display status of an issued Invoice that is not yet past its due date (or has nothing due for payment). It is computed from the Kolkata calendar date at read time, never stored.
+The derived display status of an issued Invoice with no active payments when its due date is today or later in Asia/Kolkata, or when its total is zero. It is computed from the Kolkata calendar date at read time, never stored.
 _Avoid_: paid, settled
 
 **Overdue**:
-The derived display status of an issued Invoice past its due date with a positive total still outstanding. Until payments land in #38, the balance basis is the full Invoice total.
+The derived display status of an issued Invoice whose due date has passed in Asia/Kolkata while a positive balance remains, including when some payments have been recorded.
 _Avoid_: late, unpaid
+
+**Partially Paid**:
+The derived display status of an issued Invoice with a positive amount paid and a positive balance due through its due date in Asia/Kolkata. After that date, the status is Overdue.
+_Avoid_: part-paid, partly paid
+
+**Paid**:
+The derived display status of an issued Invoice whose positive amount due has been fully paid, leaving no balance due.
+_Avoid_: settled
+
+**Payment**:
+A confirmed offline receipt recorded against an issued Invoice in that Invoice's currency.
+_Avoid_: transaction
+
+**Voided payment**:
+A previously recorded Payment reversed with a reason and timestamp. It remains in the Invoice's payment history but no longer counts toward the balance.
+_Avoid_: deleted payment
+
+**Net paid**:
+Active payments minus active refunds on an issued Invoice. It is the amount actually still collected after returned money is accounted for.
+_Avoid_: adjusted receipts
+
+**Refund due**:
+The amount by which net paid exceeds the Invoice's revised total, typically after an issued Credit Note lowers that total below payments already collected. It is shown separately from balance due and decreases as refunds are recorded.
+_Avoid_: overpayment balance, customer credit
+
+**Refund**:
+A manual return of money to a Client recorded against an over-credited paid Invoice in that Invoice's currency, with a date, amount, method, and optional reference, never above the current refund due.
+_Avoid_: reversing a payment, credit note
+
+**Voided refund**:
+A previously recorded Refund reversed with a reason and timestamp. It remains in the Invoice's refund history but no longer reduces the refund due.
+_Avoid_: deleted refund
 
 **Financial-year invoice number**:
 The `PREFIX/FY/NNNN` identifier allocated exactly once at issue, from a per-Organization sequence that restarts each Indian financial year (April 1 to March 31). Failed issue attempts never consume a number.
@@ -121,3 +153,27 @@ _Avoid_: live seller details, seller profile
 **Issued PDF artifact**:
 The byte-for-byte immutable PDF stored when an Invoice is issued and served unchanged for every later download. A missing artifact is an error, never a regeneration.
 _Avoid_: regenerated PDF
+
+**Credit Note**:
+An Organization-scoped adjustment document linked to one issued Invoice. Its issued amount reduces the Invoice's revised total without changing the original Invoice.
+_Avoid_: credit memo, refund
+
+**Credit Note Draft**:
+A linked Credit Note being prepared. It has no final number and does not change the parent Invoice balance or status.
+_Avoid_: provisional credit memo
+
+**Issued Credit Note**:
+A Credit Note assigned a financial-year credit-note number and frozen with its own immutable PDF artifact.
+_Avoid_: finalized credit memo
+
+**Financial-year credit-note number**:
+The Organization-scoped `PREFIX/FY/NNNN` identifier allocated when a Credit Note is issued, based on the credit-note date's Indian financial year.
+_Avoid_: credit-note sequence before issue
+
+**Revised total**:
+An issued Invoice's original total minus the total of its issued Credit Notes. Draft Credit Notes do not count.
+_Avoid_: adjusted total before issue
+
+**Cancelled**:
+The derived display status of an issued Invoice whose issued Credit Notes equal its original total. The original Invoice remains preserved and linked to its Credit Notes.
+_Avoid_: deleted Invoice

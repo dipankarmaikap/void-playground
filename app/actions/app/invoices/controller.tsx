@@ -19,6 +19,7 @@ import {
   findIssuedInvoicePdfBytes,
   invoicePdfFilename,
 } from '../../../data/invoice-pdf-artifacts.ts';
+import { invoicePaymentData } from '../../../data/invoice-payments.ts';
 import {
   renderInvoicePdf,
   sellerFromInvoicingProfile,
@@ -82,9 +83,10 @@ export default createController(routes.app.invoices, {
       let invoice = await findInvoice(organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
 
-      let [lines, client] = await Promise.all([
+      let [lines, client, paymentData] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
         findClient(organization.id, invoice.client_id),
+        invoicePaymentData(organization.id, invoice),
       ]);
       let message = context.session.get('message');
       return context.render(
@@ -95,6 +97,7 @@ export default createController(routes.app.invoices, {
           invoice={invoice}
           lines={lines}
           client={client}
+          {...paymentData}
           message={typeof message === 'string' ? message : undefined}
         />,
       );

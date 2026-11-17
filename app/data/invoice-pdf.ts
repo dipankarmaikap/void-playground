@@ -7,7 +7,7 @@
 
 import { inflateSync } from 'node:zlib';
 
-import type { Invoice, InvoiceLine } from './db.ts';
+import type { CreditNote, CreditNoteLine, Invoice, InvoiceLine } from './db.ts';
 import { joinAddressParts } from './address.ts';
 import { countryName } from './client-billing.ts';
 import { clientTaxTypeLabel } from './client-tax.ts';
@@ -562,6 +562,13 @@ interface LayoutContext {
   seller: InvoicePdfSeller;
   lines: readonly InvoiceLine[];
   images: PdfImageRegistry;
+  creditNoteDetails?: CreditNotePdfDetails;
+}
+
+interface CreditNotePdfDetails {
+  creditNote: CreditNote;
+  originalInvoiceNumber: string;
+  originalInvoiceDate: string;
 }
 
 function sellerAddressLines(seller: InvoicePdfSeller): string[] {
@@ -591,15 +598,24 @@ function placeOfSupplyText(invoice: InvoicePdfDocument): string {
 }
 
 function drawPageHeader(context: LayoutContext): void {
-  let { canvas, invoice, seller, images } = context;
+  let { canvas, invoice, seller, images, creditNoteDetails } = context;
   let metaRows: Array<[string, string]> = [];
-  metaRows.push([
-    'Invoice no:',
-    invoice.status === 'draft' ? 'DRAFT' : invoice.invoice_number ?? '',
-  ]);
-  metaRows.push(['Invoice date:', invoice.invoice_date]);
-  metaRows.push(['Due date:', invoice.due_date]);
-  metaRows.push(['Currency:', invoice.currency]);
+  if (creditNoteDetails) {
+    metaRows.push([
+      'Credit note no:',
+      invoice.status === 'draft' ? 'DRAFT' : invoice.invoice_number ?? '',
+    ]);
+    metaRows.push(['Credit note date:', invoice.invoice_date]);
+    metaRows.push(['Currency:', invoice.currency]);
+  } else {
+    metaRows.push([
+      'Invoice no:',
+      invoice.status === 'draft' ? 'DRAFT' : invoice.invoice_number ?? '',
+    ]);
+    metaRows.push(['Invoice date:', invoice.invoice_date]);
+    metaRows.push(['Due date:', invoice.due_date]);
+    metaRows.push(['Currency:', invoice.currency]);
+  }
 
   let metaX = 350;
   let metaValueX = RIGHT;
@@ -630,7 +646,11 @@ function drawPageHeader(context: LayoutContext): void {
     canvas.y -= 11;
   }
 
-  canvas.text('TAX INVOICE', { alignRight: metaValueX, size: 13, bold: true });
+  canvas.text(creditNoteDetails ? 'CREDIT NOTE' : 'TAX INVOICE', {
+    alignRight: metaValueX,
+    size: 13,
+    bold: true,
+  });
   let metaY = canvas.y - 22;
   canvas.y = metaY;
   for (let [label, value] of metaRows) {
@@ -680,6 +700,35 @@ function drawRecipientBlock(context: LayoutContext): void {
     canvas.y -= 11.5;
   }
   canvas.y -= 6;
+}
+
+function drawCreditNoteDetails(context: LayoutContext): void {
+  let details = context.creditNoteDetails;
+  if (!details) return;
+
+  let { canvas } = context;
+  canvas.ensure(72);
+  canvas.text(`Original invoice no: ${details.originalInvoiceNumber}`, {
+    x: MARGIN,
+    size: 9,
+    bold: true,
+  });
+  canvas.y -= 13;
+  canvas.text(`Original invoice date: ${details.originalInvoiceDate}`, {
+    x: MARGIN,
+    size: 9,
+    bold: true,
+  });
+  canvas.y -= 13;
+  canvas.text('Reason:', { x: MARGIN, size: 9, bold: true });
+  canvas.y -= 12;
+  canvas.wrapped(details.creditNote.reason, {
+    x: MARGIN,
+    size: 9,
+    width: 500,
+    lineHeight: 12,
+  });
+  canvas.y -= 7;
 }
 
 const LINE_COLUMNS = {
@@ -766,7 +815,7 @@ function drawLinesTable(context: LayoutContext): void {
 }
 
 function drawTotals(context: LayoutContext): void {
-  let { canvas, invoice, lines } = context;
+  let { canvas, invoice, lines, creditNoteDetails } = context;
   let currency = invoice.currency;
   let money = (minor: number | bigint) => formatMoney(BigInt(minor), currency);
 
@@ -789,7 +838,9 @@ function drawTotals(context: LayoutContext): void {
       tax.formattedAmount,
     ]);
   }
-  if (
+  if (creditNoteDetails) {
+    rows.push(['Total tax', money(invoice.tax_total_minor)]);
+  } else if (
     grouped.length === 0 &&
     (invoice.gst_mode === 'india_gst' || invoice.gst_mode === 'foreign_manual')
   ) {
@@ -817,6 +868,7 @@ function drawTotals(context: LayoutContext): void {
 
 function drawNotesAndDeclarations(context: LayoutContext): void {
   let { canvas, invoice } = context;
+  if (context.creditNoteDetails) return;
   let termLabel =
     PAYMENT_TERM_LABELS[invoice.payment_term as keyof typeof PAYMENT_TERM_LABELS] ??
     invoice.payment_term;
@@ -927,13 +979,15 @@ export function sellerFromInvoicingProfile(profile: InvoicingProfileView): Invoi
   };
 }
 
-/** Renders the complete invoice PDF as raw bytes. */
-export function renderInvoicePdf(input: {
+interface RenderPdfInput {
   invoice: InvoicePdfDocument;
   lines: readonly InvoiceLine[];
   seller: InvoicePdfSeller;
   watermark: boolean;
-}): Uint8Array {
+  creditNoteDetails?: CreditNotePdfDetails;
+}
+
+function renderPdf(input: RenderPdfInput): Uint8Array {
   let file = new PdfFile();
   let catalogObject = file.reserve();
   let pagesObject = file.reserve();
@@ -956,9 +1010,11 @@ export function renderInvoicePdf(input: {
     seller: input.seller,
     lines: input.lines,
     images,
+    creditNoteDetails: input.creditNoteDetails,
   };
   drawPageHeader(context);
   drawRecipientBlock(context);
+  drawCreditNoteDetails(context);
   drawLinesTable(context);
   drawTotals(context);
   drawNotesAndDeclarations(context);
@@ -991,4 +1047,51 @@ export function renderInvoicePdf(input: {
   file.setObject(catalogObject, `<< /Type /Catalog /Pages ${pagesObject} 0 R >>`);
 
   return file.serialize();
+}
+
+/** Renders a complete invoice PDF as raw bytes. */
+export function renderInvoicePdf(input: {
+  invoice: InvoicePdfDocument;
+  lines: readonly InvoiceLine[];
+  seller: InvoicePdfSeller;
+  watermark: boolean;
+}): Uint8Array {
+  return renderPdf(input);
+}
+
+/** Renders a Credit Note PDF from the original invoice's frozen snapshots and credited lines. */
+export function renderCreditNotePdf(input: {
+  invoice: InvoicePdfDocument;
+  creditNote: CreditNote;
+  lines: readonly CreditNoteLine[];
+  seller: InvoicePdfSeller;
+  watermark: boolean;
+}): Uint8Array {
+  let document: InvoicePdfDocument = {
+    ...input.invoice,
+    status: input.creditNote.status,
+    invoice_number: input.creditNote.credit_note_number,
+    invoice_date: input.creditNote.credit_date,
+    due_date: input.creditNote.credit_date,
+    subtotal_minor: input.creditNote.subtotal_minor,
+    line_discount_total_minor: input.creditNote.line_discount_total_minor,
+    invoice_discount_mode: input.creditNote.invoice_discount_mode,
+    invoice_discount_value: null,
+    invoice_discount_minor: input.creditNote.invoice_discount_minor,
+    net_subtotal_minor: input.creditNote.net_subtotal_minor,
+    tax_total_minor: input.creditNote.tax_total_minor,
+    round_off_minor: input.creditNote.round_off_minor,
+    total_minor: input.creditNote.total_minor,
+  };
+  return renderPdf({
+    invoice: document,
+    lines: input.lines,
+    seller: input.seller,
+    watermark: input.watermark,
+    creditNoteDetails: {
+      creditNote: input.creditNote,
+      originalInvoiceNumber: input.invoice.invoice_number ?? '',
+      originalInvoiceDate: input.invoice.invoice_date,
+    },
+  });
 }

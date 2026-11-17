@@ -12,17 +12,29 @@ import {
   DEFAULT_STARTING_NUMBER,
 } from './organization-invoicing.ts';
 
-export type InvoiceDisplayStatus = 'draft' | 'sent' | 'overdue';
+export type InvoiceDisplayStatus =
+  | 'draft'
+  | 'sent'
+  | 'partially_paid'
+  | 'paid'
+  | 'overdue'
+  | 'cancelled';
 
-/** Derives the unpaid issued-invoice status from the current Kolkata calendar date. */
+/** Derives an issued invoice's status from credits, net paid, and the Kolkata date. */
 export function invoiceDisplayStatus(
   invoice: Pick<Invoice, 'status' | 'due_date' | 'total_minor'>,
+  netPaidMinor = 0,
   today = todayInKolkata(),
+  creditedTotalMinor = 0,
 ): InvoiceDisplayStatus {
   if (invoice.status === 'draft') return 'draft';
-  // The balance basis is the full invoice total until payments land in #38; until then an issued
-  // invoice is overdue purely by its due date.
-  return invoice.total_minor > 0 && today > invoice.due_date ? 'overdue' : 'sent';
+  let revisedTotalMinor = Math.max(0, invoice.total_minor - creditedTotalMinor);
+  if (creditedTotalMinor > 0 && revisedTotalMinor === 0) return 'cancelled';
+  let balanceDueMinor = Math.max(0, revisedTotalMinor - netPaidMinor);
+  if (revisedTotalMinor > 0 && balanceDueMinor === 0) return 'paid';
+  if (balanceDueMinor > 0 && today > invoice.due_date) return 'overdue';
+  if (netPaidMinor > 0 && balanceDueMinor > 0) return 'partially_paid';
+  return 'sent';
 }
 
 /** Indian financial years use April 1 as the first day; invoice_date is already a calendar date. */
