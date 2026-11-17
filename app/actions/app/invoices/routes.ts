@@ -8,6 +8,7 @@ export const invoiceRoutes = route({
   index: get('/'),
   new: form('/new'),
   show: get('/:invoiceId'),
+  pdf: get('/:invoiceId/pdf'),
   edit: form('/:invoiceId/edit'),
   lifecycle: route('/:invoiceId', {
     issue: post('/issue'),

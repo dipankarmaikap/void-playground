@@ -16,6 +16,15 @@ import {
   parseInvoiceStatusFilter,
 } from '../../../data/invoices.ts';
 import {
+  findIssuedInvoicePdfBytes,
+  invoicePdfFilename,
+} from '../../../data/invoice-pdf-artifacts.ts';
+import {
+  renderInvoicePdf,
+  sellerFromInvoicingProfile,
+} from '../../../data/invoice-pdf.ts';
+import { getInvoicingProfileView } from '../../../data/organization-invoicing.ts';
+import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../middleware/organization-context.ts';
@@ -89,6 +98,47 @@ export default createController(routes.app.invoices, {
           message={typeof message === 'string' ? message : undefined}
         />,
       );
+    },
+    async pdf(context) {
+      let organization = context.get(CurrentOrganization);
+      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      if (!invoice) return new Response('Invoice not found', { status: 404 });
+
+      let filename = invoicePdfFilename(invoice);
+
+      // Issued invoices download the exact bytes preserved at issue time; a missing artifact is a
+      // 404 rather than a regeneration so the historical document can never drift.
+      if (invoice.status !== 'draft') {
+        let stored = await findIssuedInvoicePdfBytes(organization.id, invoice.id);
+        if (!stored) return new Response('Invoice PDF not found', { status: 404 });
+        return new Response(new Blob([stored as BlobPart]), {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="${filename}"`,
+          },
+        });
+      }
+
+      // Drafts render on the fly, watermarked, showing DRAFT instead of a final number, and never
+      // mutate the Draft or allocate a number. The private internal note is stripped here so it
+      // cannot reach the renderer.
+      let { internal_note: _internalNote, ...draftDocument } = invoice;
+      let [lines, profileView] = await Promise.all([
+        findInvoiceLines(organization.id, invoice.id),
+        getInvoicingProfileView(organization),
+      ]);
+      let pdf = renderInvoicePdf({
+        invoice: draftDocument,
+        lines,
+        seller: sellerFromInvoicingProfile(profileView),
+        watermark: true,
+      });
+      return new Response(new Blob([pdf as BlobPart]), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="${filename}"`,
+        },
+      });
     },
   },
 });
