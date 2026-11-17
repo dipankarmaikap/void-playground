@@ -1,4 +1,7 @@
 import { db, invoices } from '../app/data/db.ts';
+import { router } from '../app/router.ts';
+import { routes } from '../app/routes.ts';
+import { submitForm } from './http.ts';
 
 export interface InvoiceFixture {
   id: string;
@@ -53,4 +56,15 @@ export async function seedInvoice(
     created_at: createdAt,
     updated_at: createdAt,
   });
+}
+
+/** Marks a Draft as sent by submitting the show page's issue action. */
+export async function markAsSent(cookie: string, invoiceId: string): Promise<Response> {
+  return submitForm(
+    router,
+    routes.app.invoices.show.href({ invoiceId }),
+    routes.app.invoices.lifecycle.issue.href({ invoiceId }),
+    {},
+    cookie,
+  );
 }

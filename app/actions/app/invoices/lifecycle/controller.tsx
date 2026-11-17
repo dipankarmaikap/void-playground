@@ -1,12 +1,14 @@
 import { createController } from 'remix/router';
+import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
 import { Auth, requireAuth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
+import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
-import type { User } from '../../../../data/db.ts';
+import type { Invoice, Organization, User } from '../../../../data/db.ts';
 import { issueDraftInvoice } from '../../../../data/invoice-issuance.ts';
 import { storeIssuedInvoicePdf } from '../../../../data/invoice-pdf-artifacts.ts';
 import {
@@ -21,6 +23,48 @@ import {
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
+import type { InvoiceShowPageProps } from '../show-page.tsx';
+
+/**
+ * The request-context surface the shared error renderer needs: any request context plus the render
+ * middleware's `context.render`. Controller middleware entries are appended, so the shape stays
+ * wide rather than naming one controller's exact context type.
+ */
+type InvoiceShowRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  render: RenderFunction;
+};
+
+/**
+ * Validation failures reload the show page with the same Organization-scoped props, re-rendered as
+ * a 400 so the client can correct the submission.
+ */
+async function renderInvoiceShowPageError(
+  context: InvoiceShowRequestContext,
+  organization: Organization,
+  invoice: Invoice,
+  pageProps: Pick<
+    InvoiceShowPageProps,
+    'validationErrors' | 'internalNoteValue' | 'internalNoteError'
+  >,
+) {
+  let auth = context.get(Auth) as GoodAuth<User>;
+  let [lines, client] = await Promise.all([
+    findInvoiceLines(organization.id, invoice.id),
+    findClient(organization.id, invoice.client_id),
+  ]);
+  return context.render(
+    <InvoiceShowPage
+      csrfToken={getCsrfToken(context)}
+      identity={{ email: auth.identity.email, displayName: auth.identity.display_name }}
+      organizationName={organization.name}
+      invoice={invoice}
+      lines={lines}
+      client={client}
+      {...pageProps}
+    />,
+    { status: 400 },
+  );
+}
 
 export default createController(routes.app.invoices.lifecycle, {
   middleware: [
@@ -42,25 +86,11 @@ export default createController(routes.app.invoices.lifecycle, {
         return new Response('Only a Draft invoice can be issued', { status: 409 });
       }
       if (!result.ok) {
-        let auth = context.get(Auth) as GoodAuth<User>;
         let invoice = await findInvoice(organization.id, context.params.invoiceId);
         if (!invoice) return new Response('Invoice not found', { status: 404 });
-        let [lines, client] = await Promise.all([
-          findInvoiceLines(organization.id, invoice.id),
-          findClient(organization.id, invoice.client_id),
-        ]);
-        return context.render(
-          <InvoiceShowPage
-            csrfToken={getCsrfToken(context)}
-            identity={{ email: auth.identity.email, displayName: auth.identity.display_name }}
-            organizationName={organization.name}
-            invoice={invoice}
-            lines={lines}
-            client={client}
-            validationErrors={result.errors}
-          />,
-          { status: 400 },
-        );
+        return renderInvoiceShowPageError(context, organization, invoice, {
+          validationErrors: result.errors,
+        });
       }
 
       context.session.flash('message', 'Invoice marked as sent');
@@ -93,28 +123,13 @@ export default createController(routes.app.invoices.lifecycle, {
       let submittedNote = context.formData.get('internal_note');
       let internalNote = typeof submittedNote === 'string' ? submittedNote : '';
       if (typeof submittedNote !== 'string' || internalNote.length > 1000) {
-        let auth = context.get(Auth) as GoodAuth<User>;
-        let [lines, client] = await Promise.all([
-          findInvoiceLines(organization.id, invoice.id),
-          findClient(organization.id, invoice.client_id),
-        ]);
-        return context.render(
-          <InvoiceShowPage
-            csrfToken={getCsrfToken(context)}
-            identity={{ email: auth.identity.email, displayName: auth.identity.display_name }}
-            organizationName={organization.name}
-            invoice={invoice}
-            lines={lines}
-            client={client}
-            internalNoteValue={internalNote}
-            internalNoteError={
-              typeof submittedNote === 'string'
-                ? 'Internal note must be 1,000 characters or fewer.'
-                : 'Enter the internal note as text.'
-            }
-          />,
-          { status: 400 },
-        );
+        return renderInvoiceShowPageError(context, organization, invoice, {
+          internalNoteValue: internalNote,
+          internalNoteError:
+            typeof submittedNote === 'string'
+              ? 'Internal note must be 1,000 characters or fewer.'
+              : 'Enter the internal note as text.',
+        });
       }
 
       let updated = await updateIssuedInvoiceInternalNote(

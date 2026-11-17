@@ -8,6 +8,7 @@
 import { inflateSync } from 'node:zlib';
 
 import type { Invoice, InvoiceLine } from './db.ts';
+import { joinAddressParts } from './address.ts';
 import { countryName } from './client-billing.ts';
 import { clientTaxTypeLabel } from './client-tax.ts';
 import { formatMoney, formatMoneySigned } from './invoice-calculation.ts';
@@ -561,14 +562,6 @@ interface LayoutContext {
   seller: InvoicePdfSeller;
   lines: readonly InvoiceLine[];
   images: PdfImageRegistry;
-}
-
-function joinAddressParts(
-  parts: Array<string | null | undefined>,
-): string {
-  return parts
-    .filter((part): part is string => Boolean(part?.trim()))
-    .join(', ');
 }
 
 function sellerAddressLines(seller: InvoicePdfSeller): string[] {

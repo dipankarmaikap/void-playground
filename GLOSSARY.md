@@ -97,3 +97,27 @@ _Avoid_: order discount
 **Round-off**:
 An optional signed adjustment that brings the net Invoice total to the nearest whole currency unit. Exact halfway amounts round away from zero.
 _Avoid_: rounding adjustment
+
+**Issued**:
+The lifecycle state of an Invoice that has been marked as sent. Issuing allocates the financial-year invoice number, locks every Client-facing detail, and stores the Seller snapshot and issued PDF artifact.
+_Avoid_: finalized, posted, completed
+
+**Sent**:
+The derived display status of an issued Invoice that is not yet past its due date (or has nothing due for payment). It is computed from the Kolkata calendar date at read time, never stored.
+_Avoid_: paid, settled
+
+**Overdue**:
+The derived display status of an issued Invoice past its due date with a positive total still outstanding. Until payments land in #38, the balance basis is the full Invoice total.
+_Avoid_: late, unpaid
+
+**Financial-year invoice number**:
+The `PREFIX/FY/NNNN` identifier allocated exactly once at issue, from a per-Organization sequence that restarts each Indian financial year (April 1 to March 31). Failed issue attempts never consume a number.
+_Avoid_: serial number, running number
+
+**Seller snapshot**:
+The seller particulars (legal name, business address, tax identifiers, branding, signatory) copied onto an Invoice at issue time from the Invoicing profile, defaulting the legal name to the Organization name, and never refreshed by later edits.
+_Avoid_: live seller details, seller profile
+
+**Issued PDF artifact**:
+The byte-for-byte immutable PDF stored when an Invoice is issued and served unchanged for every later download. A missing artifact is an error, never a regeneration.
+_Avoid_: regenerated PDF
