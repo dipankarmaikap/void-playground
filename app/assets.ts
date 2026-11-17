@@ -16,6 +16,7 @@ export const assets = createAssetServer({
     'app/routes.ts',
     'app/actions/app/routes.ts',
     'app/actions/app/clients/routes.ts',
+    'app/actions/app/invoices/routes.ts',
     'app/**/public/**',
   ],
   allowPackages: ['remix'],

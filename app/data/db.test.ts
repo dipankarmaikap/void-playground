@@ -5,6 +5,8 @@ import { createSqliteDatabase } from 'remix/data-table/sqlite';
 import {
   clients,
   db,
+  invoiceLines,
+  invoices,
   organizationGstRatePresets,
   organizationInvoicingProfiles,
   organizationMemberships,
@@ -519,6 +521,141 @@ describe('db', () => {
       1,
       'another Organization may use the same rate',
     );
+  });
+
+  async function createClientIn(organizationId: string): Promise<string> {
+    let id = crypto.randomUUID();
+    let now = Date.now();
+    await db.create(clients, {
+      id,
+      organization_id: organizationId,
+      type: 'individual',
+      legal_name: `Constraint Client ${id}`,
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    });
+    return id;
+  }
+
+  function validInvoice(overrides: Record<string, unknown> = {}) {
+    let now = Date.now();
+    return {
+      id: crypto.randomUUID(),
+      currency: 'INR',
+      invoice_date: '2026-11-17',
+      due_date: '2026-11-17',
+      payment_term: 'due_on_receipt',
+      recipient_legal_name: 'Constraint Recipient',
+      subtotal_minor: 0,
+      total_minor: 0,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    };
+  }
+
+  async function expectRejected(values: Record<string, unknown>): Promise<void> {
+    let rejected = false;
+    try {
+      await db.create(invoices, validInvoice(values));
+    } catch {
+      rejected = true;
+    }
+    assert.equal(rejected, true, `the database must reject ${JSON.stringify(values)}`);
+  }
+
+  it('requires invoices to belong to an Organization and a Client in the same Organization', async () => {
+    let organizationId = await createOrganization('Invoice Ownership Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Ownership Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+
+    await expectRejected({ client_id: clientId });
+    await expectRejected({ organization_id: crypto.randomUUID(), client_id: clientId });
+    await expectRejected({ organization_id: otherOrganizationId, client_id: clientId });
+    await expectRejected({ organization_id: organizationId, client_id: otherClientId });
+    await expectRejected({ organization_id: organizationId, client_id: crypto.randomUUID() });
+
+    let created = validInvoice({ organization_id: organizationId, client_id: clientId });
+    await db.create(invoices, created);
+    let row = await db.find(invoices, created.id);
+    assert.ok(row);
+    assert.equal(row.organization_id, organizationId);
+    assert.equal(row.client_id, clientId);
+    assert.equal(row.document_type, 'invoice');
+    assert.equal(row.status, 'draft');
+    assert.equal(row.invoice_number, null, 'a Draft must not allocate a final invoice number');
+
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      invoice_number: 'INV/26-27/0001',
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      currency: 'IN',
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      payment_term: 'net_45',
+    });
+  });
+
+  it('requires invoice lines to reference an invoice in the same Organization', async () => {
+    let organizationId = await createOrganization('Invoice Line Ownership Test');
+    let otherOrganizationId = await createOrganization('Other Invoice Line Ownership Test');
+    let clientId = await createClientIn(organizationId);
+    let otherClientId = await createClientIn(otherOrganizationId);
+    let invoice = validInvoice({ organization_id: organizationId, client_id: clientId });
+    let otherInvoice = validInvoice({
+      organization_id: otherOrganizationId,
+      client_id: otherClientId,
+    });
+    await db.create(invoices, invoice);
+    await db.create(invoices, otherInvoice);
+
+    let now = Date.now();
+    let line = (overrides: Record<string, unknown> = {}) => ({
+      id: crypto.randomUUID(),
+      position: 0,
+      description: 'Consulting',
+      quantity: '1.5000',
+      unit_price: '100.0000',
+      amount_minor: 15000,
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    });
+
+    let rejected = async (values: Record<string, unknown>) => {
+      let didReject = false;
+      try {
+        await db.create(invoiceLines, line(values));
+      } catch {
+        didReject = true;
+      }
+      assert.equal(didReject, true, `the database must reject ${JSON.stringify(values)}`);
+    };
+
+    await rejected({ invoice_id: invoice.id });
+    await rejected({ organization_id: crypto.randomUUID(), invoice_id: invoice.id });
+    await rejected({ organization_id: otherOrganizationId, invoice_id: invoice.id });
+    await rejected({ organization_id: organizationId, invoice_id: otherInvoice.id });
+    await rejected({ organization_id: organizationId, invoice_id: crypto.randomUUID() });
+    await rejected({ organization_id: organizationId, invoice_id: invoice.id, quantity: '' });
+    await rejected({ organization_id: organizationId, invoice_id: invoice.id, description: '  ' });
+
+    let validLine = line({ organization_id: organizationId, invoice_id: invoice.id });
+    await db.create(invoiceLines, validLine);
+    assert.equal((await db.find(invoiceLines, validLine.id))?.organization_id, organizationId);
+    assert.equal(await db.count(invoiceLines, { where: { invoice_id: invoice.id } }), 1);
+
+    await db.delete(invoices, invoice.id);
+    assert.equal(await db.find(invoiceLines, validLine.id), null, 'lines cascade with their invoice');
+    assert.ok(await db.find(invoices, otherInvoice.id), 'the other Organization is untouched');
   });
 
   it('rejects an incompatible old Client schema without serving or erasing it', async () => {

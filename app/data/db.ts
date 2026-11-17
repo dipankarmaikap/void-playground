@@ -182,6 +182,66 @@ export const clients = table({
   primaryKey: 'id',
 });
 
+/**
+ * An Organization-scoped invoice. Drafts carry no `invoice_number`; that is allocated only when
+ * the invoice is issued in a later ticket. Recipient details are copied from the Client at draft
+ * creation so later edits to the Draft never change the Client profile.
+ */
+export const invoices = table({
+  name: 'invoices',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    client_id: c.text().notNull(),
+    document_type: c.text().notNull(),
+    status: c.text().notNull(),
+    invoice_number: c.text().nullable(),
+    currency: c.text().notNull(),
+    invoice_date: c.text().notNull(),
+    due_date: c.text().notNull(),
+    payment_term: c.text().notNull(),
+    custom_payment_terms: c.text().nullable(),
+    recipient_legal_name: c.text().notNull(),
+    recipient_billing_line1: c.text().nullable(),
+    recipient_billing_locality: c.text().nullable(),
+    recipient_billing_region: c.text().nullable(),
+    recipient_billing_postal_code: c.text().nullable(),
+    recipient_billing_country: c.text().nullable(),
+    recipient_tax_country: c.text().nullable(),
+    recipient_tax_type: c.text().nullable(),
+    recipient_tax_value: c.text().nullable(),
+    recipient_tax_state_name: c.text().nullable(),
+    recipient_tax_state_code: c.text().nullable(),
+    payment_instructions: c.text().nullable(),
+    customer_notes: c.text().nullable(),
+    internal_note: c.text().nullable(),
+    subtotal_minor: c.integer().notNull(),
+    total_minor: c.integer().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
+/** A free-form service line belonging to one invoice in the same Organization. */
+export const invoiceLines = table({
+  name: 'invoice_lines',
+  columns: {
+    id: c.text().notNull(),
+    organization_id: c.text().notNull(),
+    invoice_id: c.text().notNull(),
+    position: c.integer().notNull(),
+    description: c.text().notNull(),
+    sac: c.text().nullable(),
+    quantity: c.text().notNull(),
+    unit_price: c.text().notNull(),
+    amount_minor: c.integer().notNull(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+  primaryKey: 'id',
+});
+
 export const db = createSqliteDatabase({ filename: dbPath, foreignKeys: true });
 
 function missingClientOrganizationSchemaError(): Error {
@@ -408,6 +468,85 @@ CREATE INDEX IF NOT EXISTS idx_clients_legal_name ON clients(legal_name);
 CREATE INDEX IF NOT EXISTS idx_clients_tax_value ON clients(tax_value);
 `);
 
+// #42 adds Organization-scoped invoices with same-Organization composite foreign keys. SQLite
+// requires the parent key to be unique, so the matching indexes are created alongside the tables.
+await db.executeScript(`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_organization_id ON clients(organization_id, id);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  document_type TEXT NOT NULL DEFAULT 'invoice' CHECK (document_type IN ('invoice', 'credit_note')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft')),
+  invoice_number TEXT CHECK (
+    invoice_number IS NULL OR (status <> 'draft' AND length(trim(invoice_number)) > 0)
+  ),
+  currency TEXT NOT NULL CHECK (currency GLOB '[A-Z][A-Z][A-Z]'),
+  invoice_date TEXT NOT NULL CHECK (
+    invoice_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+  ),
+  due_date TEXT NOT NULL CHECK (
+    due_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+  ),
+  payment_term TEXT NOT NULL CHECK (payment_term IN (
+    'due_on_receipt', 'net_7', 'net_15', 'net_30', 'net_60', 'custom'
+  )),
+  custom_payment_terms TEXT CHECK (custom_payment_terms IS NULL OR length(custom_payment_terms) <= 200),
+  recipient_legal_name TEXT NOT NULL CHECK (length(trim(recipient_legal_name)) > 0),
+  recipient_billing_line1 TEXT,
+  recipient_billing_locality TEXT,
+  recipient_billing_region TEXT,
+  recipient_billing_postal_code TEXT,
+  recipient_billing_country TEXT,
+  recipient_tax_country TEXT,
+  recipient_tax_type TEXT,
+  recipient_tax_value TEXT,
+  recipient_tax_state_name TEXT,
+  recipient_tax_state_code TEXT,
+  payment_instructions TEXT CHECK (payment_instructions IS NULL OR length(payment_instructions) <= 1000),
+  customer_notes TEXT CHECK (customer_notes IS NULL OR length(customer_notes) <= 1000),
+  internal_note TEXT CHECK (internal_note IS NULL OR length(internal_note) <= 1000),
+  subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+  total_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_minor >= 0),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id, client_id) REFERENCES clients(organization_id, id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_organization_id ON invoices(organization_id, id);
+CREATE INDEX IF NOT EXISTS idx_invoices_organization_status
+  ON invoices(organization_id, status);
+CREATE INDEX IF NOT EXISTS idx_invoices_organization_dates
+  ON invoices(organization_id, invoice_date DESC, created_at DESC, id ASC);
+
+CREATE TABLE IF NOT EXISTS invoice_lines (
+  id TEXT PRIMARY KEY NOT NULL,
+  organization_id TEXT NOT NULL,
+  invoice_id TEXT NOT NULL,
+  position INTEGER NOT NULL CHECK (position >= 0),
+  description TEXT NOT NULL CHECK (length(trim(description)) > 0),
+  sac TEXT CHECK (sac IS NULL OR length(sac) <= 64),
+  quantity TEXT NOT NULL CHECK (
+    length(quantity) > 0 AND quantity GLOB '[0-9]*'
+    AND quantity NOT GLOB '*[^0-9.]*' AND quantity NOT LIKE '%.%.%'
+  ),
+  unit_price TEXT NOT NULL CHECK (
+    length(unit_price) > 0 AND unit_price GLOB '[0-9]*'
+    AND unit_price NOT GLOB '*[^0-9.]*' AND unit_price NOT LIKE '%.%.%'
+  ),
+  amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id, invoice_id) REFERENCES invoices(organization_id, id) ON DELETE CASCADE,
+  UNIQUE (invoice_id, position)
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON invoice_lines(invoice_id, position);
+`);
+
 if (!(await db.hasColumn(getTableReference(users), 'display_name'))) {
   await db.executeScript('ALTER TABLE users ADD COLUMN display_name TEXT;');
 }
@@ -534,3 +673,5 @@ export type OrganizationMembership = TableRow<typeof organizationMemberships>;
 export type UserPassword = TableRow<typeof userPasswords>;
 export type SessionRow = TableRow<typeof sessions>;
 export type Client = TableRow<typeof clients>;
+export type Invoice = TableRow<typeof invoices>;
+export type InvoiceLine = TableRow<typeof invoiceLines>;

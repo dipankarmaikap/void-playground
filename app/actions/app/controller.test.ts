@@ -100,6 +100,15 @@ describe('app controller', () => {
     assert.match(html, /<main id="main"/);
   });
 
+  it('offers Invoices in the main navigation alongside Dashboard and Clients', async () => {
+    let { sessionCookie } = await loginNewUser();
+    let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
+    let mainNav = html.match(/<nav aria-label="Main"[\s\S]*?<\/nav>/)?.[0] ?? '';
+
+    assert.match(mainNav, /Dashboard[\s\S]*Clients[\s\S]*Invoices[\s\S]*Settings/);
+    assert.match(mainNav, /href="\/app\/invoices"[^>]*data-rmx-document/);
+  });
+
   it('identifies the current Organization without replacing product or User identity', async () => {
     let { email, userId, sessionCookie } = await loginNewUser('Ada Lovelace');
     let organization = await findOrganizationForUser({ id: userId });

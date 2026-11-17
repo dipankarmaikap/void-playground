@@ -11,7 +11,7 @@ import { identityOf } from './identity.ts';
 import type { UserIdentity } from './identity.ts';
 import { colors, fontFamily, radius, shadow } from './theme.ts';
 
-export type AppSection = 'dashboard' | 'clients' | 'profile' | 'invoicing' | 'sessions';
+export type AppSection = 'dashboard' | 'clients' | 'invoices' | 'profile' | 'invoicing' | 'sessions';
 
 export interface AppShellProps {
   csrfToken: string;
@@ -359,6 +359,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
       section === 'profile' || section === 'invoicing' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
     let clientsHref = routes.app.clients.index.href();
+    let invoicesHref = routes.app.invoices.index.href();
     let profileHref = routes.app.settings.profile.index.href();
     let invoicingHref = routes.app.settings.invoicing.index.href();
     let sessionsHref = routes.app.settings.sessions.index.href();
@@ -376,6 +377,13 @@ export function AppShell(handle: Handle<AppShellProps>) {
         icon: 'users',
         current: section === 'clients',
         active: section === 'clients',
+      },
+      {
+        href: invoicesHref,
+        label: 'Invoices',
+        icon: 'receipt',
+        current: section === 'invoices',
+        active: section === 'invoices',
       },
       {
         // The Settings main destination intentionally opens Profile.
