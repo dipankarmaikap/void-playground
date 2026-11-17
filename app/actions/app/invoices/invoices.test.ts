@@ -273,11 +273,11 @@ describe('draft invoices', () => {
       'invoice-domestic-gst',
     );
     await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
       gst_registered: 'on',
       gstin: '27AAPCS2319F1Z5',
       gst_state_code: '27',
-      default_currency: 'INR',
-      payment_term: 'due_on_receipt',
     });
     let client = await makeClient(organizationId, {
       tax_country: 'IN',
@@ -1783,5 +1783,246 @@ describe('draft invoices', () => {
     );
     assert.match(keptPage, /Kept recipient/);
     assert.match(foreignAfterDeniedDiscard, /Foreign recipient/);
+  });
+
+  it('renders export endorsements and discloses reverse-charge GST without collecting it', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-export-reverse-charge',
+    );
+    await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+    });
+    let client = await makeClient(organizationId);
+
+    let invalidExport = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      supply_type: 'export_igst',
+      place_of_supply_country: 'IN',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(invalidExport.status, 400);
+    assert.match(await invalidExport.text(), /country outside India/i);
+
+    let lut = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      supply_type: 'export_lut',
+      place_of_supply_country: 'US',
+      export_reference: 'LUT/2026-27/001',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(lut.status, 302);
+    let lutDetail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: draftIdFrom(lut) }),
+      sessionCookie,
+    );
+    assert.match(lutDetail, /Export under LUT\/Bond/);
+    assert.match(lutDetail, /LUT\/2026-27\/001/);
+    assert.match(lutDetail, /IGST @ 0%/);
+    assert.match(lutDetail, /Total: 150\.00 INR/);
+
+    let exportIgst = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      supply_type: 'export_igst',
+      place_of_supply_country: 'US',
+      export_reference: 'EXP-2026-001',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(exportIgst.status, 302);
+    let exportIgstId = draftIdFrom(exportIgst);
+    let exportIgstDetail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: exportIgstId }),
+      sessionCookie,
+    );
+    assert.match(exportIgstDetail, /Export with IGST/);
+    assert.match(exportIgstDetail, /Place of Supply: United States/);
+    assert.match(exportIgstDetail, /EXP-2026-001/);
+    assert.match(exportIgstDetail, /IGST @ 18%/);
+    assert.match(exportIgstDetail, /Total: 177\.00 INR/);
+    let exportEdit = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: exportIgstId }),
+      sessionCookie,
+    );
+    assert.match(exportEdit, /name="supply_type"[\s\S]*?<option value="export_igst" selected/);
+    assert.match(exportEdit, /name="place_of_supply_country"[^>]*value="US"/);
+    assert.match(exportEdit, /name="export_reference"[^>]*value="EXP-2026-001"/);
+
+    let reverseCharge = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      supply_type: 'domestic',
+      place_of_supply_state_code: '27',
+      reverse_charge: 'on',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+    });
+    assert.equal(reverseCharge.status, 302);
+    let reverseDetail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: draftIdFrom(reverseCharge) }),
+      sessionCookie,
+    );
+    assert.match(reverseDetail, /Reverse charge applies/);
+    assert.match(reverseDetail, /CGST @ 9%/);
+    assert.match(reverseDetail, /SGST @ 9%/);
+    assert.match(reverseDetail, /payable by recipient/i);
+    assert.match(reverseDetail, /Tax payable by recipient: 27\.00 INR/);
+    assert.match(reverseDetail, /Total: 150\.00 INR/);
+    let reverseEdit = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(reverseCharge) }),
+      sessionCookie,
+    );
+    assert.match(reverseEdit, /name="reverse_charge"[^>]*checked/);
+  });
+
+  it('calculates percentage and fixed foreign tax at USD, EUR, JPY, and KWD precision', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-manual-foreign-tax',
+    );
+    let client = await makeClient(organizationId);
+    let cases = [
+      { currency: 'USD', percentage: '7.50 USD', fixed: '2.00 USD', fixedInput: '2.00' },
+      { currency: 'EUR', percentage: '7.50 EUR', fixed: '2.00 EUR', fixedInput: '2.00' },
+      { currency: 'JPY', percentage: '8 JPY', fixed: '2 JPY', fixedInput: '2' },
+      { currency: 'KWD', percentage: '7.500 KWD', fixed: '2.000 KWD', fixedInput: '2.000' },
+    ];
+
+    for (let { currency, percentage, fixed, fixedInput } of cases) {
+      let created = await createDraft(sessionCookie, client.id, {
+        currency,
+        gst_mode: 'foreign_manual',
+        line_description: ['Percentage-taxed service', 'Fixed-taxed service'],
+        line_quantity: ['1', '1'],
+        line_unit_price: ['100', '100'],
+        line_foreign_tax_label: ['Sales Tax', 'Withholding/VAT'],
+        line_foreign_tax_mode: ['percent', 'fixed'],
+        line_foreign_tax_value: ['7.5', '2'],
+      });
+      assert.equal(created.status, 302, `manual tax should be accepted for ${currency}`);
+      let invoiceId = draftIdFrom(created);
+      let detail = await getHtml(
+        router,
+        routes.app.invoices.show.href({ invoiceId }),
+        sessionCookie,
+      );
+      assert.match(detail, new RegExp(`Sales Tax @ 7\\.5%: ${percentage.replace('.', '\\.')}`));
+      assert.match(detail, new RegExp(`Withholding/VAT: ${fixed.replace('.', '\\.')}`));
+      assert.match(detail, /Total tax:/);
+      assert.match(detail, /Total:/);
+      assert.doesNotMatch(detail, /CGST|SGST|IGST/);
+      let edit = await getHtml(
+        router,
+        routes.app.invoices.edit.index.href({ invoiceId }),
+        sessionCookie,
+      );
+      assert.match(edit, /value="foreign_manual" selected/);
+      assert.match(edit, /name="line_foreign_tax_label"[^>]*value="Sales Tax"/);
+      assert.match(edit, /name="line_foreign_tax_mode"[\s\S]*?<option value="fixed" selected/);
+      assert.match(edit, /name="line_foreign_tax_value"[^>]*value="7\.5"/);
+      assert.match(
+        edit,
+        new RegExp(`name="line_foreign_tax_value"[^>]*value="${fixedInput.replace('.', '\\.')}"`),
+      );
+    }
+  });
+
+  it('rejects combining Indian GST and manual foreign tax on one Draft', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-mixed-tax-regimes',
+    );
+    await setInvoicingDefaults(organizationId, {
+      default_currency: 'INR',
+      payment_term: 'due_on_receipt',
+      gst_registered: 'on',
+      gstin: '27AAPCS2319F1Z5',
+      gst_state_code: '27',
+    });
+    let client = await makeClient(organizationId);
+
+    let mixedForeignLine = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'india_gst',
+      place_of_supply_state_code: '27',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+      line_foreign_tax_label: ['Sales Tax'],
+      line_foreign_tax_mode: ['percent'],
+      line_foreign_tax_value: ['5'],
+    });
+    assert.equal(mixedForeignLine.status, 400);
+    assert.match(await mixedForeignLine.text(), /cannot combine Indian GST and manual foreign tax/i);
+
+    let mixedGstLine = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'foreign_manual',
+      line_tax_treatment: ['taxable'],
+      line_gst_rate: ['18'],
+      line_foreign_tax_label: ['Sales Tax'],
+      line_foreign_tax_mode: ['percent'],
+      line_foreign_tax_value: ['5'],
+    });
+    assert.equal(mixedGstLine.status, 400);
+    assert.match(await mixedGstLine.text(), /GST line treatments require Indian GST mode/i);
+
+    let invalidManualRate = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'foreign_manual',
+      line_foreign_tax_label: ['Sales Tax'],
+      line_foreign_tax_mode: ['percent'],
+      line_foreign_tax_value: ['101'],
+    });
+    assert.equal(invalidManualRate.status, 400);
+    assert.match(await invalidManualRate.text(), /percentage cannot exceed 100%/i);
+
+    let manualWithoutLabel = await createDraft(sessionCookie, client.id, {
+      gst_mode: 'foreign_manual',
+      line_foreign_tax_label: [''],
+      line_foreign_tax_mode: ['fixed'],
+      line_foreign_tax_value: ['5'],
+    });
+    assert.equal(manualWithoutLabel.status, 400);
+    assert.match(await manualWithoutLabel.text(), /Enter a label for the manual foreign tax/i);
+  });
+
+  it('calculates manual percentage tax on the post-discount line value', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-manual-tax-discounts',
+    );
+    let client = await makeClient(organizationId);
+    let created = await createDraft(sessionCookie, client.id, {
+      currency: 'USD',
+      gst_mode: 'foreign_manual',
+      line_description: ['Discounted service'],
+      line_quantity: ['1'],
+      line_unit_price: ['100'],
+      line_discount_mode: ['percent'],
+      line_discount_value: ['10'],
+      line_foreign_tax_label: ['Sales Tax'],
+      line_foreign_tax_mode: ['percent'],
+      line_foreign_tax_value: ['10'],
+      invoice_discount_mode: 'fixed',
+      invoice_discount_value: '10',
+    });
+    assert.equal(created.status, 302);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: draftIdFrom(created) }),
+      sessionCookie,
+    );
+    assert.match(detail, /Line discounts: 10\.00 USD/);
+    assert.match(detail, /Invoice discount \(fixed\): 10\.00 USD/);
+    assert.match(detail, /Net taxable subtotal: 80\.00 USD/);
+    assert.match(detail, /Sales Tax @ 10%: 8\.00 USD/);
+    assert.match(detail, /Total: 88\.00 USD/);
   });
 });

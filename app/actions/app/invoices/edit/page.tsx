@@ -5,6 +5,7 @@ import type { Issue } from 'remix/data-schema';
 import { clientDisplayLabel } from '../../../../data/client-names.ts';
 import type { Client, Invoice, InvoiceLine } from '../../../../data/db.ts';
 import { formatMoney } from '../../../../data/invoice-calculation.ts';
+import { countryName } from '../../../../data/client-billing.ts';
 import { groupedInvoiceTaxes } from '../../../../data/invoice-tax.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
@@ -62,30 +63,48 @@ export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
             Drafts stay editable until issued. Recipient changes affect this invoice only.
           </p>
         </header>
-        {invoice.gst_mode === 'india_gst' ? (
+        {invoice.gst_mode === 'india_gst' || invoice.gst_mode === 'foreign_manual' ? (
           <section aria-labelledby="saved-tax-summary-heading">
-            <h2 id="saved-tax-summary-heading">Current GST summary</h2>
-            <ul>
-              {lines.map((line) => {
-                let components = [
-                  line.cgst_rate != null
-                    ? `CGST @ ${line.cgst_rate}%: ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
-                    : null,
-                  line.sgst_rate != null
-                    ? `SGST @ ${line.sgst_rate}%: ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
-                    : null,
-                  line.igst_rate != null
-                    ? `IGST @ ${line.igst_rate}%: ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
-                    : null,
-                ].filter((value): value is string => value != null);
-                return (
-                  <li key={line.id}>
-                    {line.description}: {line.tax_treatment?.replace('_', '-') ?? '—'}
-                    {components.length > 0 ? ` · ${components.join(' · ')}` : ' · 0%'}
-                  </li>
-                );
-              })}
-            </ul>
+            <h2 id="saved-tax-summary-heading">
+              {invoice.gst_mode === 'foreign_manual' ? 'Current manual tax summary' : 'Current GST summary'}
+            </h2>
+            {invoice.gst_mode === 'india_gst' ? (
+              <>
+                {invoice.supply_type === 'export_lut' ? (
+                  <p>Export endorsement: Export under LUT/Bond without payment of IGST.</p>
+                ) : invoice.supply_type === 'export_igst' ? (
+                  <p>
+                    Export endorsement: Export with IGST. Place of Supply:{' '}
+                    {countryName(invoice.place_of_supply_country)}
+                  </p>
+                ) : null}
+                {invoice.export_reference ? <p>Export reference: {invoice.export_reference}</p> : null}
+                {invoice.reverse_charge ? (
+                  <p>Reverse charge applies; disclosed GST is payable by recipient.</p>
+                ) : null}
+                <ul>
+                  {lines.map((line) => {
+                    let components = [
+                      line.cgst_rate != null
+                        ? `CGST @ ${line.cgst_rate}%: ${formatMoney(BigInt(line.cgst_amount_minor), invoice.currency)}`
+                        : null,
+                      line.sgst_rate != null
+                        ? `SGST @ ${line.sgst_rate}%: ${formatMoney(BigInt(line.sgst_amount_minor), invoice.currency)}`
+                        : null,
+                      line.igst_rate != null
+                        ? `IGST @ ${line.igst_rate}%: ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
+                        : null,
+                    ].filter((value): value is string => value != null);
+                    return (
+                      <li key={line.id}>
+                        {line.description}: {line.tax_treatment?.replace('_', '-') ?? '—'}
+                        {components.length > 0 ? ` · ${components.join(' · ')}` : ' · 0%'}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : null}
             <h3>Grouped tax summary</h3>
             {taxSummary.length > 0 ? (
               <ul>
@@ -96,9 +115,12 @@ export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
                 ))}
               </ul>
             ) : (
-              <p>No GST charged.</p>
+              <p>{invoice.gst_mode === 'foreign_manual' ? 'No manual foreign tax.' : 'No GST charged.'}</p>
             )}
-            <p>Total tax: {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}</p>
+            <p>
+              {invoice.reverse_charge ? 'Tax payable by recipient: ' : 'Total tax: '}
+              {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}
+            </p>
           </section>
         ) : null}
         <InvoiceForm

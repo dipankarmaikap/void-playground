@@ -23,6 +23,16 @@ export function groupedInvoiceTaxes(
       let label = `${component} @ ${rate}%`;
       totals.set(label, (totals.get(label) ?? 0n) + BigInt(amount));
     }
+    if (line.foreign_tax_label && line.foreign_tax_mode) {
+      let label =
+        line.foreign_tax_mode === 'percent' && line.foreign_tax_rate
+          ? `${line.foreign_tax_label} @ ${line.foreign_tax_rate}%`
+          : line.foreign_tax_label;
+      totals.set(
+        label,
+        (totals.get(label) ?? 0n) + BigInt(line.foreign_tax_amount_minor),
+      );
+    }
   }
   return [...totals].map(([label, amountMinor]) => ({
     label,

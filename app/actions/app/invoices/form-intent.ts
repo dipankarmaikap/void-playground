@@ -19,6 +19,9 @@ export function withAdditionalLine(values: InvoiceFormValues): InvoiceFormValues
     discount_value: '',
     tax_treatment: '',
     gst_rate: '',
+    foreign_tax_label: '',
+    foreign_tax_mode: '',
+    foreign_tax_value: '',
   };
   return { ...values, lines: [...values.lines, blank] };
 }

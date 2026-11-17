@@ -114,11 +114,30 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           {invoice.gst_mode === 'india_gst' ? (
             <>
               <p mix={detailStyle}>
-                Place of Supply: {invoice.place_of_supply_state_name ?? '—'}
+                Place of Supply:{' '}
+                {invoice.supply_type === 'domestic'
+                  ? invoice.place_of_supply_state_name ?? '—'
+                  : countryName(invoice.place_of_supply_country) || '—'}
               </p>
               <p mix={detailStyle}>
                 Recipient GSTIN applicable: {invoice.recipient_gstin_applicable ? 'Yes' : 'No'}
               </p>
+              {invoice.supply_type === 'export_lut' ? (
+                <p mix={detailStyle}>
+                  Export endorsement: Export under LUT/Bond without payment of IGST.
+                </p>
+              ) : invoice.supply_type === 'export_igst' ? (
+                <p mix={detailStyle}>Export endorsement: Export with IGST.</p>
+              ) : null}
+              {invoice.export_reference ? (
+                <p mix={detailStyle}>Export reference: {invoice.export_reference}</p>
+              ) : null}
+              {invoice.reverse_charge ? (
+                <p mix={detailStyle}>
+                  Reverse charge applies. GST shown below is payable by recipient and is excluded
+                  from the amount collected by the supplier.
+                </p>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -167,6 +186,9 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                       line.igst_rate != null
                         ? `IGST @ ${line.igst_rate}% ${formatMoney(BigInt(line.igst_amount_minor), invoice.currency)}`
                         : null,
+                      line.foreign_tax_mode && line.foreign_tax_label
+                        ? `${line.foreign_tax_label}${line.foreign_tax_mode === 'percent' ? ` @ ${line.foreign_tax_rate}%` : ''} ${formatMoney(BigInt(line.foreign_tax_amount_minor), invoice.currency)}`
+                        : null,
                     ]
                       .filter(Boolean)
                       .join(' · ') || (line.tax_treatment ? `${line.tax_treatment.replace('_', '-')}: 0%` : '—')}
@@ -192,9 +214,11 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           <p mix={breakdownStyle}>
             Net taxable subtotal: {formatMoney(BigInt(invoice.net_subtotal_minor), invoice.currency)}
           </p>
-          {invoice.gst_mode === 'india_gst' ? (
+          {invoice.gst_mode === 'india_gst' || invoice.gst_mode === 'foreign_manual' ? (
             <>
-              <h3 mix={headingStyle}>Grouped tax summary</h3>
+              <h3 mix={headingStyle}>
+                {invoice.reverse_charge ? 'GST disclosure (payable by recipient)' : 'Grouped tax summary'}
+              </h3>
               {taxSummary.length > 0 ? (
                 taxSummary.map((tax) => (
                   <p key={tax.label} mix={breakdownStyle}>
@@ -202,10 +226,13 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   </p>
                 ))
               ) : (
-                <p mix={breakdownStyle}>No GST charged.</p>
+                <p mix={breakdownStyle}>
+                  {invoice.gst_mode === 'foreign_manual' ? 'No manual foreign tax.' : 'No GST charged.'}
+                </p>
               )}
               <p mix={breakdownStyle}>
-                Total tax: {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}
+                {invoice.reverse_charge ? 'Tax payable by recipient: ' : 'Total tax: '}
+                {formatMoney(BigInt(invoice.tax_total_minor), invoice.currency)}
               </p>
             </>
           ) : null}

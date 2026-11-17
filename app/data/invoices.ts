@@ -232,6 +232,10 @@ function invoiceLineValues(
     cgst_amount_minor: line.cgst_amount_minor,
     sgst_amount_minor: line.sgst_amount_minor,
     igst_amount_minor: line.igst_amount_minor,
+    foreign_tax_label: line.foreign_tax_label,
+    foreign_tax_mode: line.foreign_tax_mode,
+    foreign_tax_rate: line.foreign_tax_rate,
+    foreign_tax_amount_minor: line.foreign_tax_amount_minor,
     created_at: now,
     updated_at: now,
   };

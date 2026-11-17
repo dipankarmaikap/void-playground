@@ -2,7 +2,7 @@ import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
-import { CURRENCIES } from '../../../data/client-billing.ts';
+import { COUNTRIES, CURRENCIES } from '../../../data/client-billing.ts';
 import { PAYMENT_TERMS, PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { INDIA_STATES } from '../../../data/india-states.ts';
 import { Button } from '../../../ui/button.tsx';
@@ -272,32 +272,51 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        {gstRatePresets.length > 0 ? (
-          <section aria-labelledby="invoice-gst-heading" mix={cardStyle}>
-            <h2 id="invoice-gst-heading" mix={sectionHeadingStyle}>
-              Indian GST
-            </h2>
-            <p mix={hintStyle}>
-              Select the tax treatment and configured rate for each service. Rates are never inferred
-              from SAC codes.
-            </p>
-            <div mix={gridStyle}>
-              <Field label="Invoice tax mode" error={firstIssue(issues, 'gst_mode')?.message}>
-                <select name="gst_mode" aria-invalid={firstIssue(issues, 'gst_mode') ? true : undefined}>
-                  <option value="none" selected={values.gst_mode === 'none'}>
-                    No Indian GST
-                  </option>
+        <section aria-labelledby="invoice-tax-heading" mix={cardStyle}>
+          <h2 id="invoice-tax-heading" mix={sectionHeadingStyle}>
+            Tax treatment
+          </h2>
+          <div mix={gridStyle}>
+            <Field label="Invoice tax mode" error={firstIssue(issues, 'gst_mode')?.message}>
+              <select name="gst_mode" aria-invalid={firstIssue(issues, 'gst_mode') ? true : undefined}>
+                <option value="none" selected={values.gst_mode === 'none'}>
+                  No tax
+                </option>
+                {gstRatePresets.length > 0 ? (
                   <option value="india_gst" selected={values.gst_mode === 'india_gst'}>
                     Indian GST
                   </option>
+                ) : null}
+                <option value="foreign_manual" selected={values.gst_mode === 'foreign_manual'}>
+                  Manual foreign tax
+                </option>
+              </select>
+            </Field>
+          </div>
+          {gstRatePresets.length > 0 ? (
+            <>
+              <p mix={hintStyle}>
+                Select the tax treatment and configured rate for each service. Rates are never
+                inferred from SAC codes.
+              </p>
+            <div mix={gridStyle}>
+              <Field label="Supply classification" error={firstIssue(issues, 'supply_type')?.message}>
+                <select name="supply_type" aria-invalid={firstIssue(issues, 'supply_type') ? true : undefined}>
+                  <option value="domestic" selected={values.supply_type === 'domestic'}>
+                    Domestic
+                  </option>
+                  <option value="export_lut" selected={values.supply_type === 'export_lut'}>
+                    Export under LUT/Bond (without IGST)
+                  </option>
+                  <option value="export_igst" selected={values.supply_type === 'export_igst'}>
+                    Export with IGST
+                  </option>
                 </select>
               </Field>
-              <Field
-                label="Place of Supply State/UT"
-                error={firstIssue(issues, 'place_of_supply_state_code')?.message}
-              >
+              <Field label="Place of Supply State/UT" error={firstIssue(issues, 'place_of_supply_state_code')?.message}>
                 <select
                   name="place_of_supply_state_code"
+                  disabled={values.supply_type === 'export_lut' || values.supply_type === 'export_igst'}
                   aria-invalid={
                     firstIssue(issues, 'place_of_supply_state_code') ? true : undefined
                   }
@@ -316,10 +335,28 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                   ))}
                 </select>
               </Field>
-              <Field
-                label="Recipient GSTIN applicable"
-                error={firstIssue(issues, 'recipient_gstin_applicable')?.message}
-              >
+              <Field label="Export Place of Supply country" error={firstIssue(issues, 'place_of_supply_country')?.message}>
+                <Input
+                  name="place_of_supply_country"
+                  list="invoice-countries"
+                  defaultValue={values.place_of_supply_country}
+                  variant={firstIssue(issues, 'place_of_supply_country') ? 'error' : 'default'}
+                />
+                <datalist id="invoice-countries">
+                  {COUNTRIES.map((country) => (
+                    <option key={country.code} value={country.code}>{country.name}</option>
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Export reference" error={firstIssue(issues, 'export_reference')?.message}>
+                <Input
+                  name="export_reference"
+                  maxLength={200}
+                  defaultValue={values.export_reference}
+                  variant={firstIssue(issues, 'export_reference') ? 'error' : 'default'}
+                />
+              </Field>
+              <Field label="Recipient GSTIN applicable" error={firstIssue(issues, 'recipient_gstin_applicable')?.message}>
                 <input
                   type="checkbox"
                   name="recipient_gstin_applicable"
@@ -327,9 +364,13 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                   checked={values.recipient_gstin_applicable === 'on'}
                 />
               </Field>
+              <Field label="Reverse charge" error={firstIssue(issues, 'reverse_charge')?.message}>
+                <input type="checkbox" name="reverse_charge" value="on" checked={values.reverse_charge === 'on'} />
+              </Field>
             </div>
-          </section>
-        ) : null}
+            </>
+          ) : null}
+        </section>
 
         <section aria-labelledby="invoice-lines-heading" mix={cardStyle}>
           <h2 id="invoice-lines-heading" mix={sectionHeadingStyle}>
@@ -354,6 +395,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               discount_value: '',
               tax_treatment: '',
               gst_rate: '',
+              foreign_tax_label: '',
+              foreign_tax_mode: '',
+              foreign_tax_value: '',
             };
             return (
               <div key={index} mix={lineRowStyle}>
@@ -472,6 +516,37 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                     </Field>
                   </>
                 ) : null}
+                <Field
+                  label={`Manual tax label ${index + 1}`}
+                  error={lineIssue(issues, index, 'foreign_tax_label')?.message}
+                >
+                  <Input
+                    name="line_foreign_tax_label"
+                    maxLength={80}
+                    defaultValue={line.foreign_tax_label}
+                    variant={lineIssue(issues, index, 'foreign_tax_label') ? 'error' : 'default'}
+                  />
+                </Field>
+                <Field
+                  label={`Manual tax type ${index + 1}`}
+                  error={lineIssue(issues, index, 'foreign_tax_mode')?.message}
+                >
+                  <select name="line_foreign_tax_mode">
+                    <option value="" selected={line.foreign_tax_mode === ''}>No manual tax</option>
+                    <option value="percent" selected={line.foreign_tax_mode === 'percent'}>Percentage</option>
+                    <option value="fixed" selected={line.foreign_tax_mode === 'fixed'}>Fixed invoice-currency amount</option>
+                  </select>
+                </Field>
+                <Field
+                  label={`Manual tax rate or amount ${index + 1}`}
+                  error={lineIssue(issues, index, 'foreign_tax_value')?.message}
+                >
+                  <Input
+                    name="line_foreign_tax_value"
+                    defaultValue={line.foreign_tax_value}
+                    variant={lineIssue(issues, index, 'foreign_tax_value') ? 'error' : 'default'}
+                  />
+                </Field>
                 {lineIssue(issues, index, 'amount') ? (
                   <p role="alert">{lineIssue(issues, index, 'amount')?.message}</p>
                 ) : null}

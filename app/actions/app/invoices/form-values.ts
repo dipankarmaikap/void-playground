@@ -26,6 +26,9 @@ const LINE_FIELDS = [
   'discount_value',
   'tax_treatment',
   'gst_rate',
+  'foreign_tax_label',
+  'foreign_tax_mode',
+  'foreign_tax_value',
 ] as const;
 
 export function emptyInvoiceFormValues(): InvoiceFormValues {
@@ -49,7 +52,11 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
     recipient_tax_state_name: '',
     recipient_gstin_applicable: '',
     gst_mode: 'none',
+    supply_type: '',
     place_of_supply_state_code: '',
+    place_of_supply_country: '',
+    reverse_charge: '',
+    export_reference: '',
     payment_instructions: '',
     customer_notes: '',
     internal_note: '',
@@ -66,6 +73,9 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
         discount_value: '',
         tax_treatment: '',
         gst_rate: '',
+        foreign_tax_label: '',
+        foreign_tax_mode: '',
+        foreign_tax_value: '',
       },
     ],
   };
@@ -97,8 +107,12 @@ export function draftFormValuesFor(
     recipient_tax_state_code: client.tax_state_code ?? '',
     recipient_tax_state_name: client.tax_state_name ?? '',
     gst_mode: view.gst_registered ? 'india_gst' : 'none',
+    supply_type: view.gst_registered ? 'domestic' : '',
     place_of_supply_state_code: defaultPlaceOfSupply(client),
+    place_of_supply_country: '',
     recipient_gstin_applicable: '',
+    reverse_charge: '',
+    export_reference: '',
     payment_instructions: view.payment_instructions ?? '',
     customer_notes: view.customer_notes ?? '',
     internal_note: '',
@@ -128,8 +142,12 @@ export function invoiceFormValuesOf(
     recipient_tax_state_code: invoice.recipient_tax_state_code ?? '',
     recipient_tax_state_name: invoice.recipient_tax_state_name ?? '',
     gst_mode: invoice.gst_mode,
+    supply_type: invoice.supply_type ?? '',
     place_of_supply_state_code: invoice.place_of_supply_state_code ?? '',
+    place_of_supply_country: invoice.place_of_supply_country ?? '',
     recipient_gstin_applicable: invoice.recipient_gstin_applicable ? 'on' : '',
+    reverse_charge: invoice.reverse_charge ? 'on' : '',
+    export_reference: invoice.export_reference ?? '',
     payment_instructions: invoice.payment_instructions ?? '',
     customer_notes: invoice.customer_notes ?? '',
     internal_note: invoice.internal_note ?? '',
@@ -148,6 +166,14 @@ export function invoiceFormValuesOf(
       discount_value: line.discount_value ?? '',
       tax_treatment: line.tax_treatment ?? '',
       gst_rate: line.gst_rate ?? '',
+      foreign_tax_label: line.foreign_tax_label ?? '',
+      foreign_tax_mode: line.foreign_tax_mode ?? '',
+      foreign_tax_value:
+        line.foreign_tax_mode === 'percent'
+          ? line.foreign_tax_rate ?? ''
+          : line.foreign_tax_mode === 'fixed'
+            ? formatMinorInput(BigInt(line.foreign_tax_amount_minor), invoice.currency)
+            : '',
     })),
   };
 }
@@ -191,8 +217,12 @@ export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
     recipient_tax_state_code: readText(formData, 'recipient_tax_state_code'),
     recipient_tax_state_name: readText(formData, 'recipient_tax_state_name'),
     gst_mode: readText(formData, 'gst_mode'),
+    supply_type: readText(formData, 'supply_type'),
     place_of_supply_state_code: readText(formData, 'place_of_supply_state_code'),
+    place_of_supply_country: readText(formData, 'place_of_supply_country'),
     recipient_gstin_applicable: readText(formData, 'recipient_gstin_applicable'),
+    reverse_charge: readText(formData, 'reverse_charge'),
+    export_reference: readText(formData, 'export_reference'),
     payment_instructions: readText(formData, 'payment_instructions'),
     customer_notes: readText(formData, 'customer_notes'),
     internal_note: readText(formData, 'internal_note'),

@@ -3,7 +3,7 @@ import type { Issue } from 'remix/data-schema';
 import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from './client-tax.ts';
 import { CLIENT_TEXT_LIMITS } from './client-text.ts';
 import { findIndiaStateByCode } from './india-states.ts';
-import { canonicalCountry } from './client-billing.ts';
+import { canonicalCountry, findCountry } from './client-billing.ts';
 import {
   allocateProportionally,
   calculateLineAmountMinor,
@@ -31,6 +31,9 @@ export interface InvoiceDraftLineInput {
   discount_value: string;
   tax_treatment: string;
   gst_rate: string;
+  foreign_tax_label: string;
+  foreign_tax_mode: string;
+  foreign_tax_value: string;
 }
 
 /** Editable invoice values, independent of the route's client-selection and display fields. */
@@ -57,8 +60,12 @@ export interface InvoiceDraftInput {
   invoice_discount_value: string;
   round_off: string;
   gst_mode: string;
+  supply_type: string;
   place_of_supply_state_code: string;
+  place_of_supply_country: string;
   recipient_gstin_applicable: string;
+  reverse_charge: string;
+  export_reference: string;
   lines: InvoiceDraftLineInput[];
 }
 
@@ -82,6 +89,10 @@ export interface InvoiceLineChanges {
   cgst_amount_minor: number;
   sgst_amount_minor: number;
   igst_amount_minor: number;
+  foreign_tax_label: string | null;
+  foreign_tax_mode: 'percent' | 'fixed' | null;
+  foreign_tax_rate: string | null;
+  foreign_tax_amount_minor: number;
 }
 
 /** The invoice-row plus line-row changes a valid Draft form submission produces. */
@@ -102,10 +113,14 @@ export interface InvoiceDraftChanges {
   recipient_tax_value: string | null;
   recipient_tax_state_name: string | null;
   recipient_tax_state_code: string | null;
-  gst_mode: 'none' | 'india_gst';
+  gst_mode: 'none' | 'india_gst' | 'foreign_manual';
+  supply_type: 'domestic' | 'export_lut' | 'export_igst' | null;
   place_of_supply_state_code: string | null;
   place_of_supply_state_name: string | null;
+  place_of_supply_country: string | null;
   recipient_gstin_applicable: boolean;
+  reverse_charge: boolean;
+  export_reference: string | null;
   payment_instructions: string | null;
   customer_notes: string | null;
   internal_note: string | null;
@@ -248,7 +263,7 @@ export function parseInvoiceDraft(
   }
 
   let gstMode = form.gst_mode.trim() || 'none';
-  if (gstMode !== 'none' && gstMode !== 'india_gst') {
+  if (gstMode !== 'none' && gstMode !== 'india_gst' && gstMode !== 'foreign_manual') {
     push('gst_mode', 'Choose a valid invoice tax mode.');
   }
   if (gstMode === 'india_gst' && !taxConfig.gstRegistered) {
@@ -257,10 +272,48 @@ export function parseInvoiceDraft(
   if (gstMode === 'india_gst' && taxConfig.gstRegistered && !findIndiaStateByCode(taxConfig.gstStateCode ?? '')) {
     push('gst_mode', 'Your Organization must have a valid GST State/UT configured before using Indian GST.');
   }
+  let supplyType = form.supply_type.trim() || 'domestic';
+  if (
+    gstMode === 'india_gst' &&
+    !['domestic', 'export_lut', 'export_igst'].includes(supplyType)
+  ) {
+    push('supply_type', 'Choose a valid GST supply classification.');
+  }
+  if (
+    gstMode !== 'india_gst' &&
+    (supplyType === 'export_lut' || supplyType === 'export_igst' || form.export_reference.trim())
+  ) {
+    push('supply_type', 'Export details require Indian GST mode.');
+  }
   let placeStateCode = form.place_of_supply_state_code.trim();
-  let placeState = gstMode === 'india_gst' ? findIndiaStateByCode(placeStateCode) : undefined;
-  if (gstMode === 'india_gst' && !placeState) {
+  let placeState =
+    gstMode === 'india_gst' && supplyType === 'domestic'
+      ? findIndiaStateByCode(placeStateCode)
+      : undefined;
+  if (gstMode === 'india_gst' && supplyType === 'domestic' && !placeState) {
     push('place_of_supply_state_code', 'Choose a valid Place of Supply State or UT.');
+  }
+  let placeCountry = canonicalCountry(form.place_of_supply_country);
+  let exportCountry = form.place_of_supply_country.trim()
+    ? findCountry(form.place_of_supply_country)
+    : null;
+  if (gstMode === 'india_gst' && supplyType !== 'domestic') {
+    if (!exportCountry || exportCountry.code === 'IN') {
+      push('place_of_supply_country', 'Choose a country outside India for an export supply.');
+    }
+  } else if (form.place_of_supply_country.trim()) {
+    push('place_of_supply_country', 'Place of Supply country is available only for exports.');
+  }
+  let exportReference = optional(form.export_reference);
+  if (form.export_reference.length > 200) {
+    push('export_reference', 'Export reference must be 200 characters or fewer.');
+  }
+  if (exportReference && gstMode === 'india_gst' && supplyType === 'domestic') {
+    push('export_reference', 'Export reference requires an export supply classification.');
+  }
+  let reverseCharge = isChecked(form.reverse_charge);
+  if (reverseCharge && gstMode !== 'india_gst') {
+    push('reverse_charge', 'Reverse charge is available only on Indian GST invoices.');
   }
   let recipientGstinApplicable = isChecked(form.recipient_gstin_applicable);
   if (recipientGstinApplicable && gstMode !== 'india_gst') {
@@ -304,9 +357,14 @@ export function parseInvoiceDraft(
       !description &&
       !sac &&
       !quantityRaw &&
-      !priceRaw &&
+    !priceRaw &&
       !line.discount_mode.trim() &&
-      !line.discount_value.trim();
+      !line.discount_value.trim() &&
+      !line.tax_treatment.trim() &&
+      !line.gst_rate.trim() &&
+      !line.foreign_tax_label.trim() &&
+      !line.foreign_tax_mode.trim() &&
+      !line.foreign_tax_value.trim();
     if (isBlank) return;
 
     let lineIssue = (field: string, message: string) =>
@@ -336,7 +394,22 @@ export function parseInvoiceDraft(
     let treatment = line.tax_treatment.trim();
     let parsedTreatment: InvoiceLineChanges['tax_treatment'] = null;
     let parsedRate: string | null = null;
+    let parsedForeignLabel: string | null = null;
+    let parsedForeignMode: InvoiceLineChanges['foreign_tax_mode'] = null;
+    let parsedForeignRate: string | null = null;
+    let parsedForeignFixedMinor = 0n;
+    let hasForeignInput = Boolean(
+      line.foreign_tax_label.trim() ||
+        line.foreign_tax_mode.trim() ||
+        line.foreign_tax_value.trim(),
+    );
     if (gstMode === 'india_gst') {
+      if (hasForeignInput) {
+        lineIssue(
+          'foreign_tax_label',
+          'An invoice cannot combine Indian GST and manual foreign tax.',
+        );
+      }
       if (!['taxable', 'nil_rated', 'exempt', 'non_gst'].includes(treatment)) {
         lineIssue('tax_treatment', 'Choose a GST treatment for this service line.');
       } else {
@@ -354,8 +427,51 @@ export function parseInvoiceDraft(
           parsedRate = formatScaledDecimal(rateScaled);
         }
       }
-    } else if (!taxConfig.gstRegistered && (treatment || line.gst_rate.trim())) {
-      lineIssue('tax_treatment', 'GST line treatments require Indian GST mode.');
+    } else {
+      if (treatment || line.gst_rate.trim()) {
+        lineIssue('tax_treatment', 'GST line treatments require Indian GST mode.');
+      }
+      if (gstMode === 'foreign_manual' && hasForeignInput) {
+        let label = line.foreign_tax_label.trim();
+        if (!label) {
+          lineIssue('foreign_tax_label', 'Enter a label for the manual foreign tax.');
+        } else if (label.length > 80) {
+          lineIssue('foreign_tax_label', 'Manual tax labels must be 80 characters or fewer.');
+        } else {
+          parsedForeignLabel = label;
+        }
+
+        let mode = line.foreign_tax_mode.trim();
+        let valueRaw = line.foreign_tax_value.trim();
+        if (mode !== 'percent' && mode !== 'fixed') {
+          lineIssue('foreign_tax_mode', 'Choose a percentage rate or fixed tax amount.');
+        } else if (!valueRaw) {
+          lineIssue('foreign_tax_value', 'Enter the manual foreign tax value.');
+        } else {
+          let scaled = parseScaledDecimal(valueRaw);
+          if (scaled == null) {
+            lineIssue(
+              'foreign_tax_value',
+              'Enter a non-negative manual tax value with at most 4 decimal places.',
+            );
+          } else if (mode === 'percent' && scaled > PERCENT_MAX_SCALED) {
+            lineIssue('foreign_tax_value', 'A manual foreign tax percentage cannot exceed 100%.');
+          } else if (mode === 'percent') {
+            parsedForeignMode = 'percent';
+            parsedForeignRate = formatScaledDecimal(scaled);
+          } else {
+            let fixedMinor = roundScaledToMinor(scaled, calculationCurrency);
+            if (toExactMinorNumber(fixedMinor) == null) {
+              lineIssue('foreign_tax_value', 'The manual foreign tax amount is too large to store exactly.');
+            } else {
+              parsedForeignMode = 'fixed';
+              parsedForeignFixedMinor = fixedMinor;
+            }
+          }
+        }
+      } else if (hasForeignInput) {
+        lineIssue('foreign_tax_label', 'Manual foreign tax requires the Manual foreign tax mode.');
+      }
     }
 
     if (quantity != null && quantity > 0n && unitPrice != null) {
@@ -401,6 +517,10 @@ export function parseInvoiceDraft(
           cgst_amount_minor: 0,
           sgst_amount_minor: 0,
           igst_amount_minor: 0,
+          foreign_tax_label: parsedForeignLabel,
+          foreign_tax_mode: parsedForeignMode,
+          foreign_tax_rate: parsedForeignRate,
+          foreign_tax_amount_minor: toExactMinorNumber(parsedForeignFixedMinor) ?? 0,
         });
         linePostValues.push(net);
       }
@@ -479,13 +599,18 @@ export function parseInvoiceDraft(
   });
 
   let taxTotalMinor = 0n;
-  if (gstMode === 'india_gst' && placeState && taxConfig.gstStateCode) {
+  if (gstMode === 'india_gst' && supplyType === 'export_lut') {
+    // LUT/Bond exports disclose taxable value with a zero IGST rate and no IGST amount charged.
+    for (let line of lines) {
+      if (line.tax_treatment === 'taxable') line.igst_rate = '0';
+    }
+  } else if (gstMode === 'india_gst' && (placeState || supplyType === 'export_igst') && taxConfig.gstStateCode) {
     for (let line of lines) {
       if (line.tax_treatment !== 'taxable' || !line.gst_rate) continue;
       let rateScaled = parseScaledDecimal(line.gst_rate);
       if (rateScaled == null) continue;
       let lineTax = percentOfMinor(BigInt(line.net_minor), rateScaled);
-      if (taxConfig.gstStateCode === placeState.code) {
+      if (supplyType === 'domestic' && taxConfig.gstStateCode === placeState?.code) {
         let cgstAmount = (lineTax + 1n) / 2n;
         let sgstAmount = lineTax / 2n;
         let cgstNumber = toExactMinorNumber(cgstAmount);
@@ -510,12 +635,32 @@ export function parseInvoiceDraft(
         taxTotalMinor += lineTax;
       }
     }
+  } else if (gstMode === 'foreign_manual') {
+    for (let line of lines) {
+      if (!line.foreign_tax_mode) continue;
+      if (line.foreign_tax_mode === 'percent' && line.foreign_tax_rate) {
+        let rateScaled = parseScaledDecimal(line.foreign_tax_rate);
+        if (rateScaled != null) {
+          let amount = percentOfMinor(BigInt(line.net_minor), rateScaled);
+          let number = toExactMinorNumber(amount);
+          if (number == null) {
+            push('total', 'The invoice tax total is too large to store exactly.');
+          } else {
+            line.foreign_tax_amount_minor = number;
+            taxTotalMinor += amount;
+          }
+        }
+      } else {
+        taxTotalMinor += BigInt(line.foreign_tax_amount_minor);
+      }
+    }
   }
   let taxTotal = toExactMinorNumber(taxTotalMinor);
   if (taxTotal == null) {
     push('total', 'The invoice tax total is too large to store exactly.');
   }
-  let totalMinor = netSubtotalMinor + taxTotalMinor + roundOffMinor;
+  let totalMinor =
+    netSubtotalMinor + (reverseCharge ? 0n : taxTotalMinor) + roundOffMinor;
   let total = toExactMinorNumber(totalMinor);
   if (totalMinor < 0n) {
     push('round_off', 'Round-off cannot make the total negative.');
@@ -554,10 +699,15 @@ export function parseInvoiceDraft(
         : null,
       recipient_tax_state_name: taxStateName,
       recipient_tax_state_code: taxState || null,
-      gst_mode: gstMode === 'india_gst' ? 'india_gst' : 'none',
-      place_of_supply_state_code: gstMode === 'india_gst' ? placeState?.code ?? null : null,
-      place_of_supply_state_name: gstMode === 'india_gst' ? placeState?.name ?? null : null,
+      gst_mode: gstMode as InvoiceDraftChanges['gst_mode'],
+      supply_type: gstMode === 'india_gst' ? (supplyType as InvoiceDraftChanges['supply_type']) : null,
+      place_of_supply_state_code: gstMode === 'india_gst' && supplyType === 'domestic' ? placeState?.code ?? null : null,
+      place_of_supply_state_name: gstMode === 'india_gst' && supplyType === 'domestic' ? placeState?.name ?? null : null,
+      place_of_supply_country:
+        gstMode === 'india_gst' && supplyType !== 'domestic' ? placeCountry : null,
       recipient_gstin_applicable: gstMode === 'india_gst' && recipientGstinApplicable,
+      reverse_charge: gstMode === 'india_gst' && reverseCharge,
+      export_reference: gstMode === 'india_gst' && supplyType !== 'domestic' ? exportReference : null,
       payment_instructions: optional(form.payment_instructions),
       customer_notes: optional(form.customer_notes),
       internal_note: optional(form.internal_note),

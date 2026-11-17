@@ -16,6 +16,7 @@ import {
   assertClientSchemaCompatible,
   assertOrganizationSchemaCompatible,
   migrateInvoiceDiscountColumns,
+  migrateInvoiceExtendedTaxColumns,
   migrateInvoiceTaxColumns,
 } from './db.ts';
 
@@ -607,7 +608,7 @@ describe('db', () => {
     await expectRejected({
       organization_id: organizationId,
       client_id: clientId,
-      gst_mode: 'foreign_manual',
+      gst_mode: 'overseas',
     });
     await expectRejected({
       organization_id: organizationId,
@@ -625,6 +626,38 @@ describe('db', () => {
       recipient_gstin_applicable: true,
       gst_mode: 'none',
     });
+    let foreignManual = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      gst_mode: 'foreign_manual',
+    });
+    await db.create(invoices, foreignManual);
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      gst_mode: 'india_gst',
+      supply_type: 'export_igst',
+      place_of_supply_country: 'IN',
+    });
+    await expectRejected({
+      organization_id: organizationId,
+      client_id: clientId,
+      gst_mode: 'india_gst',
+      supply_type: 'domestic',
+    });
+    let reverseCharge = validInvoice({
+      organization_id: organizationId,
+      client_id: clientId,
+      gst_mode: 'india_gst',
+      supply_type: 'domestic',
+      place_of_supply_state_code: '27',
+      reverse_charge: true,
+      subtotal_minor: 1000,
+      net_subtotal_minor: 1000,
+      tax_total_minor: 180,
+      total_minor: 1000,
+    });
+    await db.create(invoices, reverseCharge);
   });
 
   it('requires invoice lines to reference an invoice in the same Organization', async () => {
@@ -838,6 +871,7 @@ describe('db', () => {
         quantity TEXT NOT NULL, unit_price TEXT NOT NULL, amount_minor INTEGER NOT NULL,
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
+      CREATE UNIQUE INDEX legacy_clients_organization_id ON clients(organization_id, id);
       INSERT INTO organizations (id, name, created_at, updated_at)
         VALUES ('${organizationId}', 'Legacy Org', ${now}, ${now});
       INSERT INTO clients (id, organization_id, legal_name, status, created_at, updated_at)
@@ -862,15 +896,38 @@ describe('db', () => {
 
     await migrateInvoiceDiscountColumns(legacyDb);
     await migrateInvoiceTaxColumns(legacyDb);
+    await migrateInvoiceExtendedTaxColumns(legacyDb);
 
     let invoice = await legacyDb.find(invoices, invoiceId);
     assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
     assert.equal(invoice?.total_minor, 17469, 'the stored total is untouched');
     assert.equal(invoice?.gst_mode, 'none', 'existing invoices upgrade into no-tax mode');
+    assert.equal(invoice?.supply_type, null, 'legacy no-tax invoices have no export classification');
     assert.equal(invoice?.tax_total_minor, 0);
     let line = await legacyDb.find(invoiceLines, lineId);
     assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
     assert.equal(line?.amount_minor, 15000);
+    assert.equal(line?.foreign_tax_amount_minor, 0, 'new manual tax amounts default to zero');
+
+    let rejectedNegativeManualTax = false;
+    try {
+      await legacyDb.executeScript(
+        `UPDATE invoice_lines SET foreign_tax_amount_minor = -1 WHERE id = '${lineId}';`,
+      );
+    } catch {
+      rejectedNegativeManualTax = true;
+    }
+    assert.equal(rejectedNegativeManualTax, true, 'the migrated schema rejects negative tax amounts');
+
+    let rejectedInvalidManualRate = false;
+    try {
+      await legacyDb.executeScript(
+        `UPDATE invoice_lines SET foreign_tax_rate = '10x' WHERE id = '${lineId}';`,
+      );
+    } catch {
+      rejectedInvalidManualRate = true;
+    }
+    assert.equal(rejectedInvalidManualRate, true, 'the migrated schema rejects malformed tax rates');
 
     // A later startup must not overwrite a legitimate net value produced by #43 discounts.
     await legacyDb.executeScript(
