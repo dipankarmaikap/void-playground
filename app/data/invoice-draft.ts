@@ -7,6 +7,7 @@ import { canonicalCountry } from './client-billing.ts';
 import {
   allocateProportionally,
   calculateLineAmountMinor,
+  currencyMinorDigits,
   formatScaledDecimal,
   parseScaledDecimal,
   parseSignedScaledDecimal,
@@ -16,9 +17,45 @@ import {
   toExactMinorNumber,
   toExactSignedMinorNumber,
 } from './invoice-calculation.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
 import { isValidIsoDate } from './invoice-dates.ts';
 import { PAYMENT_TERMS } from './organization-invoicing.ts';
-import type { InvoiceFormValues } from '../actions/app/invoices/form-values.ts';
+
+/** One service line's string values at the Draft parsing seam. */
+export interface InvoiceDraftLineInput {
+  description: string;
+  sac: string;
+  quantity: string;
+  unit_price: string;
+  discount_mode: string;
+  discount_value: string;
+}
+
+/** Editable invoice values, independent of the route's client-selection and display fields. */
+export interface InvoiceDraftInput {
+  currency: string;
+  invoice_date: string;
+  due_date: string;
+  payment_term: string;
+  custom_payment_terms: string;
+  recipient_legal_name: string;
+  recipient_billing_line1: string;
+  recipient_billing_locality: string;
+  recipient_billing_region: string;
+  recipient_billing_postal_code: string;
+  recipient_billing_country: string;
+  recipient_tax_country: string;
+  recipient_tax_type: string;
+  recipient_tax_value: string;
+  recipient_tax_state_code: string;
+  payment_instructions: string;
+  customer_notes: string;
+  internal_note: string;
+  invoice_discount_mode: string;
+  invoice_discount_value: string;
+  round_off: string;
+  lines: InvoiceDraftLineInput[];
+}
 
 export interface InvoiceLineChanges {
   position: number;
@@ -135,21 +172,21 @@ function parseDiscountInput(
  * checked. Lines are ignored when every field is blank, so a blank row removes a line. Amounts are
  * computed once, with BigInt arithmetic, at the selected currency's minor-unit precision.
  */
-export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
+export function parseInvoiceDraft(form: InvoiceDraftInput): InvoiceDraftResult {
   let issues: Issue[] = [];
   let push = (field: string, message: string) => issues.push({ message, path: [field] });
 
   let legalName = form.recipient_legal_name.trim();
   if (!legalName) push('recipient_legal_name', 'Enter the recipient legal name.');
   for (let [field, max] of Object.entries(RECIPIENT_LIMITS)) {
-    if (form[field as keyof InvoiceFormValues].length > max) {
+    if (form[field as keyof InvoiceDraftInput].length > max) {
       push(field, `${field.replace(/_/g, ' ')} must be ${max} characters or fewer.`);
     }
   }
 
   let currency = form.currency.trim().toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    push('currency', 'Enter a 3-letter currency code, such as INR or USD.');
+  if (!isIso4217Currency(currency)) {
+    push('currency', ISO_4217_CURRENCY_MESSAGE);
   }
 
   let invoiceDate = form.invoice_date.trim();
@@ -168,7 +205,7 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
     push('payment_term', 'Choose a valid payment term.');
   }
 
-  let optionalText: Array<[keyof InvoiceFormValues, number, string]> = [
+  let optionalText: Array<[keyof InvoiceDraftInput, number, string]> = [
     ['custom_payment_terms', 200, 'Custom payment terms'],
     ['payment_instructions', 1000, 'Payment instructions'],
     ['customer_notes', 1000, 'Customer notes'],
@@ -183,7 +220,7 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
   let subtotalMinor = 0n;
   let lineDiscountTotalMinor = 0n;
   let hasRangeIssue = false;
-  let calculationCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'INR';
+  let calculationCurrency = isIso4217Currency(currency) ? currency : 'INR';
 
   form.lines.forEach((line, index) => {
     let description = line.description.trim();
@@ -282,6 +319,7 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
     push('invoice_discount_value', 'The invoice discount cannot exceed the post-discount subtotal.');
   }
 
+  let netSubtotalMinor = postLineSubtotal - invoiceDiscountMinor;
   let roundOffRaw = form.round_off.trim();
   let roundOffScaled = roundOffRaw ? parseSignedScaledDecimal(roundOffRaw) : 0n;
   if (roundOffScaled == null) {
@@ -293,13 +331,20 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
   if (roundOffAmount == null) {
     push('round_off', 'The round-off amount is too large to store exactly.');
   }
+  let expectedRoundOffMinor =
+    nearestWholeCurrencyUnitMinor(netSubtotalMinor, calculationCurrency) - netSubtotalMinor;
+  if (roundOffRaw && roundOffScaled != null && roundOffMinor !== expectedRoundOffMinor) {
+    push(
+      'round_off',
+      'Enter the adjustment that rounds the net total to the nearest whole currency unit (ties away from zero).',
+    );
+  }
 
   if (lines.length === 0 && !hasRangeIssue) {
     push('lines', 'Add at least one service line.');
   }
   let subtotal = toExactMinorNumber(subtotalMinor);
   let lineDiscountTotal = toExactMinorNumber(lineDiscountTotalMinor);
-  let netSubtotalMinor = postLineSubtotal - invoiceDiscountMinor;
   let netSubtotal = toExactMinorNumber(netSubtotalMinor);
   let invoiceDiscountAmount = toExactMinorNumber(invoiceDiscountMinor);
   let totalMinor = netSubtotalMinor + roundOffMinor;
@@ -371,4 +416,16 @@ export function parseInvoiceDraft(form: InvoiceFormValues): InvoiceDraftResult {
       lines,
     },
   };
+}
+
+/**
+ * Rounds a signed minor-unit total to the nearest whole currency unit, with exact halfway amounts
+ * rounded away from zero. The adjustment itself is kept in minor units.
+ */
+function nearestWholeCurrencyUnitMinor(amount: bigint, currency: string): bigint {
+  let unit = 10n ** BigInt(currencyMinorDigits(currency));
+  let negative = amount < 0n;
+  let magnitude = negative ? -amount : amount;
+  let rounded = ((magnitude + unit / 2n) / unit) * unit;
+  return negative ? -rounded : rounded;
 }

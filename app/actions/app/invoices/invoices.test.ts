@@ -2,7 +2,6 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { clients, db, invoiceLines, invoices } from '../../../data/db.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
@@ -239,13 +238,11 @@ describe('draft invoices', () => {
       recipient_tax_state_code: '27',
     });
     assert.equal(created.status, 302);
-    let invoice = await db.find(invoices, draftIdFrom(created));
-    assert.equal(invoice?.recipient_tax_state_name, 'Maharashtra');
-    assert.equal(invoice?.recipient_tax_state_code, '27');
+    let id = draftIdFrom(created);
 
     let detail = await getHtml(
       router,
-      routes.app.invoices.show.href({ invoiceId: invoice!.id }),
+      routes.app.invoices.show.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(detail, /Tax State\/UT: Maharashtra/);
@@ -281,7 +278,12 @@ describe('draft invoices', () => {
       first.sessionCookie,
     );
     assert.equal(archived.status, 302);
-    assert.equal((await db.find(clients, client.id))?.status, 'archived');
+    let archivedProfile = await getHtml(
+      router,
+      routes.app.clients.show.href({ clientId: client.id }),
+      first.sessionCookie,
+    );
+    assert.match(archivedProfile, /Status[\s\S]*?Archived/);
 
     let archivedResponse = await router.fetch(new URL(newDraftPath(client.id), origin), {
       headers: { Cookie: first.sessionCookie },
@@ -314,39 +316,24 @@ describe('draft invoices', () => {
 
     assert.equal(response.status, 302);
     let id = draftIdFrom(response);
-    let invoice = await db.find(invoices, id);
-    assert.ok(invoice);
-    assert.equal(invoice.organization_id, organizationId);
-    assert.equal(invoice.client_id, client.id);
-    assert.equal(invoice.status, 'draft');
-    assert.equal(invoice.invoice_number, null);
-    assert.equal(invoice.currency, 'INR');
-    assert.equal(invoice.recipient_legal_name, 'Draft Recipient');
-    assert.equal(invoice.recipient_billing_line1, '1 Draft Street');
-    assert.equal(invoice.internal_note, 'Private billing context');
-    assert.equal(invoice.subtotal_minor, 17469, '150.00 + 24.6912 rounds half-up to 24.69');
-    assert.equal(invoice.total_minor, 17469);
-
-    let lines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.equal(lines.length, 2);
-    assert.equal(lines[0]?.description, 'Consulting');
-    assert.equal(lines[0]?.sac, '998313');
-    assert.equal(lines[0]?.quantity, '1.5');
-    assert.equal(lines[0]?.unit_price, '100');
-    assert.equal(lines[0]?.amount_minor, 15000);
-    assert.equal(lines[1]?.description, 'Support');
-    assert.equal(lines[1]?.sac, null);
-    assert.equal(lines[1]?.amount_minor, 2469);
-    assert.equal(lines[1]?.organization_id, organizationId);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Status: Draft/);
+    assert.match(detail, /Draft Recipient/);
+    assert.match(detail, /Currency: INR/);
+    assert.match(detail, /Billing address: 1 Draft Street/);
+    assert.match(detail, /Subtotal: 174\.69 INR/);
+    assert.match(detail, /Total: 174\.69 INR/);
+    assert.match(detail, /Internal note \(private\): Private billing context/);
+    assert.ok(detail.indexOf('Consulting') < detail.indexOf('Support'));
+    assert.match(detail, /Consulting[\s\S]*?998313[\s\S]*?1\.5[\s\S]*?100[\s\S]*?150\.00 INR/);
+    assert.match(detail, /Support[\s\S]*?2[\s\S]*?12\.3456[\s\S]*?24\.69 INR/);
 
     let html = await getHtml(router, routes.app.clients.show.href({ clientId: client.id }), sessionCookie);
     assert.ok(html.includes(client.legal_name));
     let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
     assert.match(directory, /Draft Recipient/);
     assert.match(directory, /Draft · 2026-11-17 · 174\.69 INR/);
+    assert.ok(directory.includes(id), 'the Draft is visible in the invoice directory');
   });
 
   it('applies a per-line percentage discount and reconciles the subtotal breakdown', async () => {
@@ -367,31 +354,14 @@ describe('draft invoices', () => {
 
     assert.equal(response.status, 302);
     let id = draftIdFrom(response);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.subtotal_minor, 17469);
-    assert.equal(invoice?.line_discount_total_minor, 1500, '10% of 150.00 is 15.00');
-    assert.equal(invoice?.invoice_discount_minor, 0);
-    assert.equal(invoice?.net_subtotal_minor, 15969);
-    assert.equal(invoice?.round_off_minor, 0);
-    assert.equal(invoice?.total_minor, 15969);
-
-    let lines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.equal(lines[0]?.amount_minor, 15000, 'amount stays the pre-discount gross');
-    assert.equal(lines[0]?.discount_mode, 'percent');
-    assert.equal(lines[0]?.discount_value, '10');
-    assert.equal(lines[0]?.line_discount_minor, 1500);
-    assert.equal(lines[0]?.net_minor, 13500);
-    assert.equal(lines[1]?.line_discount_minor, 0);
-    assert.equal(lines[1]?.net_minor, 2469);
 
     let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
     assert.match(html, /Subtotal: 174\.69 INR/);
     assert.match(html, /Line discounts: 15\.00 INR/);
     assert.match(html, /Net taxable subtotal: 159\.69 INR/);
     assert.match(html, /Total: 159\.69 INR/);
+    assert.match(html, /Consulting[\s\S]*?10% · 15\.00 INR[\s\S]*?135\.00 INR/);
+    assert.match(html, /Support[\s\S]*?24\.69 INR/);
   });
 
   it('applies a fixed per-line discount and rejects discounts above the line gross', async () => {
@@ -410,22 +380,13 @@ describe('draft invoices', () => {
     });
     assert.equal(response.status, 302);
     let id = draftIdFrom(response);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.subtotal_minor, 11000);
-    assert.equal(invoice?.line_discount_total_minor, 2550);
-    assert.equal(invoice?.net_subtotal_minor, 8450);
-    assert.equal(invoice?.total_minor, 8450);
-    let lines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.equal(lines[0]?.discount_mode, 'fixed');
-    assert.equal(lines[0]?.discount_value, '25.5');
-    assert.equal(lines[0]?.line_discount_minor, 2550);
-    assert.equal(lines[0]?.net_minor, 7450);
-    assert.equal(lines[1]?.net_minor, 1000);
     let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Subtotal: 110\.00 INR/);
     assert.match(html, /Line discounts: 25\.50 INR/);
+    assert.match(html, /Net taxable subtotal: 84\.50 INR/);
+    assert.match(html, /Total: 84\.50 INR/);
+    assert.match(html, /Consulting[\s\S]*?25\.50 INR[\s\S]*?74\.50 INR/);
+    assert.match(html, /Support[\s\S]*?10\.00 INR/);
 
     let invalid = [
       {
@@ -461,7 +422,8 @@ describe('draft invoices', () => {
       assert.match(rejectedHtml, message);
       assert.match(rejectedHtml, preserved);
     }
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 1);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.equal((directory.match(/Draft Recipient/g) ?? []).length, 1);
   });
 
   it('allocates an invoice-wide percentage discount across uneven lines by largest remainder', async () => {
@@ -480,43 +442,14 @@ describe('draft invoices', () => {
     });
     assert.equal(response.status, 302);
     let id = draftIdFrom(response);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.subtotal_minor, 15003);
-    assert.equal(invoice?.line_discount_total_minor, 0);
-    assert.equal(invoice?.invoice_discount_mode, 'percent');
-    assert.equal(invoice?.invoice_discount_value, '33.3333');
-    assert.equal(invoice?.invoice_discount_minor, 5001, '33.3333% of 15003 minor rounds to 5001');
-    assert.equal(invoice?.net_subtotal_minor, 10002);
-    assert.equal(invoice?.total_minor, 10002);
-
-    let lines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.deepEqual(
-      lines.map((line) => line.allocated_invoice_discount_minor),
-      [3333, 1667, 1],
-      'the leftover minor unit goes to the largest remainder (the medium line)',
-    );
-    assert.deepEqual(
-      lines.map((line) => line.line_discount_minor),
-      [0, 0, 0],
-      'per-line discounts stay separate from the allocated invoice discount',
-    );
-    assert.deepEqual(
-      lines.map((line) => line.net_minor),
-      [6667, 3333, 2],
-    );
-    assert.equal(
-      lines.reduce((sum, line) => sum + line.allocated_invoice_discount_minor, 0),
-      invoice!.invoice_discount_minor,
-      'allocated line discounts sum exactly to the invoice-wide discount',
-    );
 
     let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
     assert.match(html, /Invoice discount \(percent\): 50\.01 INR/);
     assert.match(html, /Net taxable subtotal: 100\.02 INR/);
     assert.match(html, /Total: 100\.02 INR/);
+    assert.match(html, /Large[\s\S]*?100\.00 INR[\s\S]*?66\.67 INR/);
+    assert.match(html, /Medium[\s\S]*?50\.00 INR[\s\S]*?33\.33 INR/);
+    assert.match(html, /Small[\s\S]*?0\.03 INR[\s\S]*?0\.02 INR/);
   });
 
   it('applies a fixed invoice discount on post-line-discount values and rejects over-discounts', async () => {
@@ -538,32 +471,14 @@ describe('draft invoices', () => {
     let response = await createDraft(sessionCookie, client.id, fields);
     assert.equal(response.status, 302);
     let id = draftIdFrom(response);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.subtotal_minor, 25000);
-    assert.equal(invoice?.line_discount_total_minor, 5500, '5000 line percent + 500 line fixed');
-    assert.equal(invoice?.invoice_discount_mode, 'fixed');
-    assert.equal(invoice?.invoice_discount_value, '12.34');
-    assert.equal(invoice?.invoice_discount_minor, 1234);
-    assert.equal(invoice?.net_subtotal_minor, 18266, '19500 post-line subtotal − 1234');
-    assert.equal(invoice?.total_minor, 18266);
-
-    let lines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.deepEqual(
-      lines.map((line) => line.net_minor),
-      [14051, 4215],
-      'allocation is proportional to post-line-discount values, not gross values',
-    );
-    assert.deepEqual(
-      lines.map((line) => line.allocated_invoice_discount_minor),
-      [949, 285],
-    );
     let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Subtotal: 250\.00 INR/);
     assert.match(html, /Line discounts: 55\.00 INR/);
     assert.match(html, /Invoice discount \(fixed\): 12\.34 INR/);
     assert.match(html, /Net taxable subtotal: 182\.66 INR/);
+    assert.match(html, /Total: 182\.66 INR/);
+    assert.match(html, /Consulting[\s\S]*?50\.00 INR[\s\S]*?140\.51 INR/);
+    assert.match(html, /Support[\s\S]*?5\.00 INR[\s\S]*?42\.15 INR/);
 
     let tooLarge = await createDraft(sessionCookie, client.id, {
       ...fields,
@@ -581,13 +496,83 @@ describe('draft invoices', () => {
     });
     assert.equal(badPercent.status, 400);
     assert.match(await badPercent.text(), /cannot exceed 100%/);
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 1);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.equal((directory.match(/Draft Recipient/g) ?? []).length, 1);
   });
 
-  it('applies an explicit round-off adjustment that reconciles to the final total', async () => {
+  it('applies a positive round-off to the nearest whole currency unit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
-      'invoice-round-off',
+      'invoice-round-off-positive',
+    );
+    let client = await makeClient(organizationId);
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Consulting'],
+      line_quantity: ['1.5'],
+      line_unit_price: ['100.0000'],
+      invoice_discount_mode: ['fixed'],
+      invoice_discount_value: ['0.05'],
+      round_off: ['0.05'],
+    });
+    assert.equal(response.status, 302);
+
+    let id = draftIdFrom(response);
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Net taxable subtotal: 149\.95 INR/);
+    assert.match(html, /Round-off: 0\.05 INR/);
+    assert.match(html, /Total: 150\.00 INR/);
+  });
+
+  it('rounds exact halfway totals away from zero', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-round-off-halfway',
+    );
+    let client = await makeClient(organizationId);
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Halfway amount'],
+      line_quantity: ['1'],
+      line_unit_price: ['149.50'],
+      round_off: ['0.50'],
+    });
+    assert.equal(response.status, 302);
+
+    let id = draftIdFrom(response);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(detail, /Net taxable subtotal: 149\.50 INR/);
+    assert.match(detail, /Round-off: 0\.50 INR/);
+    assert.match(detail, /Total: 150\.00 INR/);
+  });
+
+  it('applies a negative round-off to the nearest whole currency unit', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-round-off-negative',
+    );
+    let client = await makeClient(organizationId);
+    let response = await createDraft(sessionCookie, client.id, {
+      line_description: ['Consulting'],
+      line_quantity: ['1'],
+      line_unit_price: ['150.07'],
+      round_off: ['-0.07'],
+    });
+    assert.equal(response.status, 302);
+
+    let id = draftIdFrom(response);
+    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(html, /Net taxable subtotal: 150\.07 INR/);
+    assert.match(html, /Round-off: -0\.07 INR/);
+    assert.match(html, /Total: 150\.00 INR/);
+  });
+
+  it('rejects round-off amounts that do not produce the nearest whole currency unit', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-round-off-invalid',
     );
     let client = await makeClient(organizationId);
     let fields = {
@@ -598,62 +583,34 @@ describe('draft invoices', () => {
       invoice_discount_value: ['0.05'],
     };
 
-    let positive = await createDraft(sessionCookie, client.id, {
-      ...fields,
-      round_off: ['0.05'],
-    });
-    assert.equal(positive.status, 302);
-    let id = draftIdFrom(positive);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.net_subtotal_minor, 14995);
-    assert.equal(invoice?.round_off_minor, 5);
-    assert.equal(invoice?.total_minor, 15000);
-    let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
-    assert.match(html, /Net taxable subtotal: 149\.95 INR/);
-    assert.match(html, /Round-off: 0\.05 INR/);
-    assert.match(html, /Total: 150\.00 INR/);
-
-    let negative = await createDraft(sessionCookie, client.id, {
-      ...fields,
-      round_off: ['-0.07'],
-    });
-    assert.equal(negative.status, 302);
-    let negativeInvoice = await db.find(invoices, draftIdFrom(negative));
-    assert.equal(negativeInvoice?.round_off_minor, -7);
-    assert.equal(negativeInvoice?.total_minor, 14988);
-    assert.match(
-      await getHtml(
-        router,
-        routes.app.invoices.show.href({ invoiceId: negativeInvoice!.id }),
-        sessionCookie,
-      ),
-      /Round-off: -0\.07 INR/,
-    );
-
-    let cases = [
-      {
-        roundOff: '-200',
-        message: /round-off cannot make the total negative/i,
-      },
-      {
-        roundOff: 'abc',
-        message: /signed round-off amount/i,
-      },
-    ];
-    for (let { roundOff, message } of cases) {
-      let rejected = await createDraft(sessionCookie, client.id, { ...fields, round_off: [roundOff] });
+    for (let roundOff of ['0.04', '-0.07']) {
+      let rejected = await createDraft(sessionCookie, client.id, {
+        ...fields,
+        round_off: [roundOff],
+      });
       assert.equal(rejected.status, 400);
       let rejectedHtml = await rejected.text();
-      assert.match(rejectedHtml, message);
-      assert.match(rejectedHtml, new RegExp(`name="round_off"[^>]*value="${roundOff.replace('-', '\\-')}"`));
+      assert.match(rejectedHtml, /nearest whole currency unit/i);
+      assert.match(
+        rejectedHtml,
+        new RegExp(`name="round_off"[^>]*value="${roundOff.replace('-', '\\-')}"`),
+      );
     }
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 2);
+
+    let malformed = await createDraft(sessionCookie, client.id, {
+      ...fields,
+      round_off: ['abc'],
+    });
+    assert.equal(malformed.status, 400);
+    assert.match(await malformed.text(), /signed round-off amount/i);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(directory, /No invoices yet\./);
   });
 
-  it('round-trips discounts and round-off through edit and preserves them on add-line and errors', async () => {
+  it('round-trips discounts and round-off through the edit form', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
-      'invoice-discount-edit',
+      'invoice-discount-round-trip',
     );
     let client = await makeClient(organizationId);
     let id = draftIdFrom(
@@ -664,7 +621,7 @@ describe('draft invoices', () => {
         line_discount_mode: ['percent'],
         line_discount_value: ['10'],
         invoice_discount_mode: ['fixed'],
-        invoice_discount_value: ['5.00'],
+        invoice_discount_value: ['5.05'],
         round_off: ['0.05'],
       }),
     );
@@ -683,9 +640,28 @@ describe('draft invoices', () => {
       editPage,
       /name="invoice_discount_mode"[^>]*>[\s\S]*?<option value="fixed" selected/,
     );
-    assert.match(editPage, /name="invoice_discount_value"[^>]*value="5"/);
+    assert.match(editPage, /name="invoice_discount_value"[^>]*value="5\.05"/);
     assert.match(editPage, /name="round_off"[^>]*value="0\.05"/);
+  });
 
+  it('preserves unsaved discount and round-off values when adding a line', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-add-line',
+    );
+    let client = await makeClient(organizationId);
+    let id = draftIdFrom(
+      await createDraft(sessionCookie, client.id, {
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['100.0000'],
+        line_discount_mode: ['percent'],
+        line_discount_value: ['10'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['5.05'],
+        round_off: ['0.05'],
+      }),
+    );
     let fields = draftFields(client.id, {
       line_description: ['Consulting', ''],
       line_quantity: ['2', ''],
@@ -694,7 +670,7 @@ describe('draft invoices', () => {
       line_discount_value: ['7.50', ''],
       invoice_discount_mode: ['percent'],
       invoice_discount_value: ['10'],
-      round_off: ['-1.25'],
+      round_off: ['-0.25'],
     });
     let added = await submitDraft(
       routes.app.invoices.edit.index.href({ invoiceId: id }),
@@ -707,53 +683,99 @@ describe('draft invoices', () => {
     assert.equal((addedHtml.match(/name="line_description"/g) ?? []).length, 3);
     assert.match(addedHtml, /name="line_discount_value"[^>]*value="7\.50"/);
     assert.match(addedHtml, /name="invoice_discount_value"[^>]*value="10"/);
-    assert.match(addedHtml, /name="round_off"[^>]*value="-1\.25"/);
-    assert.equal((await db.find(invoices, id))?.line_discount_total_minor, 2000);
+    assert.match(addedHtml, /name="round_off"[^>]*value="-0\.25"/);
 
-    let invalid = await submitDraft(
+    let savedEditPage = await getHtml(
+      router,
       routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
-      {
-        ...fields,
+      sessionCookie,
+    );
+    assert.match(savedEditPage, /name="line_discount_value"[^>]*value="10"/);
+    assert.match(savedEditPage, /name="invoice_discount_value"[^>]*value="5\.05"/);
+    assert.match(savedEditPage, /name="round_off"[^>]*value="0\.05"/);
+  });
+
+  it('preserves submitted discount and round-off values after validation errors', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-validation',
+    );
+    let client = await makeClient(organizationId);
+    let id = draftIdFrom(
+      await createDraft(sessionCookie, client.id, {
         line_description: ['Consulting'],
         line_quantity: ['2'],
         line_unit_price: ['100.0000'],
-        line_discount_mode: ['fixed'],
-        line_discount_value: ['201'],
-      },
+        line_discount_mode: ['percent'],
+        line_discount_value: ['10'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['5.05'],
+        round_off: ['0.05'],
+      }),
+    );
+    let fields = draftFields(client.id, {
+      line_description: ['Consulting'],
+      line_quantity: ['2'],
+      line_unit_price: ['100.0000'],
+      line_discount_mode: ['fixed'],
+      line_discount_value: ['201'],
+      invoice_discount_mode: ['percent'],
+      invoice_discount_value: ['10'],
+      round_off: ['-0.25'],
+    });
+    let invalid = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      fields,
       sessionCookie,
     );
     assert.equal(invalid.status, 400);
     let invalidHtml = await invalid.text();
     assert.match(invalidHtml, /discount cannot exceed the line amount/i);
     assert.match(invalidHtml, /name="line_discount_value"[^>]*value="201"/);
-    assert.match(invalidHtml, /name="round_off"[^>]*value="-1\.25"/);
+    assert.match(invalidHtml, /name="round_off"[^>]*value="-0\.25"/);
+  });
 
-    let updated = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
-      {
-        ...fields,
+  it('saves edited discounts and round-off on the Draft', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-discount-save',
+    );
+    let client = await makeClient(organizationId);
+    let id = draftIdFrom(
+      await createDraft(sessionCookie, client.id, {
         line_description: ['Consulting'],
         line_quantity: ['2'],
         line_unit_price: ['100.0000'],
-      },
+        line_discount_mode: ['percent'],
+        line_discount_value: ['10'],
+        invoice_discount_mode: ['fixed'],
+        invoice_discount_value: ['5.05'],
+        round_off: ['0.05'],
+      }),
+    );
+    let updated = await submitDraft(
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      draftFields(client.id, {
+        line_description: ['Consulting'],
+        line_quantity: ['2'],
+        line_unit_price: ['100.0000'],
+        line_discount_mode: ['fixed'],
+        line_discount_value: ['7.50'],
+        invoice_discount_mode: ['percent'],
+        invoice_discount_value: ['10'],
+        round_off: ['-0.25'],
+      }),
       sessionCookie,
     );
     assert.equal(updated.status, 302);
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.line_discount_total_minor, 750);
-    assert.equal(invoice?.invoice_discount_mode, 'percent');
-    assert.equal(invoice?.invoice_discount_value, '10');
-    assert.equal(invoice?.invoice_discount_minor, 1925, '10% of 19250 is 1925');
-    assert.equal(invoice?.net_subtotal_minor, 17325);
-    assert.equal(invoice?.round_off_minor, -125);
-    assert.equal(invoice?.total_minor, 17200);
-    let lines = await db.findMany(invoiceLines, { where: { invoice_id: id } });
-    assert.equal(lines.length, 1);
-    assert.equal(lines[0]?.discount_mode, 'fixed');
-    assert.equal(lines[0]?.line_discount_minor, 750);
-    assert.equal(lines[0]?.net_minor, 17325);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Line discounts: 7\.50 INR/);
+    assert.match(detail, /Invoice discount \(percent\): 19\.25 INR/);
+    assert.match(detail, /Net taxable subtotal: 173\.25 INR/);
+    assert.match(detail, /Round-off: -0\.25 INR/);
+    assert.match(detail, /Total: 173\.00 INR/);
   });
 
   it('keeps discount fields scoped to the Organization and protected by CSRF', async () => {
@@ -769,10 +791,10 @@ describe('draft invoices', () => {
         line_discount_value: ['10'],
         invoice_discount_mode: ['fixed'],
         invoice_discount_value: ['5.00'],
-        round_off: ['0.05'],
+        round_off: ['0'],
       }),
     );
-    let before = await db.find(invoices, id);
+    let before = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), first.sessionCookie);
 
     let foreignEdit = await submitDraft(
       routes.app.dashboard.href(),
@@ -787,18 +809,21 @@ describe('draft invoices', () => {
       other.sessionCookie,
     );
     assert.equal(foreignEdit.status, 404);
-    let after = await db.find(invoices, id);
-    assert.equal(after?.line_discount_total_minor, before?.line_discount_total_minor);
-    assert.equal(after?.invoice_discount_minor, before?.invoice_discount_minor);
-    assert.equal(after?.round_off_minor, before?.round_off_minor);
-    assert.equal(after?.updated_at, before?.updated_at);
+    let after = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), first.sessionCookie);
+    assert.match(before, /Line discounts: 10\.00 INR/);
+    assert.match(before, /Invoice discount \(fixed\): 5\.00 INR/);
+    assert.match(before, /Total: 85\.00 INR/);
+    assert.match(after, /Line discounts: 10\.00 INR/);
+    assert.match(after, /Invoice discount \(fixed\): 5\.00 INR/);
+    assert.match(after, /Round-off: 0\.00 INR/);
+    assert.match(after, /Total: 85\.00 INR/);
 
     let csrfFields = draftFields(ownClient.id, {
       line_discount_mode: 'percent',
       line_discount_value: '10',
       invoice_discount_mode: 'fixed',
       invoice_discount_value: '5.00',
-      round_off: '0.05',
+      round_off: '0',
     });
     let body = new URLSearchParams();
     for (let [name, value] of Object.entries(csrfFields)) {
@@ -814,23 +839,27 @@ describe('draft invoices', () => {
       body: body.toString(),
     });
     assert.equal(noCsrf.status, 403);
-    assert.equal(await db.count(invoices, { where: { organization_id: first.organizationId } }), 1);
+    let ownDirectory = await getHtml(router, routes.app.invoices.index.href(), first.sessionCookie);
+    assert.equal((ownDirectory.match(/Draft Recipient/g) ?? []).length, 1);
+    let otherDirectory = await getHtml(router, routes.app.invoices.index.href(), other.sessionCookie);
+    assert.match(otherDirectory, /No invoices yet\./);
   });
 
-  it('applies ISO 4217 minor-unit precision for INR, USD, JPY, and KWD', async () => {
+  it('applies ISO 4217 minor-unit precision for INR, USD, JPY, XAF, and KWD', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
       'invoice-precision',
     );
     let client = await makeClient(organizationId);
     let expected = [
-      { currency: 'INR', minor: 123, text: '1.23 INR' },
-      { currency: 'USD', minor: 123, text: '1.23 USD' },
-      { currency: 'JPY', minor: 1, text: '1 JPY' },
-      { currency: 'KWD', minor: 1235, text: '1.235 KWD' },
+      { currency: 'INR', text: '1.23 INR' },
+      { currency: 'USD', text: '1.23 USD' },
+      { currency: 'JPY', text: '1 JPY' },
+      { currency: 'XAF', text: '1 XAF' },
+      { currency: 'KWD', text: '1.235 KWD' },
     ];
 
-    for (let { currency, minor, text } of expected) {
+    for (let { currency, text } of expected) {
       let response = await createDraft(sessionCookie, client.id, {
         currency,
         line_quantity: ['1'],
@@ -838,14 +867,12 @@ describe('draft invoices', () => {
       });
       assert.equal(response.status, 302, `${currency} should be accepted`);
       let id = draftIdFrom(response);
-      let invoice = await db.find(invoices, id);
-      assert.equal(invoice?.total_minor, minor, `${currency} minor units`);
       let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
       assert.ok(html.includes(text), `${currency} should render ${text}`);
     }
   });
 
-  it('respects 0, 2, and 3 minor-unit currencies for discounts and round-off', async () => {
+  it('respects zero-, two-, and three-minor-unit currencies for discounts and round-off', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
       'invoice-discount-precision',
@@ -856,49 +883,49 @@ describe('draft invoices', () => {
         currency: 'INR',
         price: '1.2345',
         invoiceDiscount: '0.01',
-        roundOff: '0.01',
-        subtotal: 123,
-        lineDiscount: 62,
-        invoiceDiscountMinor: 1,
-        netSubtotal: 60,
-        total: 61,
-        text: '0.61 INR',
+        roundOff: '0.40',
+        subtotalText: '1.23 INR',
+        lineDiscountText: '0.62 INR',
+        invoiceDiscountText: '0.01 INR',
+        netSubtotalText: '0.60 INR',
+        totalText: '1.00 INR',
+        roundOffText: '0.40 INR',
       },
       {
         currency: 'USD',
         price: '1.2345',
         invoiceDiscount: '0.01',
-        roundOff: '0.01',
-        subtotal: 123,
-        lineDiscount: 62,
-        invoiceDiscountMinor: 1,
-        netSubtotal: 60,
-        total: 61,
-        text: '0.61 USD',
+        roundOff: '0.40',
+        subtotalText: '1.23 USD',
+        lineDiscountText: '0.62 USD',
+        invoiceDiscountText: '0.01 USD',
+        netSubtotalText: '0.60 USD',
+        totalText: '1.00 USD',
+        roundOffText: '0.40 USD',
       },
       {
         currency: 'JPY',
         price: '3.0000',
         invoiceDiscount: '1',
-        roundOff: '1',
-        subtotal: 3,
-        lineDiscount: 2,
-        invoiceDiscountMinor: 1,
-        netSubtotal: 0,
-        total: 1,
-        text: '1 JPY',
+        roundOff: '0',
+        subtotalText: '3 JPY',
+        lineDiscountText: '2 JPY',
+        invoiceDiscountText: '1 JPY',
+        netSubtotalText: '0 JPY',
+        totalText: '0 JPY',
+        roundOffText: '0 JPY',
       },
       {
         currency: 'KWD',
         price: '1.2345',
         invoiceDiscount: '0.001',
-        roundOff: '0.001',
-        subtotal: 1235,
-        lineDiscount: 618,
-        invoiceDiscountMinor: 1,
-        netSubtotal: 616,
-        total: 617,
-        text: '0.617 KWD',
+        roundOff: '0.384',
+        subtotalText: '1.235 KWD',
+        lineDiscountText: '0.618 KWD',
+        invoiceDiscountText: '0.001 KWD',
+        netSubtotalText: '0.616 KWD',
+        totalText: '1.000 KWD',
+        roundOffText: '0.384 KWD',
       },
     ];
 
@@ -916,18 +943,13 @@ describe('draft invoices', () => {
       });
       assert.equal(response.status, 302, `${item.currency} draft should be accepted`);
       let id = draftIdFrom(response);
-      let invoice = await db.find(invoices, id);
-      assert.equal(invoice?.subtotal_minor, item.subtotal, `${item.currency} gross`);
-      assert.equal(invoice?.line_discount_total_minor, item.lineDiscount, `${item.currency} line discount`);
-      assert.equal(
-        invoice?.invoice_discount_minor,
-        item.invoiceDiscountMinor,
-        `${item.currency} invoice discount`,
-      );
-      assert.equal(invoice?.net_subtotal_minor, item.netSubtotal, `${item.currency} net subtotal`);
-      assert.equal(invoice?.total_minor, item.total, `${item.currency} total`);
       let html = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
-      assert.ok(html.includes(item.text), `${item.currency} should render ${item.text}`);
+      assert.ok(html.includes(`Subtotal: ${item.subtotalText}`));
+      assert.ok(html.includes(`Line discounts: ${item.lineDiscountText}`));
+      assert.ok(html.includes(`Invoice discount (fixed): ${item.invoiceDiscountText}`));
+      assert.ok(html.includes(`Net taxable subtotal: ${item.netSubtotalText}`));
+      assert.ok(html.includes(`Round-off: ${item.roundOffText}`));
+      assert.ok(html.includes(`Total: ${item.totalText}`));
     }
   });
 
@@ -950,17 +972,21 @@ describe('draft invoices', () => {
     });
     assert.equal(response.status, 302);
 
-    let invoice = await db.find(invoices, draftIdFrom(response));
-    assert.equal(invoice?.recipient_legal_name, 'Override Recipient');
-    assert.equal(invoice?.recipient_billing_line1, '99 Override Street');
-    assert.equal(invoice?.recipient_billing_locality, 'New City');
-    assert.equal(invoice?.recipient_tax_value, '09ZZZ9999Z1Z5');
+    let id = draftIdFrom(response);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Recipient: Override Recipient/);
+    assert.match(detail, /Billing address: 99 Override Street/);
+    assert.match(detail, /Tax identifier: GSTIN 09ZZZ9999Z1Z5/);
 
-    let stored = await db.find(clients, client.id);
-    assert.equal(stored?.legal_name, client.legal_name);
-    assert.equal(stored?.billing_line1, '12 Original Road');
-    assert.equal(stored?.billing_locality, 'Original City');
-    assert.equal(stored?.tax_value, '27AAPCS2319F1Z5');
+    let clientProfile = await getHtml(
+      router,
+      routes.app.clients.show.href({ clientId: client.id }),
+      sessionCookie,
+    );
+    assert.ok(clientProfile.includes(client.legal_name));
+    assert.match(clientProfile, /12 Original Road/);
+    assert.match(clientProfile, /Original City/);
+    assert.match(clientProfile, /27AAPCS2319F1Z5/);
   });
 
   it('adds service lines through a no-JS server intent and saves four or more lines', async () => {
@@ -987,7 +1013,8 @@ describe('draft invoices', () => {
     assert.match(addedHtml, /name="line_description"[^>]*value="First"/);
     assert.match(addedHtml, /name="line_description"[^>]*value="Third"/);
     assert.match(addedHtml, /name="_intent" value="add_line"[^>]*>Add another line</);
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+    let emptyDirectory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(emptyDirectory, /No invoices yet\./);
 
     let created = await createDraft(sessionCookie, client.id, {
       line_description: ['First', 'Second', 'Third', 'Fourth'],
@@ -996,16 +1023,11 @@ describe('draft invoices', () => {
     });
     assert.equal(created.status, 302);
     let id = draftIdFrom(created);
-    let savedLines = await db.findMany(invoiceLines, {
-      where: { invoice_id: id },
-      orderBy: [['position', 'asc']],
-    });
-    assert.equal(savedLines.length, 4);
-    assert.deepEqual(
-      savedLines.map((line) => line.description),
-      ['First', 'Second', 'Third', 'Fourth'],
-    );
-    assert.equal((await db.find(invoices, id))?.total_minor, 30000);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.ok(detail.indexOf('First') < detail.indexOf('Second'));
+    assert.ok(detail.indexOf('Second') < detail.indexOf('Third'));
+    assert.ok(detail.indexOf('Third') < detail.indexOf('Fourth'));
+    assert.match(detail, /Total: 300\.00 INR/);
   });
 
   it('adds a line while editing without mutating the Draft until saved', async () => {
@@ -1015,7 +1037,6 @@ describe('draft invoices', () => {
     );
     let client = await makeClient(organizationId);
     let id = draftIdFrom(await createDraft(sessionCookie, client.id));
-    let before = await db.find(invoices, id);
 
     let added = await submitDraft(
       routes.app.invoices.edit.index.href({ invoiceId: id }),
@@ -1032,8 +1053,19 @@ describe('draft invoices', () => {
     let html = await added.text();
     assert.equal((html.match(/name="line_description"/g) ?? []).length, 4);
     assert.match(html, /name="line_description"[^>]*value="Consulting services"/);
-    assert.equal((await db.find(invoices, id))?.updated_at, before?.updated_at);
-    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
+    let savedEditPage = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.equal((savedEditPage.match(/name="line_description"/g) ?? []).length, 3);
+    assert.match(savedEditPage, /name="line_description"[^>]*value="Consulting services"/);
+    let savedDetail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(savedDetail, /Total: 150\.00 INR/);
   });
 
   it('rejects invalid lines with 400 responses that preserve what was submitted', async () => {
@@ -1088,7 +1120,8 @@ describe('draft invoices', () => {
       assert.match(html, message);
       assert.match(html, preserved);
     }
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(directory, /No invoices yet\./);
   });
 
   it('rejects a discount-only blank line instead of silently dropping its discount', async () => {
@@ -1113,7 +1146,8 @@ describe('draft invoices', () => {
     assert.match(html, /Enter a service description/);
     assert.match(html, /<option value="percent" selected>Percentage<\/option>/);
     assert.match(html, /name="line_discount_value"[^>]*value="12\.5"/);
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(directory, /No invoices yet\./);
   });
 
   it('rejects amounts outside the exact persisted numeric range without saving anything', async () => {
@@ -1131,15 +1165,14 @@ describe('draft invoices', () => {
     let created = await createDraft(sessionCookie, client.id, oversized);
     assert.equal(created.status, 400);
     assert.match(await created.text(), /too large to store exactly/i);
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
-    assert.equal(
-      await db.count(invoiceLines, { where: { organization_id: organizationId } }),
-      0,
-    );
+    let emptyDirectory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(emptyDirectory, /No invoices yet\./);
 
     let valid = await createDraft(sessionCookie, client.id);
+    assert.equal(valid.status, 302);
     let id = draftIdFrom(valid);
-    let before = await db.find(invoices, id);
+    let before = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(before, /Total: 150\.00 INR/);
     let edited = await submitDraft(
       routes.app.invoices.edit.index.href({ invoiceId: id }),
       routes.app.invoices.edit.action.href({ invoiceId: id }),
@@ -1148,10 +1181,10 @@ describe('draft invoices', () => {
     );
     assert.equal(edited.status, 400);
     assert.match(await edited.text(), /too large to store exactly/i);
-    let after = await db.find(invoices, id);
-    assert.equal(after?.total_minor, before?.total_minor);
-    assert.equal(after?.updated_at, before?.updated_at);
-    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
+    let after = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(after, /Total: 150\.00 INR/);
+    assert.match(after, /Consulting services/);
+    assert.doesNotMatch(after, /Huge line/);
   });
 
   it('validates invoice dates, due dates, and currency codes', async () => {
@@ -1175,7 +1208,13 @@ describe('draft invoices', () => {
 
     let badCurrency = await createDraft(sessionCookie, client.id, { currency: 'EURO' });
     assert.equal(badCurrency.status, 400);
-    assert.match(await badCurrency.text(), /3-letter currency code/i);
+    assert.match(await badCurrency.text(), /valid 3-letter ISO 4217 currency code/i);
+
+    let unknownCurrency = await createDraft(sessionCookie, client.id, { currency: 'ZZZ' });
+    assert.equal(unknownCurrency.status, 400);
+    let unknownCurrencyHtml = await unknownCurrency.text();
+    assert.match(unknownCurrencyHtml, /valid 3-letter ISO 4217 currency code/i);
+    assert.match(unknownCurrencyHtml, /name="currency"[^>]*value="ZZZ"/);
 
     let custom = await createDraft(sessionCookie, client.id, {
       payment_term: 'custom',
@@ -1183,10 +1222,17 @@ describe('draft invoices', () => {
       due_date: expectedDueDate(today, 45),
     });
     assert.equal(custom.status, 302);
-    let invoice = await db.find(invoices, draftIdFrom(custom));
-    assert.equal(invoice?.payment_term, 'custom');
-    assert.equal(invoice?.custom_payment_terms, 'Payable within 45 days');
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 1);
+    let customId = draftIdFrom(custom);
+    let detail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: customId }),
+      sessionCookie,
+    );
+    assert.match(detail, /Payment term: Custom/);
+    assert.match(detail, /Custom terms: Payable within 45 days/);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.ok(directory.includes(customId));
+    assert.equal((directory.match(/Draft Recipient/g) ?? []).length, 1);
   });
 
   it('rejects draft mutations without a CSRF token', async () => {
@@ -1211,7 +1257,8 @@ describe('draft invoices', () => {
     });
 
     assert.equal(response.status, 403);
-    assert.equal(await db.count(invoices, { where: { organization_id: organizationId } }), 0);
+    let directory = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
+    assert.match(directory, /No invoices yet\./);
   });
 
   it('ignores forged Organization ids and refuses Clients from another Organization', async () => {
@@ -1224,10 +1271,13 @@ describe('draft invoices', () => {
       organization_id: second.organizationId,
     } as DraftFields);
     assert.equal(forged.status, 302);
-    assert.equal(
-      (await db.find(invoices, draftIdFrom(forged)))?.organization_id,
-      first.organizationId,
+    let forgedId = draftIdFrom(forged);
+    let ownDetail = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: forgedId }),
+      first.sessionCookie,
     );
+    assert.ok(ownDetail.includes(ownClient.legal_name));
 
     let foreign = await submitDraft(
       newDraftPath(ownClient.id),
@@ -1236,8 +1286,11 @@ describe('draft invoices', () => {
       first.sessionCookie,
     );
     assert.equal(foreign.status, 404);
-    assert.equal(await db.count(invoices, { where: { organization_id: first.organizationId } }), 1);
-    assert.equal(await db.count(invoices, { where: { organization_id: second.organizationId } }), 0);
+    let ownDirectory = await getHtml(router, routes.app.invoices.index.href(), first.sessionCookie);
+    assert.ok(ownDirectory.includes(forgedId));
+    assert.doesNotMatch(ownDirectory, new RegExp(foreignClient.legal_name));
+    let foreignDirectory = await getHtml(router, routes.app.invoices.index.href(), second.sessionCookie);
+    assert.match(foreignDirectory, /No invoices yet\./);
   });
 
   it('views a Draft with its lines, totals, notes, and no final invoice number', async () => {
@@ -1260,6 +1313,11 @@ describe('draft invoices', () => {
     assert.match(html, /Private billing context/);
     assert.match(html, /Edit draft/);
     assert.match(html, /Discard draft/);
+    assert.match(
+      html,
+      /<details[\s\S]*?<summary[^>]*>Discard draft<\/summary>[\s\S]*?cannot be undone[\s\S]*?<form[^>]*action="\/app\/invoices\/[^"]+\/discard"[\s\S]*?name="_csrf"[\s\S]*?Confirm discard draft[\s\S]*?<\/form>[\s\S]*?<\/details>/,
+      'the destructive POST should be behind an accessible no-JS confirmation',
+    );
 
     let foreign = await createUserAndLoginWithOrganization(router, 'invoice-show-foreign');
     let response = await router.fetch(new URL(routes.app.invoices.show.href({ invoiceId: id }), origin), {
@@ -1291,7 +1349,13 @@ describe('draft invoices', () => {
     );
     assert.equal(invalid.status, 400);
     assert.match(await invalid.text(), /positive quantity/);
-    assert.equal((await db.find(invoices, id))?.total_minor, 15000);
+    let afterInvalid = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(afterInvalid, /Total: 150\.00 INR/);
+    assert.match(afterInvalid, /Consulting services/);
 
     let updated = await submitDraft(
       routes.app.invoices.edit.index.href({ invoiceId: id }),
@@ -1309,16 +1373,23 @@ describe('draft invoices', () => {
     );
     assert.equal(updated.status, 302);
 
-    let invoice = await db.find(invoices, id);
-    assert.equal(invoice?.recipient_legal_name, 'Edited Recipient');
-    assert.equal(invoice?.internal_note, 'Updated internal note');
-    assert.equal(invoice?.currency, 'USD');
-    assert.equal(invoice?.client_id, client.id, 'a forged client_id on edit is ignored');
-    assert.equal(invoice?.total_minor, 3400, '20.00 + 14.00');
-    let lines = await db.findMany(invoiceLines, { where: { invoice_id: id } });
-    assert.equal(lines.length, 2);
-    assert.equal(lines[0]?.description, 'rewritten line');
-    assert.doesNotMatch(JSON.stringify(lines), /Consulting services/);
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Recipient: Edited Recipient/);
+    assert.ok(detail.includes(`Client: ${client.legal_name}`));
+    assert.match(detail, /Currency: USD/);
+    assert.match(detail, /Internal note \(private\): Updated internal note/);
+    assert.match(detail, /Total: 34\.00 USD/);
+    assert.ok(detail.indexOf('rewritten line') < detail.indexOf('second line'));
+    assert.doesNotMatch(detail, /Consulting services/);
+
+    let updatedEditPage = await getHtml(
+      router,
+      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      sessionCookie,
+    );
+    assert.match(updatedEditPage, new RegExp(`name="client_id"[^>]*value="${client.id}"`));
+    assert.match(updatedEditPage, /name="line_description"[^>]*value="rewritten line"/);
+    assert.match(updatedEditPage, /name="line_description"[^>]*value="second line"/);
   });
 
   it('does not let another Organization view or edit a Draft', async () => {
@@ -1327,7 +1398,11 @@ describe('draft invoices', () => {
     let client = await makeClient(first.organizationId);
     let created = await createDraft(first.sessionCookie, client.id);
     let id = draftIdFrom(created);
-    let before = await db.find(invoices, id);
+    let before = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      first.sessionCookie,
+    );
 
     let show = await router.fetch(new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin), {
       headers: { Cookie: other.sessionCookie },
@@ -1346,11 +1421,16 @@ describe('draft invoices', () => {
     assert.equal(edit.status, 404);
     assert.ok(!(await edit.text()).includes('Hacked Recipient'));
 
-    let after = await db.find(invoices, id);
-    assert.equal(after?.recipient_legal_name, before?.recipient_legal_name);
-    assert.equal(after?.total_minor, before?.total_minor);
-    assert.equal(after?.updated_at, before?.updated_at);
-    assert.equal(await db.count(invoiceLines, { where: { invoice_id: id } }), 1);
+    let after = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: id }),
+      first.sessionCookie,
+    );
+    assert.match(before, /Recipient: Draft Recipient/);
+    assert.match(before, /Total: 150\.00 INR/);
+    assert.match(after, /Recipient: Draft Recipient/);
+    assert.match(after, /Total: 150\.00 INR/);
+    assert.match(after, /Consulting services/);
   });
 
   it('keeps an existing Draft accessible and editable after its Client is archived', async () => {
@@ -1369,7 +1449,12 @@ describe('draft invoices', () => {
       sessionCookie,
     );
     assert.equal(archived.status, 302);
-    assert.equal((await db.find(clients, client.id))?.status, 'archived');
+    let clientProfile = await getHtml(
+      router,
+      routes.app.clients.show.href({ clientId: client.id }),
+      sessionCookie,
+    );
+    assert.match(clientProfile, /Status[\s\S]*?Archived/);
 
     let show = await router.fetch(new URL(routes.app.invoices.show.href({ invoiceId: id }), origin), {
       headers: { Cookie: sessionCookie },
@@ -1390,17 +1475,30 @@ describe('draft invoices', () => {
       sessionCookie,
     );
     assert.equal(edited.status, 302);
-    assert.equal((await db.find(invoices, id))?.internal_note, 'Still editable');
+    let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
+    assert.match(detail, /Internal note \(private\): Still editable/);
   });
 
   it('discards only the current Organization’s Drafts with CSRF protection', async () => {
     let first = await createUserAndLoginWithOrganization(router, 'invoice-discard-first');
     let ownClient = await makeClient(first.organizationId);
-    let firstDraft = draftIdFrom(await createDraft(first.sessionCookie, ownClient.id));
-    let keepDraft = draftIdFrom(await createDraft(first.sessionCookie, ownClient.id));
+    let firstDraft = draftIdFrom(
+      await createDraft(first.sessionCookie, ownClient.id, {
+        recipient_legal_name: 'Discard target recipient',
+      }),
+    );
+    let keepDraft = draftIdFrom(
+      await createDraft(first.sessionCookie, ownClient.id, {
+        recipient_legal_name: 'Kept recipient',
+      }),
+    );
     let second = await createUserAndLoginWithOrganization(router, 'invoice-discard-second');
     let foreignClient = await makeClient(second.organizationId);
-    let foreignDraft = draftIdFrom(await createDraft(second.sessionCookie, foreignClient.id));
+    let foreignDraft = draftIdFrom(
+      await createDraft(second.sessionCookie, foreignClient.id, {
+        recipient_legal_name: 'Foreign recipient',
+      }),
+    );
 
     let noCsrf = await router.fetch(
       new URL(
@@ -1417,7 +1515,12 @@ describe('draft invoices', () => {
       },
     );
     assert.equal(noCsrf.status, 403);
-    assert.ok(await db.find(invoices, firstDraft));
+    let targetBeforeDiscard = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: firstDraft }),
+      first.sessionCookie,
+    );
+    assert.match(targetBeforeDiscard, /Discard target recipient/);
 
     let foreignDiscard = await submitForm(
       router,
@@ -1427,6 +1530,12 @@ describe('draft invoices', () => {
       first.sessionCookie,
     );
     assert.equal(foreignDiscard.status, 404);
+    let foreignAfterDeniedDiscard = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: foreignDraft }),
+      second.sessionCookie,
+    );
+    assert.match(foreignAfterDeniedDiscard, /Foreign recipient/);
 
     let discarded = await submitForm(
       router,
@@ -1438,14 +1547,23 @@ describe('draft invoices', () => {
     assert.equal(discarded.status, 302);
     assert.equal(discarded.headers.get('Location'), routes.app.invoices.index.href());
 
-    assert.equal(await db.find(invoices, firstDraft), null);
-    assert.equal(await db.count(invoiceLines, { where: { invoice_id: firstDraft } }), 0);
-    assert.ok(await db.find(invoices, keepDraft));
-    assert.ok(await db.find(invoices, foreignDraft));
-
     let directory = await getHtml(router, routes.app.invoices.index.href(), first.sessionCookie);
     assert.match(directory, /Invoice draft discarded/);
     assert.ok(!directory.includes(firstDraft), 'the discarded draft is no longer listed');
     assert.ok(directory.includes(keepDraft), 'the other draft is still listed');
+    assert.ok(directory.includes('Kept recipient'));
+    assert.ok(!directory.includes('Discard target recipient'));
+    let missingDraft = await router.fetch(
+      new URL(routes.app.invoices.show.href({ invoiceId: firstDraft }), origin),
+      { headers: { Cookie: first.sessionCookie } },
+    );
+    assert.equal(missingDraft.status, 404);
+    let keptPage = await getHtml(
+      router,
+      routes.app.invoices.show.href({ invoiceId: keepDraft }),
+      first.sessionCookie,
+    );
+    assert.match(keptPage, /Kept recipient/);
+    assert.match(foreignAfterDeniedDiscard, /Foreign recipient/);
   });
 });

@@ -1,6 +1,6 @@
 # App Domain
 
-The domain language for this app's identity, sign-in, and client-management features. Single context: the whole repo.
+The domain language for this app's identity, sign-in, Client management, and invoicing features. Single context: the whole repo.
 
 ## Language
 
@@ -71,3 +71,29 @@ _Avoid_: deleted, inactive, disabled, removed
 **Tax identifier**:
 The single optional country-specific tax number recorded on a Client, such as an India GSTIN or UIN. Missing means not recorded, not unregistered.
 _Avoid_: tax ID, VAT number, GST number, tax registration
+
+### Invoicing
+
+**Invoice**:
+A document that records an Organization's claim for payment from a Client for supplied services.
+_Avoid_: bill, receipt
+
+**Draft**:
+An Invoice being prepared that has not been issued. It has no final invoice number.
+_Avoid_: provisional invoice
+
+**Service line**:
+A separately described service on an Invoice, with a quantity and unit price.
+_Avoid_: line item
+
+**Line discount**:
+A reduction applied to one Service line's gross amount before invoice-wide discounts.
+_Avoid_: item discount
+
+**Invoice discount**:
+A reduction applied to the combined Service line amount after line discounts, allocated proportionally across the lines.
+_Avoid_: order discount
+
+**Round-off**:
+An optional signed adjustment that brings the net Invoice total to the nearest whole currency unit. Exact halfway amounts round away from zero.
+_Avoid_: rounding adjustment

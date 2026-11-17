@@ -59,6 +59,24 @@ describe('organization invoicing defaults', () => {
     assert.match(html, /Thank you for your business\./);
   });
 
+  it('accepts and renders the valid ISO 4217 currency XAF', async () => {
+    let { sessionCookie } = await createUserAndLoginWithOrganization(
+      router,
+      'inv-default-xaf',
+    );
+
+    let response = await postForm(
+      router,
+      action,
+      invoicingFormFields({ default_currency: 'xaf' }),
+      sessionCookie,
+    );
+    assert.equal(response.status, 302);
+
+    let html = await getHtml(router, index, sessionCookie);
+    assert.match(html, /name="default_currency"[^>]*value="XAF"/);
+  });
+
   it('updates and clears the client-visible defaults', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
@@ -125,13 +143,25 @@ describe('organization invoicing defaults', () => {
     assert.equal(response.status, 400);
     let html = await response.text();
     assert.match(html, /<p role="alert"[^>]*>Please correct the fields below\.<\/p>/);
-    assert.match(html, /Enter a 3-letter currency code, such as INR or USD\./);
+    assert.match(html, /valid 3-letter ISO 4217 currency code/i);
     assert.match(html, /Choose a valid default payment term\./);
     assert.match(html, /name="default_currency"[^>]*value="rupees"/);
     assert.match(html, /name="payment_instructions"[^>]*>Keep my instructions<\/textarea>/);
     assert.match(html, /name="default_currency"[^>]*aria-invalid="true"/);
     assert.match(html, /name="payment_term"[^>]*aria-invalid="true"/);
     assert.equal(await findInvoicingProfile(organizationId), null, 'invalid defaults are not stored');
+
+    let unknownCurrency = await postForm(
+      router,
+      action,
+      invoicingFormFields({
+        default_currency: 'ZZZ',
+        payment_term: 'due_on_receipt',
+      }),
+      sessionCookie,
+    );
+    assert.equal(unknownCurrency.status, 400);
+    assert.match(await unknownCurrency.text(), /valid 3-letter ISO 4217 currency code/i);
   });
 
   it('rejects overlong client-visible text without truncating the submitted draft', async () => {

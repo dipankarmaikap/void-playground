@@ -2,65 +2,20 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, invoices } from '../../../data/db.ts';
 import { addDays } from '../../../data/invoice-dates.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
+import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
+import type { InvoiceFixture as SeedInvoiceFixture } from '../../../../test/invoice-fixtures.ts';
 import {
   createUserAndLoginWithOrganization,
   getHtml,
   origin,
 } from '../../../../test/http.ts';
 
-interface InvoiceFixture {
-  id: string;
-  label: string;
+interface InvoiceFixture extends SeedInvoiceFixture {
   invoiceDate: string;
   createdAt: number;
-}
-
-async function seedInvoice(
-  organizationId: string,
-  clientId: string,
-  fixture: InvoiceFixture,
-): Promise<void> {
-  await db.create(invoices, {
-    id: fixture.id,
-    organization_id: organizationId,
-    client_id: clientId,
-    document_type: 'invoice',
-    status: 'draft',
-    invoice_number: null,
-    currency: 'INR',
-    invoice_date: fixture.invoiceDate,
-    due_date: fixture.invoiceDate,
-    payment_term: 'due_on_receipt',
-    custom_payment_terms: null,
-    recipient_legal_name: fixture.label,
-    recipient_billing_line1: null,
-    recipient_billing_locality: null,
-    recipient_billing_region: null,
-    recipient_billing_postal_code: null,
-    recipient_billing_country: null,
-    recipient_tax_country: null,
-    recipient_tax_type: null,
-    recipient_tax_value: null,
-    recipient_tax_state_name: null,
-    recipient_tax_state_code: null,
-    payment_instructions: null,
-    customer_notes: null,
-    internal_note: null,
-    subtotal_minor: 1000,
-    line_discount_total_minor: 0,
-    invoice_discount_mode: null,
-    invoice_discount_value: null,
-    invoice_discount_minor: 0,
-    net_subtotal_minor: 1000,
-    round_off_minor: 0,
-    total_minor: 1000,
-    created_at: fixture.createdAt,
-    updated_at: fixture.createdAt,
-  });
 }
 
 function indexHref(params: Record<string, string> = {}): string {
@@ -93,31 +48,31 @@ describe('invoice directory pagination', () => {
     let fixtures: InvoiceFixture[] = [
       {
         id: 'invoice-date-newest',
-        label: 'Newest invoice date',
+        recipientName: 'Newest invoice date',
         invoiceDate: '2026-03-03',
         createdAt: 1,
       },
       {
         id: 'invoice-created-newest',
-        label: 'Newest creation time',
+        recipientName: 'Newest creation time',
         invoiceDate: '2026-03-02',
         createdAt: 9,
       },
       {
         id: 'invoice-created-earlier',
-        label: 'Earlier creation time',
+        recipientName: 'Earlier creation time',
         invoiceDate: '2026-03-02',
         createdAt: 8,
       },
       {
         id: 'invoice-id-a',
-        label: 'Tie id A',
+        recipientName: 'Tie id A',
         invoiceDate: '2026-03-01',
         createdAt: 7,
       },
       {
         id: 'invoice-id-z',
-        label: 'Tie id Z',
+        recipientName: 'Tie id Z',
         invoiceDate: '2026-03-01',
         createdAt: 7,
       },
@@ -125,7 +80,7 @@ describe('invoice directory pagination', () => {
     for (let number = 1; number <= 40; number += 1) {
       fixtures.push({
         id: `invoice-page-${String(number).padStart(2, '0')}`,
-        label: `Paged invoice ${String(number).padStart(2, '0')}`,
+        recipientName: `Paged invoice ${String(number).padStart(2, '0')}`,
         invoiceDate: addDays('2026-01-01', number),
         createdAt: number,
       });
@@ -184,7 +139,7 @@ describe('invoice directory pagination', () => {
     });
     let fixture: InvoiceFixture = {
       id: 'invoice-invalid-page',
-      label: 'Page normalization invoice',
+      recipientName: 'Page normalization invoice',
       invoiceDate: '2026-04-01',
       createdAt: 1,
     };
@@ -211,13 +166,13 @@ describe('invoice directory search', () => {
     let token = `Recipient${crypto.randomUUID().replaceAll('-', '')}`;
     let matching: InvoiceFixture = {
       id: 'invoice-search-match',
-      label: `Draft recipient ${token}`,
+      recipientName: `Draft recipient ${token}`,
       invoiceDate: '2026-05-01',
       createdAt: 1,
     };
     let unrelated: InvoiceFixture = {
       id: 'invoice-search-unrelated',
-      label: 'An unrelated Draft recipient',
+      recipientName: 'An unrelated Draft recipient',
       invoiceDate: '2026-05-02',
       createdAt: 2,
     };
@@ -226,8 +181,8 @@ describe('invoice directory search', () => {
 
     let html = await getHtml(router, indexHref({ q: token.toUpperCase() }), sessionCookie);
 
-    assert.match(html, new RegExp(matching.label));
-    assert.doesNotMatch(html, new RegExp(unrelated.label));
+    assert.match(html, new RegExp(matching.recipientName));
+    assert.doesNotMatch(html, new RegExp(unrelated.recipientName));
     assert.deepEqual(invoiceLinks(html, [matching, unrelated]), [matching.id]);
   });
 
@@ -244,26 +199,26 @@ describe('invoice directory search', () => {
     for (let number = 1; number <= 25; number += 1) {
       percentMatches.push({
         id: `invoice-literal-percent-${String(number).padStart(2, '0')}`,
-        label: `Literal ${String(number).padStart(2, '0')} 100% Cotton`,
+        recipientName: `Literal ${String(number).padStart(2, '0')} 100% Cotton`,
         invoiceDate: addDays('2026-06-01', number),
         createdAt: number,
       });
     }
     let percentLookalike: InvoiceFixture = {
       id: 'invoice-literal-percent-lookalike',
-      label: 'Literal 100X Cotton',
+      recipientName: 'Literal 100X Cotton',
       invoiceDate: '2026-06-30',
       createdAt: 30,
     };
     let underscoreMatch: InvoiceFixture = {
       id: 'invoice-literal-underscore-match',
-      label: 'Literal Under_score Match',
+      recipientName: 'Literal Under_score Match',
       invoiceDate: '2026-06-30',
       createdAt: 31,
     };
     let underscoreLookalike: InvoiceFixture = {
       id: 'invoice-literal-underscore-lookalike',
-      label: 'Literal UnderXscore Match',
+      recipientName: 'Literal UnderXscore Match',
       invoiceDate: '2026-06-30',
       createdAt: 32,
     };
@@ -321,31 +276,31 @@ describe('invoice directory filters', () => {
     let fixtures: InvoiceFixture[] = [
       {
         id: 'invoice-filter-before',
-        label: 'Before range',
+        recipientName: 'Before range',
         invoiceDate: '2026-06-30',
         createdAt: 1,
       },
       {
         id: 'invoice-filter-from',
-        label: 'At range start',
+        recipientName: 'At range start',
         invoiceDate: '2026-07-01',
         createdAt: 2,
       },
       {
         id: 'invoice-filter-middle',
-        label: 'Inside range',
+        recipientName: 'Inside range',
         invoiceDate: '2026-07-15',
         createdAt: 3,
       },
       {
         id: 'invoice-filter-to',
-        label: 'At range end',
+        recipientName: 'At range end',
         invoiceDate: '2026-07-31',
         createdAt: 4,
       },
       {
         id: 'invoice-filter-after',
-        label: 'After range',
+        recipientName: 'After range',
         invoiceDate: '2026-08-01',
         createdAt: 5,
       },
@@ -400,7 +355,7 @@ describe('invoice directory filters', () => {
     for (let number = 1; number <= 25; number += 1) {
       await seedInvoice(organizationId, client.id, {
         id: `invoice-filter-form-${String(number).padStart(2, '0')}`,
-        label: `${token} invoice ${String(number).padStart(2, '0')}`,
+        recipientName: `${token} invoice ${String(number).padStart(2, '0')}`,
         invoiceDate: addDays('2026-09-01', number),
         createdAt: number,
       });
@@ -457,13 +412,13 @@ describe('invoice directory Organization scope', () => {
     });
     let ownInvoice: InvoiceFixture = {
       id: 'invoice-directory-own',
-      label: 'Owner Organization invoice',
+      recipientName: 'Owner Organization invoice',
       invoiceDate: '2026-11-01',
       createdAt: 1,
     };
     let foreignInvoice: InvoiceFixture = {
       id: 'invoice-directory-foreign',
-      label: 'Foreign Organization invoice',
+      recipientName: 'Foreign Organization invoice',
       invoiceDate: '2026-11-02',
       createdAt: 2,
     };

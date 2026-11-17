@@ -3,9 +3,10 @@ import type { Issue } from 'remix/data-schema';
 import { canonicalCountry } from './client-billing.ts';
 import { parseClientContacts } from './client-contacts.ts';
 import { GSTIN_PATTERN } from './client-tax.ts';
-import { BILLING_CURRENCY_LENGTH_MESSAGE, CLIENT_TEXT_LIMITS } from './client-text.ts';
+import { CLIENT_TEXT_LIMITS } from './client-text.ts';
 import { db, organizationInvoicingProfiles } from './db.ts';
 import type { Organization, OrganizationInvoicingProfile } from './db.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
 import { findIndiaStateByCode } from './india-states.ts';
 import { parseOrganizationName } from './organization-name.ts';
 
@@ -134,9 +135,6 @@ const INVOICE_TEXT_LIMITS = {
 } as const;
 
 type InvoiceTextField = keyof typeof INVOICE_TEXT_LIMITS;
-
-/** Basic ISO 4217 shape; unlisted three-letter codes are accepted, as in Client billing. */
-const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
 
 /** Short, unambiguous document prefixes. Lowercase input is normalized to uppercase. */
 const PREFIX_MAX_LENGTH = 12;
@@ -278,8 +276,8 @@ export function parseInvoicingProfile(
 
   let currencyInput = (input.default_currency ?? '').trim().toUpperCase();
   let defaultCurrency = DEFAULT_CURRENCY;
-  if (!currencyInput || !CURRENCY_CODE_PATTERN.test(currencyInput)) {
-    issues.push({ message: BILLING_CURRENCY_LENGTH_MESSAGE, path: ['default_currency'] });
+  if (!isIso4217Currency(currencyInput)) {
+    issues.push({ message: ISO_4217_CURRENCY_MESSAGE, path: ['default_currency'] });
   } else {
     defaultCurrency = currencyInput;
   }

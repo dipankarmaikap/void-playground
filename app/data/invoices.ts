@@ -2,7 +2,7 @@ import { gte, ilike, lte, or } from 'remix/data-table';
 
 import { db, invoiceLines, invoices } from './db.ts';
 import type { Invoice, InvoiceLine } from './db.ts';
-import type { InvoiceDraftChanges } from './invoice-draft.ts';
+import type { InvoiceDraftChanges, InvoiceLineChanges } from './invoice-draft.ts';
 import { isValidIsoDate } from './invoice-dates.ts';
 
 /** User-facing label for the only status a Draft can have in this ticket. */
@@ -203,6 +203,32 @@ function invoiceValues(changes: InvoiceDraftChanges) {
   return invoiceColumns;
 }
 
+function invoiceLineValues(
+  organizationId: string,
+  invoiceId: string,
+  line: InvoiceLineChanges,
+  now: number,
+) {
+  return {
+    id: crypto.randomUUID(),
+    organization_id: organizationId,
+    invoice_id: invoiceId,
+    position: line.position,
+    description: line.description,
+    sac: line.sac,
+    quantity: line.quantity,
+    unit_price: line.unit_price,
+    amount_minor: line.amount_minor,
+    discount_mode: line.discount_mode,
+    discount_value: line.discount_value,
+    line_discount_minor: line.line_discount_minor,
+    allocated_invoice_discount_minor: line.allocated_invoice_discount_minor,
+    net_minor: line.net_minor,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 /** Inserts a Draft and its service lines atomically. Organization id always comes from the server. */
 export async function createDraftInvoice(
   organizationId: string,
@@ -224,24 +250,7 @@ export async function createDraftInvoice(
       updated_at: now,
     });
     for (let line of changes.lines) {
-      await tx.create(invoiceLines, {
-        id: crypto.randomUUID(),
-        organization_id: organizationId,
-        invoice_id: id,
-        position: line.position,
-        description: line.description,
-        sac: line.sac,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        amount_minor: line.amount_minor,
-        discount_mode: line.discount_mode,
-        discount_value: line.discount_value,
-        line_discount_minor: line.line_discount_minor,
-        allocated_invoice_discount_minor: line.allocated_invoice_discount_minor,
-        net_minor: line.net_minor,
-        created_at: now,
-        updated_at: now,
-      });
+      await tx.create(invoiceLines, invoiceLineValues(organizationId, id, line, now));
     }
   });
   return findInvoice(organizationId, id);
@@ -264,24 +273,7 @@ export async function updateDraftInvoice(
       where: { organization_id: organizationId, invoice_id: id },
     });
     for (let line of changes.lines) {
-      await tx.create(invoiceLines, {
-        id: crypto.randomUUID(),
-        organization_id: organizationId,
-        invoice_id: id,
-        position: line.position,
-        description: line.description,
-        sac: line.sac,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        amount_minor: line.amount_minor,
-        discount_mode: line.discount_mode,
-        discount_value: line.discount_value,
-        line_discount_minor: line.line_discount_minor,
-        allocated_invoice_discount_minor: line.allocated_invoice_discount_minor,
-        net_minor: line.net_minor,
-        created_at: now,
-        updated_at: now,
-      });
+      await tx.create(invoiceLines, invoiceLineValues(organizationId, id, line, now));
     }
   });
   return findInvoice(organizationId, id);

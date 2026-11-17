@@ -363,7 +363,8 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </h2>
           <p mix={hintStyle}>
             An invoice-wide discount is allocated proportionally across each line's value after
-            line discounts. Round-off is a signed adjustment that reconciles the net total.
+            line discounts. Round-off is optional and adjusts the net total to the nearest whole
+            currency unit; exact halfway amounts round away from zero.
           </p>
           <div mix={gridStyle}>
             <Field

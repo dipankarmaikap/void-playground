@@ -184,15 +184,24 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           >
             Edit draft
           </a>
-          <form
-            method="post"
-            action={routes.app.invoices.lifecycle.discard.href({ invoiceId: invoice.id })}
-          >
-            <input type="hidden" name="_csrf" value={csrfToken} />
-            <Button type="submit" variant="danger">
-              Discard draft
-            </Button>
-          </form>
+          <details>
+            <summary>Discard draft</summary>
+            <div>
+              <p>
+                Discarding this Draft permanently removes it and its service lines. This cannot be
+                undone.
+              </p>
+              <form
+                method="post"
+                action={routes.app.invoices.lifecycle.discard.href({ invoiceId: invoice.id })}
+              >
+                <input type="hidden" name="_csrf" value={csrfToken} />
+                <Button type="submit" variant="danger">
+                  Confirm discard draft
+                </Button>
+              </form>
+            </div>
+          </details>
         </div>
       </AppShell>
     );

@@ -2,55 +2,10 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, invoices } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
+import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
-
-async function seedInvoice(
-  organizationId: string,
-  clientId: string,
-  id: string,
-  recipientName: string,
-): Promise<void> {
-  await db.create(invoices, {
-    id,
-    organization_id: organizationId,
-    client_id: clientId,
-    document_type: 'invoice',
-    status: 'draft',
-    invoice_number: null,
-    currency: 'INR',
-    invoice_date: '2026-10-01',
-    due_date: '2026-10-01',
-    payment_term: 'due_on_receipt',
-    custom_payment_terms: null,
-    recipient_legal_name: recipientName,
-    recipient_billing_line1: null,
-    recipient_billing_locality: null,
-    recipient_billing_region: null,
-    recipient_billing_postal_code: null,
-    recipient_billing_country: null,
-    recipient_tax_country: null,
-    recipient_tax_type: null,
-    recipient_tax_value: null,
-    recipient_tax_state_name: null,
-    recipient_tax_state_code: null,
-    payment_instructions: null,
-    customer_notes: null,
-    internal_note: null,
-    subtotal_minor: 1000,
-    line_discount_total_minor: 0,
-    invoice_discount_mode: null,
-    invoice_discount_value: null,
-    invoice_discount_minor: 0,
-    net_subtotal_minor: 1000,
-    round_off_minor: 0,
-    total_minor: 1000,
-    created_at: Date.now(),
-    updated_at: Date.now(),
-  });
-}
 
 describe('Client invoice links', () => {
   it('links Active and Archived Clients to only their Organization-scoped invoices', async () => {
@@ -75,24 +30,33 @@ describe('Client invoice links', () => {
       legal_name: `Foreign Invoice Client ${crypto.randomUUID()}`,
     });
 
-    await seedInvoice(owner.organizationId, activeClient.id, 'active-client-invoice', 'Active invoice');
+    await seedInvoice(owner.organizationId, activeClient.id, {
+      id: 'active-client-invoice',
+      recipientName: 'Active invoice',
+    });
     await seedInvoice(
       owner.organizationId,
       archivedClient.id,
-      'archived-client-invoice',
-      'Archived invoice',
+      {
+        id: 'archived-client-invoice',
+        recipientName: 'Archived invoice',
+      },
     );
     await seedInvoice(
       owner.organizationId,
       anotherClient.id,
-      'another-client-invoice',
-      'Another Client invoice',
+      {
+        id: 'another-client-invoice',
+        recipientName: 'Another Client invoice',
+      },
     );
     await seedInvoice(
       other.organizationId,
       foreignClient.id,
-      'foreign-client-invoice',
-      'Foreign Organization invoice',
+      {
+        id: 'foreign-client-invoice',
+        recipientName: 'Foreign Organization invoice',
+      },
     );
 
     let activeProfile = await getHtml(

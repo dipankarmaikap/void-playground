@@ -1,45 +1,17 @@
 import type { Client, Invoice, InvoiceLine } from '../../../data/db.ts';
+import type { InvoiceDraftInput, InvoiceDraftLineInput } from '../../../data/invoice-draft.ts';
 import { formatMinorInput } from '../../../data/invoice-calculation.ts';
 import { suggestDueDate } from '../../../data/invoice-dates.ts';
 import type { InvoicingProfileView } from '../../../data/organization-invoicing.ts';
 
 /** One editable free-form service line as it appears in a submitted form. */
-export interface InvoiceLineFormValue {
-  description: string;
-  sac: string;
-  quantity: string;
-  unit_price: string;
-  discount_mode: string;
-  discount_value: string;
-}
+export type InvoiceLineFormValue = InvoiceDraftLineInput;
 
 /** The string snapshot a Draft invoice form submits or re-renders after validation fails. */
-export interface InvoiceFormValues {
+export interface InvoiceFormValues extends InvoiceDraftInput {
   client_id: string;
-  currency: string;
-  invoice_date: string;
-  due_date: string;
-  payment_term: string;
-  custom_payment_terms: string;
-  recipient_legal_name: string;
-  recipient_billing_line1: string;
-  recipient_billing_locality: string;
-  recipient_billing_region: string;
-  recipient_billing_postal_code: string;
-  recipient_billing_country: string;
-  recipient_tax_country: string;
-  recipient_tax_type: string;
-  recipient_tax_value: string;
-  recipient_tax_state_code: string;
   /** Carried for redisplay only; the saved name is always derived from the State/UT code. */
   recipient_tax_state_name: string;
-  payment_instructions: string;
-  customer_notes: string;
-  internal_note: string;
-  invoice_discount_mode: string;
-  invoice_discount_value: string;
-  round_off: string;
-  lines: InvoiceLineFormValue[];
 }
 
 const LINE_FIELDS = [
