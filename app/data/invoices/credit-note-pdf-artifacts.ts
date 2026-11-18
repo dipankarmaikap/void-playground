@@ -1,6 +1,7 @@
 import { creditNotePdfArtifacts } from '../db.ts';
 import type { CreditNote } from '../db.ts';
 import type { IssuedCreditNoteFinalizer } from './credit-notes.ts';
+import { documentPdfFilename } from './pdf-filenames.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
@@ -14,15 +15,7 @@ export function creditNotePdfFilename(
     creditNote.status === 'draft' || !creditNote.credit_note_number
       ? 'credit-note-draft'
       : creditNote.credit_note_number;
-  let cleaned = base
-    .replace(/[^A-Za-z0-9._ -]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[-. ]+|[-. ]+$/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 80)
-    .trim();
-  return `${cleaned || 'credit-note'}.pdf`;
+  return documentPdfFilename(base, 'credit-note');
 }
 
 /** Captures the English PDF bytes in the same transaction as numbering and issuance. */
