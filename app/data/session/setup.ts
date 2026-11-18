@@ -1,12 +1,12 @@
 import { createCookie } from 'remix/cookie';
 import { createSessionAuthScheme } from 'remix/middleware/auth';
 
-import { db, users } from './db.ts';
-import type { User } from './db.ts';
+import { db, users } from '../db.ts';
+import type { User } from '../db.ts';
 import {
   createHybridSessionStorage,
   SESSION_TTL_SECONDS,
-} from './session-storage.ts';
+} from './storage.ts';
 
 let sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret && process.env.NODE_ENV === 'production') {

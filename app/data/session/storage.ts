@@ -5,7 +5,7 @@ import { createSession } from 'remix/session';
 import type { Session, SessionStorage } from 'remix/session';
 import { createCookieSessionStorage } from 'remix/session-storage/cookie';
 
-import { db, sessions } from './db.ts';
+import { db, sessions } from '../db.ts';
 
 export interface SessionRequestContext {
   ip: string;
