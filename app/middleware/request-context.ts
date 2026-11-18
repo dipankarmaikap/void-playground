@@ -1,6 +1,6 @@
 import { type Middleware } from 'remix/router';
 
-import { sessionRequestContext } from '../data/session-storage.ts';
+import { sessionRequestContext } from '../data/session/storage.ts';
 
 // Display-only metadata; without a trusted proxy these headers are client-controlled.
 export const requestContextMiddleware: Middleware = async (context, next) => {

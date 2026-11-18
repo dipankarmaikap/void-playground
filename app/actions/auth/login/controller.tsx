@@ -9,6 +9,7 @@ import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from '
 
 import { db, users, userPasswords } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
+import { setAuthPayload } from '../../../data/session/auth-payload.ts';
 import { verifyPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { LoginPage } from './page.tsx';
@@ -62,7 +63,7 @@ export default createController(routes.auth.login, {
         return redirect(routes.auth.login.index.href());
       }
       let session = completeAuth(context);
-      session.set('auth', { userId: user.id });
+      setAuthPayload(session, { userId: user.id });
       return redirect(routes.app.dashboard.href());
     },
   },

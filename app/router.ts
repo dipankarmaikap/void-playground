@@ -34,7 +34,7 @@ import settingsSessionsController from './actions/app/settings/sessions/controll
 import { assets, documentScriptEntryMiddleware } from './assets.ts';
 import { requestContextMiddleware } from './middleware/request-context.ts';
 import { routes } from './routes.ts';
-import { sessionCookie, sessionStorage, sessionScheme } from './data/session.ts';
+import { sessionCookie, sessionStorage, sessionScheme } from './data/session/setup.ts';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
