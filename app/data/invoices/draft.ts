@@ -17,6 +17,7 @@ import {
   toExactMinorNumber,
   toExactSignedMinorNumber,
 } from './calculation.ts';
+import type { LineValueFields } from './documents.ts';
 import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
 import { isValidIsoDate } from './dates.ts';
 import { PAYMENT_TERMS } from '../organization-invoicing.ts';
@@ -69,30 +70,10 @@ export interface InvoiceDraftInput {
   lines: InvoiceDraftLineInput[];
 }
 
-export interface InvoiceLineChanges {
-  position: number;
-  description: string;
-  sac: string | null;
-  quantity: string;
-  unit_price: string;
-  amount_minor: number;
-  discount_mode: string | null;
-  discount_value: string | null;
-  line_discount_minor: number;
-  allocated_invoice_discount_minor: number;
-  net_minor: number;
+/** One normalized service line, with the Invoice's narrowed tax-treatment unions. */
+export interface InvoiceLineChanges extends LineValueFields {
   tax_treatment: 'taxable' | 'nil_rated' | 'exempt' | 'non_gst' | null;
-  gst_rate: string | null;
-  cgst_rate: string | null;
-  sgst_rate: string | null;
-  igst_rate: string | null;
-  cgst_amount_minor: number;
-  sgst_amount_minor: number;
-  igst_amount_minor: number;
-  foreign_tax_label: string | null;
   foreign_tax_mode: 'percent' | 'fixed' | null;
-  foreign_tax_rate: string | null;
-  foreign_tax_amount_minor: number;
 }
 
 /** The invoice-row plus line-row changes a valid Draft form submission produces. */

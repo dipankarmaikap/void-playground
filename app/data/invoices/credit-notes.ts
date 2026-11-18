@@ -15,7 +15,7 @@ import type {
   Invoice,
   InvoiceLine,
 } from '../db.ts';
-import type { InvoicePdfDocument } from './documents.ts';
+import type { InvoicePdfDocument, LineValueFields } from './documents.ts';
 import {
   calculateLineAmountMinor,
   formatScaledDecimal,
@@ -40,31 +40,11 @@ export interface CreditNoteDraftIssue {
   message: string;
 }
 
-export interface CreditNoteLineChanges {
+/** One reversal line: copied stable values plus its source-line identity and copied tax strings. */
+export interface CreditNoteLineChanges extends LineValueFields {
   invoice_line_id: string;
-  position: number;
-  description: string;
-  sac: string | null;
-  quantity: string;
-  unit_price: string;
-  amount_minor: number;
-  discount_mode: string | null;
-  discount_value: string | null;
-  line_discount_minor: number;
-  allocated_invoice_discount_minor: number;
-  net_minor: number;
   tax_treatment: string | null;
-  gst_rate: string | null;
-  cgst_rate: string | null;
-  sgst_rate: string | null;
-  igst_rate: string | null;
-  cgst_amount_minor: number;
-  sgst_amount_minor: number;
-  igst_amount_minor: number;
-  foreign_tax_label: string | null;
   foreign_tax_mode: string | null;
-  foreign_tax_rate: string | null;
-  foreign_tax_amount_minor: number;
 }
 
 export interface CreditNoteDraftChanges {
