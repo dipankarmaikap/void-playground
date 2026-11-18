@@ -3,6 +3,8 @@ import { createSessionAuthScheme } from 'remix/middleware/auth';
 
 import { db, users } from '../db.ts';
 import type { User } from '../db.ts';
+import { AUTH_SESSION_KEY, readAuthPayload } from './auth-payload.ts';
+import type { AuthPayload } from './auth-payload.ts';
 import {
   createHybridSessionStorage,
   SESSION_TTL_SECONDS,
@@ -23,14 +25,12 @@ export const sessionCookie = createCookie('__session', {
 
 export const sessionStorage = createHybridSessionStorage();
 
-export const sessionScheme = createSessionAuthScheme<User, { userId: string }>({
-  read(session) {
-    return session.get('auth') as { userId: string } | null;
-  },
+export const sessionScheme = createSessionAuthScheme<User, AuthPayload>({
+  read: readAuthPayload,
   async verify(value) {
     return (await db.find(users, value.userId)) ?? null;
   },
   invalidate(session) {
-    session.unset('auth');
+    session.unset(AUTH_SESSION_KEY);
   },
 });
