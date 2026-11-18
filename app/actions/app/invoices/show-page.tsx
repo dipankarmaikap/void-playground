@@ -3,11 +3,8 @@ import { css } from 'remix/component';
 
 import type {
   Client,
-  CreditNote,
   Invoice,
   InvoiceLine,
-  InvoicePayment,
-  InvoiceRefund,
 } from '../../../data/db.ts';
 import { joinAddressParts } from '../../../data/address.ts';
 import { countryName } from '../../../data/client-billing.ts';
@@ -27,6 +24,7 @@ import {
   INVOICE_PAYMENT_METHODS,
   invoicePaymentMethodLabel,
 } from '../../../data/invoices/payments.ts';
+import type { InvoiceActivityData } from '../../../data/invoices/payments.ts';
 import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoices/refunds.ts';
 import type { InvoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
 import { invoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
@@ -62,23 +60,14 @@ export interface RefundFormValues {
   reference: string;
 }
 
-export interface InvoiceShowPageProps {
+/** Payments, refunds, and Credit Notes arrive composed through the shared InvoiceActivityData. */
+export interface InvoiceShowPageProps extends InvoiceActivityData {
   csrfToken: string;
   identity: UserIdentity;
   organizationName?: string;
   invoice: Invoice;
   lines: InvoiceLine[];
   client: Client | null;
-  payments: InvoicePayment[];
-  amountPaidMinor: number;
-  refunds: InvoiceRefund[];
-  activeRefundedMinor: number;
-  netPaidMinor: number;
-  refundDueMinor: number;
-  creditNotes: CreditNote[];
-  creditedTotalMinor: number;
-  revisedTotalMinor: number;
-  balanceDueMinor: number;
   message?: string;
   validationErrors?: readonly string[];
   internalNoteValue?: string;

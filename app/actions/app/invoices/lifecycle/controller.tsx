@@ -10,7 +10,7 @@ import type { RenderFunction } from 'remix/middleware/render';
 import { findClient } from '../../../../data/clients.ts';
 import type { Invoice, Organization, User } from '../../../../data/db.ts';
 import { issueDraftInvoice } from '../../../../data/invoices/issuance.ts';
-import { invoicePaymentData } from '../../../../data/invoices/payments.ts';
+import { invoiceActivityData } from '../../../../data/invoices/payments.ts';
 import { storeIssuedInvoicePdf } from '../../../../data/invoices/pdf-artifacts.ts';
 import {
   discardDraftInvoice,
@@ -52,7 +52,7 @@ async function renderInvoiceShowPageError(
   let [lines, client, paymentData] = await Promise.all([
     findInvoiceLines(organization.id, invoice.id),
     findClient(organization.id, invoice.client_id),
-    invoicePaymentData(organization.id, invoice),
+    invoiceActivityData(organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
