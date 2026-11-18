@@ -20,7 +20,7 @@ import { InvoiceForm } from '../invoice-form.tsx';
 export interface NewInvoicePageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   clients: ClientDirectoryItem[];
   selectedClient?: Client;
   values?: InvoiceFormValues;

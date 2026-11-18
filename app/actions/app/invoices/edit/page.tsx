@@ -25,7 +25,7 @@ import { InvoiceForm } from '../invoice-form.tsx';
 export interface EditInvoicePageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   invoice: Invoice;
   client: Client | null;
   lines: InvoiceLine[];

@@ -65,7 +65,7 @@ export interface RefundFormValues {
 export interface InvoiceShowPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   invoice: Invoice;
   lines: InvoiceLine[];
   client: Client | null;

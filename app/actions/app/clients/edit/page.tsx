@@ -14,7 +14,7 @@ import type { ClientFormValues } from '../form-values.ts';
 export interface EditClientPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   client: Client;
   values?: ClientFormValues;
   issues?: readonly Issue[];

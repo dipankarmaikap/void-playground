@@ -25,7 +25,7 @@ import { colors, radius, shadow } from '../../../ui/theme.ts';
 export interface ClientsIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   clients: ClientDirectoryItem[];
   query: string;
   type: ClientTypeFilter;

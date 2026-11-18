@@ -12,7 +12,7 @@ import type { ClientFormValues } from '../form-values.ts';
 export interface NewClientPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   values?: ClientFormValues;
   issues?: readonly Issue[];
 }
