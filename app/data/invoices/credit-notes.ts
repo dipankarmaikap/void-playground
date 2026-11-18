@@ -25,6 +25,7 @@ import {
   toExactSignedMinorNumber,
 } from './calculation.ts';
 import { indianFinancialYear } from './issuance.ts';
+import { allocateDocumentNumber } from './document-numbers.ts';
 import type {
   CreditNoteDraftInput,
 } from './credit-note-form-values.ts';
@@ -720,36 +721,6 @@ function creditNoteLineMatches(
   );
 }
 
-async function allocateCreditNoteNumber(
-  transaction: Database,
-  organizationId: string,
-  financialYear: string,
-  prefix: string,
-  startingNumber: number,
-  now: number,
-): Promise<string> {
-  let result = await transaction.exec(sql`
-    INSERT INTO document_sequences (
-      id, organization_id, document_type, financial_year, current_number, created_at, updated_at
-    )
-    VALUES (
-      ${crypto.randomUUID()}, ${organizationId}, 'credit_note', ${financialYear},
-      ${startingNumber}, ${now}, ${now}
-    )
-    ON CONFLICT (organization_id, document_type, financial_year)
-    DO UPDATE SET
-      current_number = MAX(document_sequences.current_number + 1, excluded.current_number),
-      updated_at = excluded.updated_at
-    RETURNING current_number
-  `);
-  let row = result.rows?.[0] as { current_number?: unknown } | undefined;
-  let number = row?.current_number;
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
-    throw new Error('Unable to allocate a safe credit-note sequence number.');
-  }
-  return `${prefix}/${financialYear}/${String(number).padStart(4, '0')}`;
-}
-
 /** Issues a Draft atomically with its FY number and exact stored PDF bytes. */
 export async function issueCreditNoteDraft(
   organizationId: string,
@@ -839,12 +810,11 @@ export async function issueCreditNoteDraft(
       organizationId,
     );
     let now = Date.now();
-    let number = await allocateCreditNoteNumber(
+    let number = await allocateDocumentNumber(
       transaction,
       organizationId,
       indianFinancialYear(creditNote.credit_date),
-      prefix,
-      startingNumber,
+      { documentType: 'credit_note', prefix, startingNumber },
       now,
     );
     let update = await transaction.updateMany(
