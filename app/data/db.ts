@@ -116,9 +116,3 @@ export async function migrateInvoiceIssueColumns(
 ): Promise<void> {
   await migrations.migrateInvoiceIssueColumns(database);
 }
-
-export async function migrateCreditNoteDiscountModeColumn(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await migrations.migrateCreditNoteDiscountModeColumn(database);
-}
