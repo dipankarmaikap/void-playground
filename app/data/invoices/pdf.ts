@@ -3,6 +3,13 @@
  * uncompressed text streams). Content streams stay uncompressed so stored issued artifacts remain
  * byte-stable and inspectable, and tests can assert on plain text. The private `internal_note` is
  * excluded structurally: the render input omits it from the invoice row.
+ *
+ * One module owns the whole issued-invoice PDF rendering surface: the canvas layout engine, the
+ * self-contained PNG/JPEG decoding for logos and signatures, watermarking, the header, recipient,
+ * lines-table, tax/GST, and totals blocks with the amount-in-words line, and the
+ * `renderInvoicePdf`/`renderCreditNotePdf` entry points. It stays one file (per the cohesion prompt
+ * in docs/agents/data-modules.md) because every piece changes for the same reason: the PDF
+ * rendering contract.
  */
 
 import { inflateSync } from 'node:zlib';

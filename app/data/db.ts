@@ -48,6 +48,9 @@ export type {
  * The application's single database instance. Importing this module creates it and runs the
  * schema, migrations, and compatibility checks below in one explicit order; startup fails closed
  * rather than upgrading a database that predates Organization ownership.
+ *
+ * The default-`db` wrappers and re-exported row types below are the stable entry blessed by
+ * docs/agents/data-modules.md: the test/back-compat seam imported by db.test.ts and consumers.
  */
 export const db: SqliteDatabase = createAppDatabase();
 

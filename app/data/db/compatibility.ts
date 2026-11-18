@@ -25,6 +25,10 @@ export async function assertClientSchemaCompatible(database: SqliteDatabase): Pr
 /**
  * Rejects a database whose identity data is not Organization-owned: either a `clients` table
  * without `organization_id`, or any User with no Organization membership.
+ *
+ * The `organization_id` check intentionally repeats `assertClientSchemaCompatible` above: that one
+ * guards the pre-schema-creation lifecycle stage, this one the post-creation stage, so the
+ * repetition is deliberate, not a merge candidate.
  */
 export async function assertOrganizationSchemaCompatible(
   database: SqliteDatabase,
