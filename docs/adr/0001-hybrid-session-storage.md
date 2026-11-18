@@ -8,4 +8,4 @@ A pre-login browser gets a signed cookie holding little more than a CSRF token; 
 
 ## Consequences
 
-`app/data/session-storage.ts` implements both paths behind one `SessionStorage`. Revoking a Session deletes its row, so that browser's next request degrades to a pre-login cookie rather than failing.
+`app/data/session/storage.ts` implements both paths behind one `SessionStorage`. Revoking a Session deletes its row, so that browser's next request degrades to a pre-login cookie rather than failing.
