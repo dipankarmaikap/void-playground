@@ -9,7 +9,7 @@ import {
   organizations,
   users,
 } from '../app/data/db.ts';
-import { findOrganizationForUser } from '../app/data/organizations.ts';
+import { findOrganizationForUser } from '../app/data/organization/access.ts';
 
 import {
   cookieFromResponse,

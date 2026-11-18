@@ -1,5 +1,5 @@
-import { db, organizationMemberships, organizations } from './db.ts';
-import type { Organization, OrganizationMembership, User } from './db.ts';
+import { db, organizationMemberships, organizations } from '../db.ts';
+import type { Organization, OrganizationMembership, User } from '../db.ts';
 
 async function findSingleMembershipForUser(
   user: Pick<User, 'id'>,

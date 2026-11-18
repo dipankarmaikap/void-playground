@@ -1,5 +1,5 @@
-import { db, organizationGstRatePresets } from './db.ts';
-import type { OrganizationGstRatePreset } from './db.ts';
+import { db, organizationGstRatePresets } from '../db.ts';
+import type { OrganizationGstRatePreset } from '../db.ts';
 
 /** Standard Indian service-tax slabs every Organization starts with, editable per Organization. */
 export const GST_RATE_SEED = ['0', '5', '12', '18', '28'] as const;

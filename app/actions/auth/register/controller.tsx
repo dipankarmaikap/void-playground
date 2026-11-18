@@ -19,7 +19,7 @@ import {
 } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { parseDisplayName } from '../../../data/display-name.ts';
-import { defaultGstPresetRows } from '../../../data/organization-gst-presets.ts';
+import { defaultGstPresetRows } from '../../../data/organization/gst-presets.ts';
 import { hashPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';

@@ -4,7 +4,7 @@ import { createContextKey } from 'remix/router';
 import type { Middleware } from 'remix/router';
 
 import type { Organization, User } from '../data/db.ts';
-import { findOrganizationForUser } from '../data/organizations.ts';
+import { findOrganizationForUser } from '../data/organization/access.ts';
 
 export const CurrentOrganization = createContextKey<Organization>();
 

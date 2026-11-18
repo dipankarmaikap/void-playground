@@ -9,8 +9,8 @@ import { findClient } from '../../../../data/clients.ts';
 import type { User } from '../../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../../data/invoice-draft.ts';
 import { findInvoice, findInvoiceLines, updateDraftInvoice } from '../../../../data/invoices.ts';
-import { ensureGstPresets, findGstPresets } from '../../../../data/organization-gst-presets.ts';
-import { getInvoicingProfileView } from '../../../../data/organization-invoicing.ts';
+import { ensureGstPresets, findGstPresets } from '../../../../data/organization/gst-presets.ts';
+import { getInvoicingProfileView } from '../../../../data/organization/invoicing.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

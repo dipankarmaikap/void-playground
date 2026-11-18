@@ -19,7 +19,7 @@ import {
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
-} from '../../../data/organization-invoicing.ts';
+} from '../../../data/organization/invoicing.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';

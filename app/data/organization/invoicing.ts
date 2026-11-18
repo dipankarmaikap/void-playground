@@ -1,14 +1,14 @@
 import type { Issue } from 'remix/data-schema';
 
-import { canonicalCountry } from './client-billing.ts';
-import { parseClientContacts } from './client-contacts.ts';
-import { GSTIN_PATTERN } from './client-tax.ts';
-import { CLIENT_TEXT_LIMITS } from './client-text.ts';
-import { db, organizationInvoicingProfiles } from './db.ts';
-import type { Organization, OrganizationInvoicingProfile } from './db.ts';
-import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
-import { findIndiaStateByCode } from './india-states.ts';
-import { parseOrganizationName } from './organization-name.ts';
+import { canonicalCountry } from '../client-billing.ts';
+import { parseClientContacts } from '../client-contacts.ts';
+import { GSTIN_PATTERN } from '../client-tax.ts';
+import { CLIENT_TEXT_LIMITS } from '../client-text.ts';
+import { db, organizationInvoicingProfiles } from '../db.ts';
+import type { Organization, OrganizationInvoicingProfile } from '../db.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
+import { parseOrganizationName } from './name.ts';
 
 /** The currency new invoices start with when the Client has no default of their own. */
 export const DEFAULT_CURRENCY = 'INR';

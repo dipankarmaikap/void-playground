@@ -32,7 +32,7 @@ import { isValidIsoDate } from './invoice-dates.ts';
 import {
   DEFAULT_CREDIT_NOTE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from './organization-invoicing.ts';
+} from './organization/invoicing.ts';
 
 export interface CreditNoteDraftIssue {
   field: 'credit_date' | 'reason' | 'lines' | 'line_quantity';

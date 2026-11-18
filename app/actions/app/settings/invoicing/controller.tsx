@@ -12,12 +12,12 @@ import {
   findGstPresets,
   removeGstPreset,
   updateGstPreset,
-} from '../../../../data/organization-gst-presets.ts';
+} from '../../../../data/organization/gst-presets.ts';
 import {
   getInvoicingProfileView,
   parseInvoicingProfile,
   saveInvoicingProfile,
-} from '../../../../data/organization-invoicing.ts';
+} from '../../../../data/organization/invoicing.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

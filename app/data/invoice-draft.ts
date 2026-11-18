@@ -19,7 +19,7 @@ import {
 } from './invoice-calculation.ts';
 import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
 import { isValidIsoDate } from './invoice-dates.ts';
-import { PAYMENT_TERMS } from './organization-invoicing.ts';
+import { PAYMENT_TERMS } from './organization/invoicing.ts';
 
 /** One service line's string values at the Draft parsing seam. */
 export interface InvoiceDraftLineInput {

@@ -31,7 +31,7 @@ import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoice
 import type { InvoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
 import { invoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
 import { todayInKolkata } from '../../../data/invoice-dates.ts';
-import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
+import { PAYMENT_TERM_LABELS } from '../../../data/organization/invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';
