@@ -1,8 +1,8 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { db, sessions, users } from './db.ts';
-import { createHybridSessionStorage, SESSION_TTL_MS } from './session-storage.ts';
+import { db, sessions, users } from '../db.ts';
+import { createHybridSessionStorage, SESSION_TTL_MS } from './storage.ts';
 
 async function createUser() {
   let id = crypto.randomUUID();
