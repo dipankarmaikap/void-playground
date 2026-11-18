@@ -3,7 +3,7 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import { db, invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
-import { todayInKolkata } from '../../../data/invoice-dates.ts';
+import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {

@@ -1,4 +1,4 @@
-import type { CreditNote, CreditNoteLine, Invoice, InvoiceLine } from './db.ts';
+import type { CreditNote, CreditNoteLine, Invoice, InvoiceLine } from '../db.ts';
 
 export interface CreditNoteLineInput {
   invoice_line_id: string;

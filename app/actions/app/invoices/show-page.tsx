@@ -17,20 +17,20 @@ import {
   formatMinorInput,
   formatMoney,
   formatMoneySigned,
-} from '../../../data/invoice-calculation.ts';
+} from '../../../data/invoices/calculation.ts';
 import {
   groupedInvoiceTaxes,
   invoiceLineGstComponents,
-} from '../../../data/invoice-tax.ts';
-import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
+} from '../../../data/invoices/tax.ts';
+import { DRAFT_STATUS_LABEL } from '../../../data/invoices/records.ts';
 import {
   INVOICE_PAYMENT_METHODS,
   invoicePaymentMethodLabel,
-} from '../../../data/invoice-payments.ts';
-import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoice-refunds.ts';
-import type { InvoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
-import { invoiceDisplayStatus } from '../../../data/invoice-issuance.ts';
-import { todayInKolkata } from '../../../data/invoice-dates.ts';
+} from '../../../data/invoices/payments.ts';
+import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoices/refunds.ts';
+import type { InvoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
+import { invoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
+import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';

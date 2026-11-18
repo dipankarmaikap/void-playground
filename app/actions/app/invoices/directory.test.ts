@@ -2,7 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { addDays } from '../../../data/invoice-dates.ts';
+import { addDays } from '../../../data/invoices/dates.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';

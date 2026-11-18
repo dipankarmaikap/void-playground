@@ -8,13 +8,13 @@ import {
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
-} from './db.ts';
+} from '../db.ts';
 import type {
   CreditNote,
   CreditNoteLine,
   Invoice,
   InvoiceLine,
-} from './db.ts';
+} from '../db.ts';
 import type { IssuedCreditNoteFinalizer } from './credit-note-pdf-artifacts.ts';
 import {
   calculateLineAmountMinor,
@@ -23,16 +23,16 @@ import {
   percentOfMinor,
   toExactMinorNumber,
   toExactSignedMinorNumber,
-} from './invoice-calculation.ts';
-import { indianFinancialYear } from './invoice-issuance.ts';
+} from './calculation.ts';
+import { indianFinancialYear } from './issuance.ts';
 import type {
   CreditNoteDraftInput,
 } from './credit-note-form-values.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
+import { isValidIsoDate } from './dates.ts';
 import {
   DEFAULT_CREDIT_NOTE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from './organization-invoicing.ts';
+} from '../organization-invoicing.ts';
 
 export interface CreditNoteDraftIssue {
   field: 'credit_date' | 'reason' | 'lines' | 'line_quantity';

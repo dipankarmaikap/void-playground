@@ -9,15 +9,15 @@ import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
 import type { Invoice, Organization, User } from '../../../../data/db.ts';
-import { issueDraftInvoice } from '../../../../data/invoice-issuance.ts';
-import { invoicePaymentData } from '../../../../data/invoice-payments.ts';
-import { storeIssuedInvoicePdf } from '../../../../data/invoice-pdf-artifacts.ts';
+import { issueDraftInvoice } from '../../../../data/invoices/issuance.ts';
+import { invoicePaymentData } from '../../../../data/invoices/payments.ts';
+import { storeIssuedInvoicePdf } from '../../../../data/invoices/pdf-artifacts.ts';
 import {
   discardDraftInvoice,
   findInvoice,
   findInvoiceLines,
   updateIssuedInvoiceInternalNote,
-} from '../../../../data/invoices.ts';
+} from '../../../../data/invoices/records.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

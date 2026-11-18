@@ -1,9 +1,9 @@
 import type { Issue } from 'remix/data-schema';
 
-import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from './client-tax.ts';
-import { CLIENT_TEXT_LIMITS } from './client-text.ts';
-import { findIndiaStateByCode } from './india-states.ts';
-import { canonicalCountry, findCountry } from './client-billing.ts';
+import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from '../client-tax.ts';
+import { CLIENT_TEXT_LIMITS } from '../client-text.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
+import { canonicalCountry, findCountry } from '../client-billing.ts';
 import {
   allocateProportionally,
   calculateLineAmountMinor,
@@ -16,10 +16,10 @@ import {
   roundScaledToMinor,
   toExactMinorNumber,
   toExactSignedMinorNumber,
-} from './invoice-calculation.ts';
-import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
-import { PAYMENT_TERMS } from './organization-invoicing.ts';
+} from './calculation.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
+import { isValidIsoDate } from './dates.ts';
+import { PAYMENT_TERMS } from '../organization-invoicing.ts';
 
 /** One service line's string values at the Draft parsing seam. */
 export interface InvoiceDraftLineInput {

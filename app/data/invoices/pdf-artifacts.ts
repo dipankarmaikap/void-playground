@@ -5,10 +5,10 @@
  * those bytes verbatim.
  */
 
-import { db, invoicePdfArtifacts } from './db.ts';
-import type { Invoice } from './db.ts';
-import type { IssuedInvoiceFinalizer } from './invoice-issuance.ts';
-import { renderInvoicePdf, sellerFromInvoiceSnapshot } from './invoice-pdf.ts';
+import { db, invoicePdfArtifacts } from '../db.ts';
+import type { Invoice } from '../db.ts';
+import type { IssuedInvoiceFinalizer } from './issuance.ts';
+import { renderInvoicePdf, sellerFromInvoiceSnapshot } from './pdf.ts';
 
 /** A safe `Content-Disposition` filename for an invoice's PDF, with `/` and other hazards removed. */
 export function invoicePdfFilename(

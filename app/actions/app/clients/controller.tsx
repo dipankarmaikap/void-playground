@@ -14,7 +14,7 @@ import {
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
-import { countClientInvoices } from '../../../data/invoices.ts';
+import { countClientInvoices } from '../../../data/invoices/records.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

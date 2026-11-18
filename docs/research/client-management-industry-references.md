@@ -9,7 +9,7 @@ This is a research note, not a product specification. Product behavior below is 
 
 - The app resolves an authenticated `User` to an `Organization` through `OrganizationMembership`. The accepted ADR says missing or ambiguous membership fails closed, and that each `Client` row belongs to an `Organization`; it does not define customer-facing Client authentication. See [`docs/adr/0002-organization-access.md`](../adr/0002-organization-access.md) and [`app/middleware/organization-context.ts`](../../app/middleware/organization-context.ts).
 - The current `clients` table has an individual/business type, legal/preferred/trading names, one top-level email/phone, one named contact with role/email/phone, a billing address, currency, tax fields, and active/archived state. It does not currently have a contact-person collection, a shipping/additional address collection, client notes, or client-level payment-term defaults. See [`app/data/db.ts`](../../app/data/db.ts).
-- The invoice table is Organization-scoped, links to a Client, and stores recipient name, billing-address fields, tax details, currency, and payment terms on the invoice. The schema comment says draft recipient details are copied from the Client when the draft is created. See [`app/data/db.ts`](../../app/data/db.ts) and [`app/data/invoices.ts`](../../app/data/invoices.ts).
+- The invoice table is Organization-scoped, links to a Client, and stores recipient name, billing-address fields, tax details, currency, and payment terms on the invoice. The schema comment says draft recipient details are copied from the Client when the draft is created. See [`app/data/db.ts`](../../app/data/db.ts) and [`app/data/invoices/records.ts`](../../app/data/invoices/records.ts).
 
 ## Sourced product findings
 

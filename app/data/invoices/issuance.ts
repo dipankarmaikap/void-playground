@@ -1,16 +1,16 @@
 import { sql } from 'remix/data-table';
 import type { Database } from 'remix/data-table';
 
-import { findIndiaStateByCode } from './india-states.ts';
-import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from './db.ts';
-import type { Invoice, InvoiceLine } from './db.ts';
-import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from './client-tax.ts';
-import { parseScaledDecimal } from './invoice-calculation.ts';
-import { todayInKolkata } from './invoice-dates.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
+import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from '../db.ts';
+import type { Invoice, InvoiceLine } from '../db.ts';
+import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from '../client-tax.ts';
+import { parseScaledDecimal } from './calculation.ts';
+import { todayInKolkata } from './dates.ts';
 import {
   DEFAULT_INVOICE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from './organization-invoicing.ts';
+} from '../organization-invoicing.ts';
 
 export type InvoiceDisplayStatus =
   | 'draft'

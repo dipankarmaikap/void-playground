@@ -1,12 +1,12 @@
 import type { Database } from 'remix/data-table';
 
-import { creditNotePdfArtifacts } from './db.ts';
-import type { CreditNote, CreditNoteLine } from './db.ts';
-import type { InvoicePdfDocument } from './invoice-pdf.ts';
+import { creditNotePdfArtifacts } from '../db.ts';
+import type { CreditNote, CreditNoteLine } from '../db.ts';
+import type { InvoicePdfDocument } from './pdf.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
-} from './invoice-pdf.ts';
+} from './pdf.ts';
 
 export interface IssuedCreditNoteFinalizerContext {
   transaction: Database;
