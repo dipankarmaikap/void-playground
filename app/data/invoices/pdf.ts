@@ -7,7 +7,8 @@
 
 import { inflateSync } from 'node:zlib';
 
-import type { CreditNote, CreditNoteLine, Invoice, InvoiceLine } from '../db.ts';
+import type { CreditNote, CreditNoteLine, InvoiceLine } from '../db.ts';
+import type { InvoicePdfDocument } from './documents.ts';
 import { joinAddressParts } from '../address.ts';
 import { countryName } from '../client-billing.ts';
 import { clientTaxTypeLabel } from '../client-tax.ts';
@@ -37,9 +38,6 @@ export interface InvoicePdfSeller {
   signatoryName: string | null;
   signatoryDesignation: string | null;
 }
-
-/** An invoice row without its private internal note, so it can never be rendered. */
-export type InvoicePdfDocument = Omit<Invoice, 'internal_note'>;
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;

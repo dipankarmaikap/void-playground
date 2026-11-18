@@ -15,7 +15,7 @@ import type {
   Invoice,
   InvoiceLine,
 } from '../db.ts';
-import type { IssuedCreditNoteFinalizer } from './credit-note-pdf-artifacts.ts';
+import type { InvoicePdfDocument } from './documents.ts';
 import {
   calculateLineAmountMinor,
   formatScaledDecimal,
@@ -95,6 +95,20 @@ export type IssueCreditNoteResult =
       ok: false;
       kind: 'not_found' | 'not_issued' | 'conflict' | 'over_limit' | 'invalid';
     };
+
+/** The context the issue transaction hands to the issued-credit-note finalizer. */
+export interface IssuedCreditNoteFinalizerContext {
+  transaction: Database;
+  /** Client-facing parent invoice snapshot; the private internal note is excluded. */
+  invoice: InvoicePdfDocument;
+  creditNote: CreditNote;
+  lines: readonly CreditNoteLine[];
+}
+
+/** Runs inside the issue transaction to persist the immutable issued PDF artifact. */
+export type IssuedCreditNoteFinalizer = (
+  context: IssuedCreditNoteFinalizerContext,
+) => Promise<void>;
 
 export interface CreditNoteLineCapacity {
   quantity: string;

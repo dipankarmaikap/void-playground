@@ -5,6 +5,7 @@ import { findIndiaStateByCode } from '../india-states.ts';
 import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from '../db.ts';
 import type { Invoice, InvoiceLine } from '../db.ts';
 import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from '../client-tax.ts';
+import type { InvoicePdfDocument } from './documents.ts';
 import { parseScaledDecimal } from './calculation.ts';
 import { todayInKolkata } from './dates.ts';
 import {
@@ -49,7 +50,7 @@ export interface IssuedInvoiceFinalizerContext {
   /** Runs inside the issue transaction; use it to persist the immutable issued PDF artifact. */
   transaction: Database;
   /** Client-facing snapshot excludes the private internal note by construction. */
-  invoice: Omit<Invoice, 'internal_note'>;
+  invoice: InvoicePdfDocument;
   lines: readonly InvoiceLine[];
 }
 

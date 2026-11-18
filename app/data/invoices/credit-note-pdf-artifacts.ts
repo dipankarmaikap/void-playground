@@ -1,23 +1,10 @@
-import type { Database } from 'remix/data-table';
-
 import { creditNotePdfArtifacts } from '../db.ts';
-import type { CreditNote, CreditNoteLine } from '../db.ts';
-import type { InvoicePdfDocument } from './pdf.ts';
+import type { CreditNote } from '../db.ts';
+import type { IssuedCreditNoteFinalizer } from './credit-notes.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
 } from './pdf.ts';
-
-export interface IssuedCreditNoteFinalizerContext {
-  transaction: Database;
-  invoice: InvoicePdfDocument;
-  creditNote: CreditNote;
-  lines: readonly CreditNoteLine[];
-}
-
-export type IssuedCreditNoteFinalizer = (
-  context: IssuedCreditNoteFinalizerContext,
-) => Promise<void>;
 
 /** A safe Content-Disposition filename for a Draft or numbered Credit Note. */
 export function creditNotePdfFilename(
