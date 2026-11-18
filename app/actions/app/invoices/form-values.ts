@@ -14,7 +14,6 @@ export interface InvoiceFormValues extends InvoiceDraftInput {
   client_id: string;
   /** Carried for redisplay only; the saved name is always derived from the State/UT code. */
   recipient_tax_state_name: string;
-  recipient_gstin_applicable: string;
 }
 
 const LINE_FIELDS = [

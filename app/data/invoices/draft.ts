@@ -21,6 +21,7 @@ import type { LineValueFields } from './documents.ts';
 import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
 import { isValidIsoDate } from './dates.ts';
 import { PAYMENT_TERMS } from '../organization-invoicing.ts';
+import type { PaymentTerm } from '../organization-invoicing.ts';
 
 /** One service line's string values at the Draft parsing seam. */
 export interface InvoiceDraftLineInput {
@@ -81,7 +82,8 @@ export interface InvoiceDraftChanges {
   currency: string;
   invoice_date: string;
   due_date: string;
-  payment_term: string;
+  /** Normalized: one of the canonical terms; raw submissions stay strings. */
+  payment_term: PaymentTerm;
   custom_payment_terms: string | null;
   recipient_legal_name: string;
   recipient_billing_line1: string | null;
@@ -238,8 +240,8 @@ export function parseInvoiceDraft(
     push('due_date', 'The due date cannot be earlier than the invoice date.');
   }
 
-  let paymentTerm = form.payment_term.trim();
-  if (!(PAYMENT_TERMS as readonly string[]).includes(paymentTerm)) {
+  let paymentTerm = PAYMENT_TERMS.find((term) => term === form.payment_term.trim());
+  if (paymentTerm == null) {
     push('payment_term', 'Choose a valid payment term.');
   }
 
@@ -666,7 +668,7 @@ export function parseInvoiceDraft(
       currency,
       invoice_date: invoiceDate,
       due_date: dueDate,
-      payment_term: paymentTerm,
+      payment_term: paymentTerm!,
       custom_payment_terms: paymentTerm === 'custom' ? optional(form.custom_payment_terms) : null,
       recipient_legal_name: legalName,
       recipient_billing_line1: optional(form.recipient_billing_line1),
