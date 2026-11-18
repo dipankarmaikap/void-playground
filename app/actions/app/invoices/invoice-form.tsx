@@ -3,7 +3,7 @@ import { css } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
 import { COUNTRIES, CURRENCIES } from '../../../data/client-billing.ts';
-import { PAYMENT_TERMS, PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
+import { PAYMENT_TERMS, PAYMENT_TERM_LABELS } from '../../../data/organization/invoicing.ts';
 import { INDIA_STATES } from '../../../data/india-states.ts';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';

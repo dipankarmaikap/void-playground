@@ -4,7 +4,7 @@ import { describe, it } from 'remix/test';
 import { router } from '../../router.ts';
 import { routes } from '../../routes.ts';
 import { db, organizationMemberships, users } from '../../data/db.ts';
-import { findOrganizationForUser } from '../../data/organizations.ts';
+import { findOrganizationForUser } from '../../data/organization/access.ts';
 import { createUser, login, origin, postForm } from '../../../test/http.ts';
 
 async function loginNewUser(displayName: string | null = null) {

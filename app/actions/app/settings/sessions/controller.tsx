@@ -9,7 +9,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { and, ne } from 'remix/data-table';
 import { db, sessions } from '../../../../data/db.ts';
 import type { User } from '../../../../data/db.ts';
-import { findOrganizationForUser } from '../../../../data/organizations.ts';
+import { findOrganizationForUser } from '../../../../data/organization/access.ts';
 import { browserLabel } from '../../../../data/user-agent.ts';
 import { routes } from '../../../../routes.ts';
 import { SessionsPage } from './page.tsx';

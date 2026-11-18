@@ -15,8 +15,8 @@ import { clientTaxTypeLabel } from '../client-tax.ts';
 import { formatMoney, formatMoneySigned } from './calculation.ts';
 import { groupedInvoiceTaxes, invoiceLineGstComponents } from './tax.ts';
 import { totalAmountInWords } from './amount-words.ts';
-import { PAYMENT_TERM_LABELS } from '../organization-invoicing.ts';
-import type { InvoicingProfileView } from '../organization-invoicing.ts';
+import { PAYMENT_TERM_LABELS } from '../organization/invoicing.ts';
+import type { InvoicingProfileView } from '../organization/invoicing.ts';
 
 /** The seller particulars a PDF needs, taken from the issue snapshot or the current profile. */
 export interface InvoicePdfSeller {

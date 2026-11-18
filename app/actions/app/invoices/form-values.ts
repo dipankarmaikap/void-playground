@@ -4,7 +4,7 @@ import { formatMinorInput } from '../../../data/invoices/calculation.ts';
 import { suggestDueDate } from '../../../data/invoices/dates.ts';
 import { findIndiaStateByCode, INDIA_STATES } from '../../../data/india-states.ts';
 import { isIndiaCountry } from '../../../data/client-tax.ts';
-import type { InvoicingProfileView } from '../../../data/organization-invoicing.ts';
+import type { InvoicingProfileView } from '../../../data/organization/invoicing.ts';
 
 /** One editable free-form service line as it appears in a submitted form. */
 export type InvoiceLineFormValue = InvoiceDraftLineInput;

@@ -9,8 +9,8 @@ import { INDIA_STATES } from '../../../../data/india-states.ts';
 import {
   PAYMENT_TERMS,
   PAYMENT_TERM_LABELS,
-} from '../../../../data/organization-invoicing.ts';
-import type { InvoicingProfileView } from '../../../../data/organization-invoicing.ts';
+} from '../../../../data/organization/invoicing.ts';
+import type { InvoicingProfileView } from '../../../../data/organization/invoicing.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
 import { Field } from '../../../../ui/field.tsx';

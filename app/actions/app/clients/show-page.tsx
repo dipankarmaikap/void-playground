@@ -24,7 +24,7 @@ import { ClientTaxSummary } from './tax-summary.tsx';
 export interface ClientProfilePageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   client: Client;
   invoiceCount: number;
   error?: string;

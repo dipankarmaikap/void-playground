@@ -1,5 +1,10 @@
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
+import { CLIENT_TYPES } from '../client-names.ts';
+
+/** The quoted Client type values for SQL CHECK lists, from the one canonical `ClientType` source. */
+const CLIENT_TYPE_SQL_LIST = CLIENT_TYPES.map((type) => `'${type}'`).join(', ');
+
 /**
  * Creates every table a fresh install needs. These declarations must stay synchronized with the
  * typed table declarations in `./tables.ts` and with the guarded migrations in `./migrations.ts`.
@@ -171,7 +176,7 @@ export async function applyFreshInstallSchema(database: SqliteDatabase): Promise
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY NOT NULL,
       organization_id TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('individual', 'business')),
+      type TEXT NOT NULL CHECK (type IN (${CLIENT_TYPE_SQL_LIST})),
       legal_name TEXT NOT NULL,
       preferred_name TEXT,
       trading_name TEXT,

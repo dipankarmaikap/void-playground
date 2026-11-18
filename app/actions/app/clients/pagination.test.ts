@@ -2,6 +2,7 @@ import { beforeEach, describe, it } from 'remix/test';
 import * as assert from 'remix/assert';
 
 import { clients, db } from '../../../data/db.ts';
+import type { ClientType } from '../../../data/client-names.ts';
 import { listClients } from '../../../data/clients.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
@@ -24,7 +25,7 @@ function indexHref(params: Record<string, string> = {}) {
 async function seedClient(input: {
   id: string;
   legalName: string;
-  type?: 'individual' | 'business';
+  type?: ClientType;
   status?: 'active' | 'archived';
 }) {
   let now = Date.now();

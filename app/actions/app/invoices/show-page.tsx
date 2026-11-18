@@ -29,7 +29,7 @@ import { INVOICE_REFUND_METHODS, refundMethodLabel } from '../../../data/invoice
 import type { InvoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
 import { invoiceDisplayStatus } from '../../../data/invoices/issuance.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
-import { PAYMENT_TERM_LABELS } from '../../../data/organization-invoicing.ts';
+import { PAYMENT_TERM_LABELS } from '../../../data/organization/invoicing.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';
@@ -64,7 +64,7 @@ export interface RefundFormValues {
 export interface InvoiceShowPageProps extends InvoiceActivityData {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   invoice: Invoice;
   lines: InvoiceLine[];
   client: Client | null;

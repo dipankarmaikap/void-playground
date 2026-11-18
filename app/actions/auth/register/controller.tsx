@@ -19,7 +19,8 @@ import {
 } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { parseDisplayName } from '../../../data/display-name.ts';
-import { defaultGstPresetRows } from '../../../data/organization-gst-presets.ts';
+import { defaultGstPresetRows } from '../../../data/organization/gst-presets.ts';
+import { parseOrganizationName } from '../../../data/organization/name.ts';
 import { hashPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';
@@ -82,9 +83,9 @@ export default createController(routes.auth.register, {
         return renderInvalidRegistration(displayName.error);
       }
 
-      let organizationName = parsed.value.organization_name.trim();
-      if (!organizationName) {
-        return renderInvalidRegistration('Organization name is required');
+      let organizationName = parseOrganizationName(parsed.value.organization_name);
+      if (!organizationName.ok) {
+        return renderInvalidRegistration(organizationName.error);
       }
 
       let email = parsed.value.email.trim().toLowerCase();
@@ -121,7 +122,7 @@ export default createController(routes.auth.register, {
           });
           await tx.create(organizations, {
             id: organizationId,
-            name: organizationName,
+            name: organizationName.value,
             created_at: now,
             updated_at: now,
           });

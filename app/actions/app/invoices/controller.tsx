@@ -24,7 +24,7 @@ import {
   renderInvoicePdf,
   sellerFromInvoicingProfile,
 } from '../../../data/invoices/pdf.ts';
-import { getInvoicingProfileView } from '../../../data/organization-invoicing.ts';
+import { getInvoicingProfileView } from '../../../data/organization/invoicing.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

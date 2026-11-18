@@ -4,8 +4,8 @@ import {
   DEFAULT_INVOICE_PREFIX,
   DEFAULT_PAYMENT_TERM,
   DEFAULT_STARTING_NUMBER,
-} from '../../../../data/organization-invoicing.ts';
-import type { InvoicingProfileInput, InvoicingProfileView } from '../../../../data/organization-invoicing.ts';
+} from '../../../../data/organization/invoicing.ts';
+import type { InvoicingProfileInput, InvoicingProfileView } from '../../../../data/organization/invoicing.ts';
 
 /** The string values the Invoicing form submits, kept separate from normalized stored values. */
 export interface InvoicingFormValues extends Required<InvoicingProfileInput> {}

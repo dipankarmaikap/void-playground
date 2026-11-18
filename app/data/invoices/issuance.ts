@@ -11,7 +11,7 @@ import { todayInKolkata } from './dates.ts';
 import {
   DEFAULT_INVOICE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from '../organization-invoicing.ts';
+} from '../organization/invoicing.ts';
 
 export type InvoiceDisplayStatus =
   | 'draft'

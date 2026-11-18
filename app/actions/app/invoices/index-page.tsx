@@ -21,7 +21,7 @@ import { colors, radius, shadow } from '../../../ui/theme.ts';
 export interface InvoicesIndexPageProps {
   csrfToken: string;
   identity: UserIdentity;
-  organizationName?: string;
+  organizationName: string;
   invoices: InvoiceDirectoryItem[];
   clientId: string;
   clientName?: string;

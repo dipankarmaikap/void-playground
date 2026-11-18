@@ -10,8 +10,8 @@ import type { User } from '../../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../../data/invoices/draft.ts';
 import { todayInKolkata } from '../../../../data/invoices/dates.ts';
 import { createDraftInvoice } from '../../../../data/invoices/records.ts';
-import { ensureGstPresets, findGstPresets } from '../../../../data/organization-gst-presets.ts';
-import { getInvoicingProfileView } from '../../../../data/organization-invoicing.ts';
+import { ensureGstPresets, findGstPresets } from '../../../../data/organization/gst-presets.ts';
+import { getInvoicingProfileView } from '../../../../data/organization/invoicing.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

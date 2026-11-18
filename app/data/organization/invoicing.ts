@@ -1,14 +1,13 @@
 import type { Issue } from 'remix/data-schema';
 
-import { canonicalCountry } from './client-billing.ts';
-import { parseClientContacts } from './client-contacts.ts';
-import { GSTIN_PATTERN } from './client-tax.ts';
-import { CLIENT_TEXT_LIMITS } from './client-text.ts';
-import { db, organizationInvoicingProfiles } from './db.ts';
-import type { Organization, OrganizationInvoicingProfile } from './db.ts';
-import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
-import { findIndiaStateByCode } from './india-states.ts';
-import { parseOrganizationName } from './organization-name.ts';
+import { canonicalCountry } from '../client-billing.ts';
+import { parseClientContacts } from '../client-contacts.ts';
+import { GSTIN_PATTERN } from '../client-tax.ts';
+import { CLIENT_TEXT_LIMITS } from '../client-text.ts';
+import { db, organizationInvoicingProfiles } from '../db.ts';
+import type { Organization, OrganizationInvoicingProfile } from '../db.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
 
 /** The currency new invoices start with when the Client has no default of their own. */
 export const DEFAULT_CURRENCY = 'INR';
@@ -176,16 +175,9 @@ export function parseInvoicingProfile(
       issues.push({ message: `${label} must be ${max} characters or fewer.`, path: [field] });
     }
   }
-  let legalNameInput = raw.legal_name.trim();
-  let legalName: string | null = null;
-  if (legalNameInput) {
-    let parsed = parseOrganizationName(legalNameInput);
-    if (!parsed.ok) {
-      issues.push({ message: 'Legal seller name is required.', path: ['legal_name'] });
-    } else {
-      legalName = parsed.value;
-    }
-  }
+  // The input is already trimmed and non-blank here, so the canonical Organization-name parser
+  // could only reject an empty value that the branch's guard has already ruled out.
+  let legalName: string | null = raw.legal_name.trim() || null;
 
   let addressLine1 = raw.address_line1.trim();
   let locality = raw.address_locality.trim();

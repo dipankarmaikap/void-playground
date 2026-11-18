@@ -1,5 +1,7 @@
 import { column as c, table } from 'remix/data-table';
 
+import { CLIENT_TYPES } from '../client-names.ts';
+
 export const users = table({
   name: 'users',
   columns: {
@@ -140,7 +142,7 @@ export const clients = table({
   columns: {
     id: c.text().notNull(),
     organization_id: c.text().notNull(),
-    type: c.enum(['individual', 'business'] as const).notNull(),
+    type: c.enum(CLIENT_TYPES).notNull(),
     legal_name: c.text().notNull(),
     preferred_name: c.text().nullable(),
     trading_name: c.text().nullable(),

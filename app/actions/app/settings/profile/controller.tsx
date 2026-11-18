@@ -8,8 +8,8 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { db, users } from '../../../../data/db.ts';
 import type { User } from '../../../../data/db.ts';
 import { parseDisplayName } from '../../../../data/display-name.ts';
-import { parseOrganizationName } from '../../../../data/organization-name.ts';
-import { renameOwnedOrganizationForUser } from '../../../../data/organizations.ts';
+import { parseOrganizationName } from '../../../../data/organization/name.ts';
+import { renameOwnedOrganizationForUser } from '../../../../data/organization/access.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
