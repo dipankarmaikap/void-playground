@@ -9,21 +9,21 @@ import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
 import type { Invoice, Organization, User } from '../../../../data/db.ts';
-import { currencyMinorDigits } from '../../../../data/invoice-calculation.ts';
+import { currencyMinorDigits } from '../../../../data/invoices/calculation.ts';
 import {
-  invoicePaymentData,
+  invoiceActivityData,
   isInvoicePaymentMethod,
   parsePaymentAmount,
   recordInvoicePayment,
   voidInvoicePayment,
-} from '../../../../data/invoice-payments.ts';
-import type { InvoicePaymentMethod } from '../../../../data/invoice-payments.ts';
-import { findInvoice, findInvoiceLines } from '../../../../data/invoices.ts';
+} from '../../../../data/invoices/payments.ts';
+import type { InvoicePaymentMethod } from '../../../../data/invoices/payments.ts';
+import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
-import { isValidIsoDate } from '../../../../data/invoice-dates.ts';
+import { isValidIsoDate } from '../../../../data/invoices/dates.ts';
 import { routes } from '../../../../routes.ts';
 import { formText } from '../form-text.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
@@ -49,7 +49,7 @@ async function renderPaymentError(
   let [lines, client, paymentData] = await Promise.all([
     findInvoiceLines(organization.id, invoice.id),
     findClient(organization.id, invoice.client_id),
-    invoicePaymentData(organization.id, invoice),
+    invoiceActivityData(organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage

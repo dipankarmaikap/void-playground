@@ -1,4 +1,4 @@
-import type { PaymentTerm } from './organization-invoicing.ts';
+import type { PaymentTerm } from '../organization-invoicing.ts';
 
 /** Calendar day offsets for fixed payment terms. */
 const TERM_DAYS: Record<Exclude<PaymentTerm, 'custom'>, number> = {

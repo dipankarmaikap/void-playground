@@ -1,9 +1,9 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import type { InvoiceDraftInput, InvoiceDraftLineInput, InvoiceDraftResult } from './invoice-draft.ts';
-import { parseInvoiceDraft } from './invoice-draft.ts';
-import { ISO_4217_CURRENCY_MESSAGE } from './currency.ts';
+import type { InvoiceDraftInput, InvoiceDraftLineInput, InvoiceDraftResult } from './draft.ts';
+import { parseInvoiceDraft } from './draft.ts';
+import { ISO_4217_CURRENCY_MESSAGE } from '../currency.ts';
 
 function draftLine(overrides: Partial<InvoiceDraftLineInput> = {}): InvoiceDraftLineInput {
   return {

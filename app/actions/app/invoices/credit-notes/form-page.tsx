@@ -8,10 +8,10 @@ import {
   formatMoney,
   formatScaledDecimal,
   parseScaledDecimal,
-} from '../../../../data/invoice-calculation.ts';
-import type { CreditNoteDraftIssue } from '../../../../data/credit-notes.ts';
-import type { CreditNoteLineCapacity } from '../../../../data/credit-notes.ts';
-import type { CreditNoteFormValues } from '../../../../data/credit-note-form-values.ts';
+} from '../../../../data/invoices/calculation.ts';
+import type { CreditNoteDraftIssue } from '../../../../data/invoices/credit-notes.ts';
+import type { CreditNoteLineCapacity } from '../../../../data/invoices/credit-notes.ts';
+import type { CreditNoteFormValues } from '../../../../data/invoices/credit-note-form-values.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../../ui/button.tsx';
 import { Field } from '../../../../ui/field.tsx';

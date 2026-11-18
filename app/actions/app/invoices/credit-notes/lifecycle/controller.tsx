@@ -7,18 +7,18 @@ import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
-import type { CreditNoteDraftIssue } from '../../../../../data/credit-notes.ts';
+import type { CreditNoteDraftIssue } from '../../../../../data/invoices/credit-notes.ts';
 import {
   discardCreditNoteDraft,
   findCreditNote,
   findCreditNoteLines,
   issueCreditNoteDraft,
   remainingCreditNoteLineCapacity,
-} from '../../../../../data/credit-notes.ts';
-import { creditNoteFormValuesOf } from '../../../../../data/credit-note-form-values.ts';
+} from '../../../../../data/invoices/credit-notes.ts';
+import { creditNoteFormValuesOf } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { Invoice, Organization, User } from '../../../../../data/db.ts';
-import { storeIssuedCreditNotePdf } from '../../../../../data/credit-note-pdf-artifacts.ts';
-import { findInvoice, findInvoiceLines } from '../../../../../data/invoices.ts';
+import { storeIssuedCreditNotePdf } from '../../../../../data/invoices/credit-note-pdf-artifacts.ts';
+import { findInvoice, findInvoiceLines } from '../../../../../data/invoices/records.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

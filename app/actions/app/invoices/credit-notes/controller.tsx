@@ -7,14 +7,14 @@ import {
   findCreditNote,
   findCreditNoteLines,
   findIssuedCreditNotePdfBytes,
-} from '../../../../data/credit-notes.ts';
+} from '../../../../data/invoices/credit-notes.ts';
 import type { User } from '../../../../data/db.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
-} from '../../../../data/invoice-pdf.ts';
-import { creditNotePdfFilename } from '../../../../data/credit-note-pdf-artifacts.ts';
-import { findInvoice } from '../../../../data/invoices.ts';
+} from '../../../../data/invoices/pdf.ts';
+import { creditNotePdfFilename } from '../../../../data/invoices/credit-note-pdf-artifacts.ts';
+import { findInvoice } from '../../../../data/invoices/records.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,

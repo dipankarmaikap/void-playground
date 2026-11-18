@@ -1,9 +1,9 @@
 import type { Issue } from 'remix/data-schema';
 
-import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from './client-tax.ts';
-import { CLIENT_TEXT_LIMITS } from './client-text.ts';
-import { findIndiaStateByCode } from './india-states.ts';
-import { canonicalCountry, findCountry } from './client-billing.ts';
+import { GSTIN_PATTERN, isIndiaCountry, normalizeTaxValue, UIN_PATTERN } from '../client-tax.ts';
+import { CLIENT_TEXT_LIMITS } from '../client-text.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
+import { canonicalCountry, findCountry } from '../client-billing.ts';
 import {
   allocateProportionally,
   calculateLineAmountMinor,
@@ -16,10 +16,12 @@ import {
   roundScaledToMinor,
   toExactMinorNumber,
   toExactSignedMinorNumber,
-} from './invoice-calculation.ts';
-import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from './currency.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
-import { PAYMENT_TERMS } from './organization-invoicing.ts';
+} from './calculation.ts';
+import type { LineValueFields } from './documents.ts';
+import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
+import { isValidIsoDate } from './dates.ts';
+import { PAYMENT_TERMS } from '../organization-invoicing.ts';
+import type { PaymentTerm } from '../organization-invoicing.ts';
 
 /** One service line's string values at the Draft parsing seam. */
 export interface InvoiceDraftLineInput {
@@ -69,30 +71,10 @@ export interface InvoiceDraftInput {
   lines: InvoiceDraftLineInput[];
 }
 
-export interface InvoiceLineChanges {
-  position: number;
-  description: string;
-  sac: string | null;
-  quantity: string;
-  unit_price: string;
-  amount_minor: number;
-  discount_mode: string | null;
-  discount_value: string | null;
-  line_discount_minor: number;
-  allocated_invoice_discount_minor: number;
-  net_minor: number;
+/** One normalized service line, with the Invoice's narrowed tax-treatment unions. */
+export interface InvoiceLineChanges extends LineValueFields {
   tax_treatment: 'taxable' | 'nil_rated' | 'exempt' | 'non_gst' | null;
-  gst_rate: string | null;
-  cgst_rate: string | null;
-  sgst_rate: string | null;
-  igst_rate: string | null;
-  cgst_amount_minor: number;
-  sgst_amount_minor: number;
-  igst_amount_minor: number;
-  foreign_tax_label: string | null;
   foreign_tax_mode: 'percent' | 'fixed' | null;
-  foreign_tax_rate: string | null;
-  foreign_tax_amount_minor: number;
 }
 
 /** The invoice-row plus line-row changes a valid Draft form submission produces. */
@@ -100,7 +82,8 @@ export interface InvoiceDraftChanges {
   currency: string;
   invoice_date: string;
   due_date: string;
-  payment_term: string;
+  /** Normalized: one of the canonical terms; raw submissions stay strings. */
+  payment_term: PaymentTerm;
   custom_payment_terms: string | null;
   recipient_legal_name: string;
   recipient_billing_line1: string | null;
@@ -257,8 +240,8 @@ export function parseInvoiceDraft(
     push('due_date', 'The due date cannot be earlier than the invoice date.');
   }
 
-  let paymentTerm = form.payment_term.trim();
-  if (!(PAYMENT_TERMS as readonly string[]).includes(paymentTerm)) {
+  let paymentTerm = PAYMENT_TERMS.find((term) => term === form.payment_term.trim());
+  if (paymentTerm == null) {
     push('payment_term', 'Choose a valid payment term.');
   }
 
@@ -685,7 +668,7 @@ export function parseInvoiceDraft(
       currency,
       invoice_date: invoiceDate,
       due_date: dueDate,
-      payment_term: paymentTerm,
+      payment_term: paymentTerm!,
       custom_payment_terms: paymentTerm === 'custom' ? optional(form.custom_payment_terms) : null,
       recipient_legal_name: legalName,
       recipient_billing_line1: optional(form.recipient_billing_line1),

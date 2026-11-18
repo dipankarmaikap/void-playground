@@ -8,14 +8,14 @@ import {
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
-} from './db.ts';
+} from '../db.ts';
 import type {
   CreditNote,
   CreditNoteLine,
   Invoice,
   InvoiceLine,
-} from './db.ts';
-import type { IssuedCreditNoteFinalizer } from './credit-note-pdf-artifacts.ts';
+} from '../db.ts';
+import type { InvoicePdfDocument, LineValueFields } from './documents.ts';
 import {
   calculateLineAmountMinor,
   formatScaledDecimal,
@@ -23,16 +23,17 @@ import {
   percentOfMinor,
   toExactMinorNumber,
   toExactSignedMinorNumber,
-} from './invoice-calculation.ts';
-import { indianFinancialYear } from './invoice-issuance.ts';
+} from './calculation.ts';
+import { indianFinancialYear } from './issuance.ts';
+import { allocateDocumentNumber } from './document-numbers.ts';
 import type {
   CreditNoteDraftInput,
 } from './credit-note-form-values.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
+import { isValidIsoDate } from './dates.ts';
 import {
   DEFAULT_CREDIT_NOTE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from './organization-invoicing.ts';
+} from '../organization-invoicing.ts';
 
 export interface CreditNoteDraftIssue {
   field: 'credit_date' | 'reason' | 'lines' | 'line_quantity';
@@ -40,31 +41,11 @@ export interface CreditNoteDraftIssue {
   message: string;
 }
 
-export interface CreditNoteLineChanges {
+/** One reversal line: copied stable values plus its source-line identity and copied tax strings. */
+export interface CreditNoteLineChanges extends LineValueFields {
   invoice_line_id: string;
-  position: number;
-  description: string;
-  sac: string | null;
-  quantity: string;
-  unit_price: string;
-  amount_minor: number;
-  discount_mode: string | null;
-  discount_value: string | null;
-  line_discount_minor: number;
-  allocated_invoice_discount_minor: number;
-  net_minor: number;
   tax_treatment: string | null;
-  gst_rate: string | null;
-  cgst_rate: string | null;
-  sgst_rate: string | null;
-  igst_rate: string | null;
-  cgst_amount_minor: number;
-  sgst_amount_minor: number;
-  igst_amount_minor: number;
-  foreign_tax_label: string | null;
   foreign_tax_mode: string | null;
-  foreign_tax_rate: string | null;
-  foreign_tax_amount_minor: number;
 }
 
 export interface CreditNoteDraftChanges {
@@ -95,6 +76,20 @@ export type IssueCreditNoteResult =
       ok: false;
       kind: 'not_found' | 'not_issued' | 'conflict' | 'over_limit' | 'invalid';
     };
+
+/** The context the issue transaction hands to the issued-credit-note finalizer. */
+export interface IssuedCreditNoteFinalizerContext {
+  transaction: Database;
+  /** Client-facing parent invoice snapshot; the private internal note is excluded. */
+  invoice: InvoicePdfDocument;
+  creditNote: CreditNote;
+  lines: readonly CreditNoteLine[];
+}
+
+/** Runs inside the issue transaction to persist the immutable issued PDF artifact. */
+export type IssuedCreditNoteFinalizer = (
+  context: IssuedCreditNoteFinalizerContext,
+) => Promise<void>;
 
 export interface CreditNoteLineCapacity {
   quantity: string;
@@ -726,36 +721,6 @@ function creditNoteLineMatches(
   );
 }
 
-async function allocateCreditNoteNumber(
-  transaction: Database,
-  organizationId: string,
-  financialYear: string,
-  prefix: string,
-  startingNumber: number,
-  now: number,
-): Promise<string> {
-  let result = await transaction.exec(sql`
-    INSERT INTO document_sequences (
-      id, organization_id, document_type, financial_year, current_number, created_at, updated_at
-    )
-    VALUES (
-      ${crypto.randomUUID()}, ${organizationId}, 'credit_note', ${financialYear},
-      ${startingNumber}, ${now}, ${now}
-    )
-    ON CONFLICT (organization_id, document_type, financial_year)
-    DO UPDATE SET
-      current_number = MAX(document_sequences.current_number + 1, excluded.current_number),
-      updated_at = excluded.updated_at
-    RETURNING current_number
-  `);
-  let row = result.rows?.[0] as { current_number?: unknown } | undefined;
-  let number = row?.current_number;
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
-    throw new Error('Unable to allocate a safe credit-note sequence number.');
-  }
-  return `${prefix}/${financialYear}/${String(number).padStart(4, '0')}`;
-}
-
 /** Issues a Draft atomically with its FY number and exact stored PDF bytes. */
 export async function issueCreditNoteDraft(
   organizationId: string,
@@ -845,12 +810,11 @@ export async function issueCreditNoteDraft(
       organizationId,
     );
     let now = Date.now();
-    let number = await allocateCreditNoteNumber(
+    let number = await allocateDocumentNumber(
       transaction,
       organizationId,
       indianFinancialYear(creditNote.credit_date),
-      prefix,
-      startingNumber,
+      { documentType: 'credit_note', prefix, startingNumber },
       now,
     );
     let update = await transaction.updateMany(

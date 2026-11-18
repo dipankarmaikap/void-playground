@@ -1,23 +1,11 @@
-import type { Database } from 'remix/data-table';
-
-import { creditNotePdfArtifacts } from './db.ts';
-import type { CreditNote, CreditNoteLine } from './db.ts';
-import type { InvoicePdfDocument } from './invoice-pdf.ts';
+import { creditNotePdfArtifacts } from '../db.ts';
+import type { CreditNote } from '../db.ts';
+import type { IssuedCreditNoteFinalizer } from './credit-notes.ts';
+import { documentPdfFilename } from './pdf-filenames.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
-} from './invoice-pdf.ts';
-
-export interface IssuedCreditNoteFinalizerContext {
-  transaction: Database;
-  invoice: InvoicePdfDocument;
-  creditNote: CreditNote;
-  lines: readonly CreditNoteLine[];
-}
-
-export type IssuedCreditNoteFinalizer = (
-  context: IssuedCreditNoteFinalizerContext,
-) => Promise<void>;
+} from './pdf.ts';
 
 /** A safe Content-Disposition filename for a Draft or numbered Credit Note. */
 export function creditNotePdfFilename(
@@ -27,15 +15,7 @@ export function creditNotePdfFilename(
     creditNote.status === 'draft' || !creditNote.credit_note_number
       ? 'credit-note-draft'
       : creditNote.credit_note_number;
-  let cleaned = base
-    .replace(/[^A-Za-z0-9._ -]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[-. ]+|[-. ]+$/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 80)
-    .trim();
-  return `${cleaned || 'credit-note'}.pdf`;
+  return documentPdfFilename(base, 'credit-note');
 }
 
 /** Captures the English PDF bytes in the same transaction as numbering and issuance. */

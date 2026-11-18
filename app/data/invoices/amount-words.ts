@@ -4,8 +4,8 @@
  * in the currency's own minor units.
  */
 
-import { currencyName } from './client-billing.ts';
-import { currencyMinorDigits } from './invoice-calculation.ts';
+import { currencyName } from '../client-billing.ts';
+import { currencyMinorDigits } from './calculation.ts';
 
 const ONES = [
   'Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',

@@ -7,15 +7,16 @@
 
 import { inflateSync } from 'node:zlib';
 
-import type { CreditNote, CreditNoteLine, Invoice, InvoiceLine } from './db.ts';
-import { joinAddressParts } from './address.ts';
-import { countryName } from './client-billing.ts';
-import { clientTaxTypeLabel } from './client-tax.ts';
-import { formatMoney, formatMoneySigned } from './invoice-calculation.ts';
-import { groupedInvoiceTaxes, invoiceLineGstComponents } from './invoice-tax.ts';
-import { totalAmountInWords } from './invoice-amount-words.ts';
-import { PAYMENT_TERM_LABELS } from './organization-invoicing.ts';
-import type { InvoicingProfileView } from './organization-invoicing.ts';
+import type { CreditNote, CreditNoteLine, InvoiceLine } from '../db.ts';
+import type { InvoicePdfDocument } from './documents.ts';
+import { joinAddressParts } from '../address.ts';
+import { countryName } from '../client-billing.ts';
+import { clientTaxTypeLabel } from '../client-tax.ts';
+import { formatMoney, formatMoneySigned } from './calculation.ts';
+import { groupedInvoiceTaxes, invoiceLineGstComponents } from './tax.ts';
+import { totalAmountInWords } from './amount-words.ts';
+import { PAYMENT_TERM_LABELS } from '../organization-invoicing.ts';
+import type { InvoicingProfileView } from '../organization-invoicing.ts';
 
 /** The seller particulars a PDF needs, taken from the issue snapshot or the current profile. */
 export interface InvoicePdfSeller {
@@ -37,9 +38,6 @@ export interface InvoicePdfSeller {
   signatoryName: string | null;
   signatoryDesignation: string | null;
 }
-
-/** An invoice row without its private internal note, so it can never be rendered. */
-export type InvoicePdfDocument = Omit<Invoice, 'internal_note'>;
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
