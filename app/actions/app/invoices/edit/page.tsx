@@ -4,12 +4,12 @@ import type { Issue } from 'remix/data-schema';
 
 import { clientDisplayLabel } from '../../../../data/client-names.ts';
 import type { Client, Invoice, InvoiceLine } from '../../../../data/db.ts';
-import { formatMoney } from '../../../../data/invoice-calculation.ts';
+import { formatMoney } from '../../../../data/invoices/calculation.ts';
 import { countryName } from '../../../../data/client-billing.ts';
 import {
   groupedInvoiceTaxes,
   invoiceLineGstComponents,
-} from '../../../../data/invoice-tax.ts';
+} from '../../../../data/invoices/tax.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';

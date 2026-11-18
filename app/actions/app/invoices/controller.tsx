@@ -14,16 +14,16 @@ import {
   parseInvoiceDirectoryDateFilter,
   parseInvoiceDirectoryPage,
   parseInvoiceStatusFilter,
-} from '../../../data/invoices.ts';
+} from '../../../data/invoices/records.ts';
 import {
   findIssuedInvoicePdfBytes,
   invoicePdfFilename,
-} from '../../../data/invoice-pdf-artifacts.ts';
-import { invoicePaymentData } from '../../../data/invoice-payments.ts';
+} from '../../../data/invoices/pdf-artifacts.ts';
+import { invoiceActivityData } from '../../../data/invoices/payments.ts';
 import {
   renderInvoicePdf,
   sellerFromInvoicingProfile,
-} from '../../../data/invoice-pdf.ts';
+} from '../../../data/invoices/pdf.ts';
 import { getInvoicingProfileView } from '../../../data/organization/invoicing.ts';
 import {
   CurrentOrganization,
@@ -86,7 +86,7 @@ export default createController(routes.app.invoices, {
       let [lines, client, paymentData] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
         findClient(organization.id, invoice.client_id),
-        invoicePaymentData(organization.id, invoice),
+        invoiceActivityData(organization.id, invoice),
       ]);
       let message = context.session.get('message');
       return context.render(

@@ -1,4 +1,4 @@
-import { currencyMinorDigits, MAX_EXACT_MINOR_UNITS } from './invoice-calculation.ts';
+import { currencyMinorDigits, MAX_EXACT_MINOR_UNITS } from './calculation.ts';
 
 /** The seven payment rails shared by invoice payments and refunds. */
 export const INVOICE_MONEY_MOVEMENT_METHODS = [

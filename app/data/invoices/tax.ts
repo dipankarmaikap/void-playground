@@ -1,5 +1,5 @@
-import type { InvoiceLine } from './db.ts';
-import { formatMoney } from './invoice-calculation.ts';
+import type { InvoiceLine } from '../db.ts';
+import { formatMoney } from './calculation.ts';
 
 export interface GroupedInvoiceTax {
   label: string;

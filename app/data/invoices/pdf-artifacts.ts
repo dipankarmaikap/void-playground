@@ -5,10 +5,11 @@
  * those bytes verbatim.
  */
 
-import { db, invoicePdfArtifacts } from './db.ts';
-import type { Invoice } from './db.ts';
-import type { IssuedInvoiceFinalizer } from './invoice-issuance.ts';
-import { renderInvoicePdf, sellerFromInvoiceSnapshot } from './invoice-pdf.ts';
+import { db, invoicePdfArtifacts } from '../db.ts';
+import type { Invoice } from '../db.ts';
+import type { IssuedInvoiceFinalizer } from './issuance.ts';
+import { documentPdfFilename } from './pdf-filenames.ts';
+import { renderInvoicePdf, sellerFromInvoiceSnapshot } from './pdf.ts';
 
 /** A safe `Content-Disposition` filename for an invoice's PDF, with `/` and other hazards removed. */
 export function invoicePdfFilename(
@@ -18,15 +19,7 @@ export function invoicePdfFilename(
     invoice.status === 'draft' || !invoice.invoice_number
       ? 'invoice-draft'
       : invoice.invoice_number;
-  let cleaned = base
-    .replace(/[^A-Za-z0-9._ -]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[-. ]+|[-. ]+$/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 80)
-    .trim();
-  return `${cleaned || 'invoice'}.pdf`;
+  return documentPdfFilename(base, 'invoice');
 }
 
 /** Reads the exact stored PDF bytes for an issued invoice, scoped to the Organization. */

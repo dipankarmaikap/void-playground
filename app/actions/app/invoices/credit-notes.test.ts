@@ -10,8 +10,8 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import { todayInKolkata } from '../../../data/invoice-dates.ts';
-import { issueCreditNoteDraft } from '../../../data/credit-notes.ts';
+import { todayInKolkata } from '../../../data/invoices/dates.ts';
+import { issueCreditNoteDraft } from '../../../data/invoices/credit-notes.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {

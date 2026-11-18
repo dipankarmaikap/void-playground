@@ -1,15 +1,15 @@
-import { db, creditNotes, invoicePayments, invoiceRefunds, invoices } from './db.ts';
-import type { CreditNote, Invoice, InvoicePayment, InvoiceRefund } from './db.ts';
+import { db, creditNotes, invoicePayments, invoiceRefunds, invoices } from '../db.ts';
+import type { CreditNote, Invoice, InvoicePayment, InvoiceRefund } from '../db.ts';
 import { findInvoiceCreditNotes } from './credit-notes.ts';
-import { isValidIsoDate } from './invoice-dates.ts';
+import { isValidIsoDate } from './dates.ts';
 import {
   INVOICE_MONEY_MOVEMENT_METHODS,
   invoiceMoneyMovementMethodLabel,
   isInvoiceMoneyMovementMethod,
   parseMoneyMovementAmount,
-} from './invoice-money-movements.ts';
-import type { InvoiceMoneyMovementMethod } from './invoice-money-movements.ts';
-import { findInvoiceRefunds, invoiceFinancialBalances } from './invoice-refunds.ts';
+} from './money-movements.ts';
+import type { InvoiceMoneyMovementMethod } from './money-movements.ts';
+import { findInvoiceRefunds, invoiceFinancialBalances } from './refunds.ts';
 
 export const INVOICE_PAYMENT_METHODS = INVOICE_MONEY_MOVEMENT_METHODS;
 
@@ -35,7 +35,12 @@ export interface InvoicePaymentSummary {
   refundDueMinor: number;
 }
 
-export interface InvoicePaymentData extends InvoicePaymentSummary {
+/**
+ * The payments, refunds, and Credit Notes recorded against one Invoice, with the totals
+ * they derive. This is the Invoice detail read model: pages compose it instead of
+ * restating its fields.
+ */
+export interface InvoiceActivityData extends InvoicePaymentSummary {
   payments: InvoicePayment[];
   refunds: InvoiceRefund[];
   creditNotes: CreditNote[];
@@ -106,10 +111,10 @@ export function findInvoicePayments(
   });
 }
 
-export async function invoicePaymentData(
+export async function invoiceActivityData(
   organizationId: string,
   invoice: Invoice,
-): Promise<InvoicePaymentData> {
+): Promise<InvoiceActivityData> {
   let [payments, creditNotes, refunds] = await Promise.all([
     findInvoicePayments(organizationId, invoice.id),
     findInvoiceCreditNotes(organizationId, invoice.id),

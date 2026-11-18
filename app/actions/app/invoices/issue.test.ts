@@ -2,8 +2,8 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { addDays, todayInKolkata } from '../../../data/invoice-dates.ts';
-import { issueDraftInvoice } from '../../../data/invoice-issuance.ts';
+import { addDays, todayInKolkata } from '../../../data/invoices/dates.ts';
+import { issueDraftInvoice } from '../../../data/invoices/issuance.ts';
 import {
   db,
   documentSequences,
@@ -11,11 +11,11 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import { parseInvoiceDraft } from '../../../data/invoice-draft.ts';
+import { parseInvoiceDraft } from '../../../data/invoices/draft.ts';
 import {
   findInvoiceLines,
   updateDraftInvoice,
-} from '../../../data/invoices.ts';
+} from '../../../data/invoices/records.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,

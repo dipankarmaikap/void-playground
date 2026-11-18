@@ -1,9 +1,9 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
-import { formatMoney } from '../../../data/invoice-calculation.ts';
-import { DRAFT_STATUS_LABEL } from '../../../data/invoices.ts';
-import type { InvoiceDirectoryItem } from '../../../data/invoices.ts';
+import { formatMoney } from '../../../data/invoices/calculation.ts';
+import { DRAFT_STATUS_LABEL } from '../../../data/invoices/records.ts';
+import type { InvoiceDirectoryItem } from '../../../data/invoices/records.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';

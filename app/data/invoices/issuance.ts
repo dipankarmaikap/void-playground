@@ -1,16 +1,17 @@
-import { sql } from 'remix/data-table';
 import type { Database } from 'remix/data-table';
 
-import { findIndiaStateByCode } from './india-states.ts';
-import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from './db.ts';
-import type { Invoice, InvoiceLine } from './db.ts';
-import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from './client-tax.ts';
-import { parseScaledDecimal } from './invoice-calculation.ts';
-import { todayInKolkata } from './invoice-dates.ts';
+import { findIndiaStateByCode } from '../india-states.ts';
+import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from '../db.ts';
+import type { Invoice, InvoiceLine } from '../db.ts';
+import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from '../client-tax.ts';
+import type { InvoicePdfDocument } from './documents.ts';
+import { allocateDocumentNumber } from './document-numbers.ts';
+import { parseScaledDecimal } from './calculation.ts';
+import { todayInKolkata } from './dates.ts';
 import {
   DEFAULT_INVOICE_PREFIX,
   DEFAULT_STARTING_NUMBER,
-} from './organization/invoicing.ts';
+} from '../organization/invoicing.ts';
 
 export type InvoiceDisplayStatus =
   | 'draft'
@@ -49,7 +50,7 @@ export interface IssuedInvoiceFinalizerContext {
   /** Runs inside the issue transaction; use it to persist the immutable issued PDF artifact. */
   transaction: Database;
   /** Client-facing snapshot excludes the private internal note by construction. */
-  invoice: Omit<Invoice, 'internal_note'>;
+  invoice: InvoicePdfDocument;
   lines: readonly InvoiceLine[];
 }
 
@@ -136,36 +137,6 @@ function invoiceLinesInvalid(lines: readonly InvoiceLine[]): boolean {
   return lines.length === 0 || lines.some((line) => !isValidServiceLine(line));
 }
 
-async function allocateInvoiceNumber(
-  transaction: Database,
-  organizationId: string,
-  financialYear: string,
-  prefix: string,
-  startingNumber: number,
-  now: number,
-): Promise<string> {
-  let result = await transaction.exec(sql`
-    INSERT INTO document_sequences (
-      id, organization_id, document_type, financial_year, current_number, created_at, updated_at
-    )
-    VALUES (
-      ${crypto.randomUUID()}, ${organizationId}, 'invoice', ${financialYear},
-      ${startingNumber}, ${now}, ${now}
-    )
-    ON CONFLICT (organization_id, document_type, financial_year)
-    DO UPDATE SET
-      current_number = MAX(document_sequences.current_number + 1, excluded.current_number),
-      updated_at = excluded.updated_at
-    RETURNING current_number
-  `);
-  let row = result.rows?.[0] as { current_number?: unknown } | undefined;
-  let number = row?.current_number;
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
-    throw new Error('Unable to allocate a safe invoice sequence number.');
-  }
-  return `${prefix}/${financialYear}/${String(number).padStart(4, '0')}`;
-}
-
 /**
  * Issues a Draft atomically: validates current settings and invoice lines, allocates its FY number,
  * stores seller snapshots, then invokes the optional artifact finalizer before the transaction commits.
@@ -207,12 +178,15 @@ export async function issueDraftInvoice(
 
       let now = Date.now();
       let financialYear = indianFinancialYear(invoice.invoice_date);
-      let invoiceNumber = await allocateInvoiceNumber(
+      let invoiceNumber = await allocateDocumentNumber(
         transaction,
         organizationId,
         financialYear,
-        profile?.invoice_prefix ?? DEFAULT_INVOICE_PREFIX,
-        profile?.invoice_starting_number ?? DEFAULT_STARTING_NUMBER,
+        {
+          documentType: 'invoice',
+          prefix: profile?.invoice_prefix ?? DEFAULT_INVOICE_PREFIX,
+          startingNumber: profile?.invoice_starting_number ?? DEFAULT_STARTING_NUMBER,
+        },
         now,
       );
       let update = await transaction.updateMany(
