@@ -180,7 +180,9 @@ export default createController(routes.app.invoices.payments, {
         let error = voidPaymentError(
           result.kind === 'not_issued'
             ? 'Payments can be voided only on issued invoices.'
-            : 'Enter a reason for voiding this payment.',
+            : result.kind === 'refunds_exceed_remaining_payments'
+              ? 'This payment cannot be voided because active refunds would exceed the remaining active payments.'
+              : 'Enter a reason for voiding this payment.',
         );
         return renderPaymentError(context, organization, invoice, { voidPaymentError: error });
       }

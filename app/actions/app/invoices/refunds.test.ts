@@ -155,6 +155,12 @@ function paymentVoidActionFrom(html: string, paymentId: string): string {
   return match![1]!;
 }
 
+function activePaymentVoidActionFrom(html: string): string {
+  let match = /<form\b[^>]*action="([^"]+\/payments\/[^/"?]+\/void)"/.exec(html);
+  assert.ok(match, 'an active payment should have a void action');
+  return match![1]!;
+}
+
 describe('invoice refunds', () => {
   it('surfaces refund due after a post-payment full credit note and records a full refund', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
@@ -283,6 +289,76 @@ describe('invoice refunds', () => {
     let draftResponse = await recordRefund(sessionCookie, draftId, refundFields('1.00'));
     assert.equal(draftResponse.status, 400);
     assert.match(await draftResponse.text(), /Refunds can be recorded only for issued invoices/);
+  });
+
+  it('rejects voiding the only payment after a full credit and refund', async () => {
+    let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
+      router,
+      'invoice-refund-payment-void-invariant',
+    );
+    let client = await createClient(organizationId, {
+      type: 'individual',
+      legal_name: `Payment Void Invariant Client ${crypto.randomUUID()}`,
+      status: 'active',
+    });
+    let { invoiceId, lineId } = await createIssuedInvoice(organizationId, client.id);
+    assert.equal((await recordPayment(sessionCookie, invoiceId, '10.00')).status, 302);
+    await issueCreditNote(sessionCookie, invoiceId, lineId, '1.0000');
+    assert.equal(
+      (
+        await recordRefund(sessionCookie, invoiceId, {
+          ...refundFields('10.00'),
+          reference: 'FULL-CREDIT-REFUND',
+        })
+      ).status,
+      302,
+    );
+
+    let showPath = routes.app.invoices.show.href({ invoiceId });
+    let beforeVoid = await getHtml(router, showPath, sessionCookie);
+    assert.match(beforeVoid, /Status: Cancelled/);
+    assert.match(beforeVoid, /Revised total: 0\.00 INR/);
+    assert.match(beforeVoid, /Refunded: 10\.00 INR/);
+    assert.match(beforeVoid, /Net paid: 0\.00 INR/);
+    assert.match(beforeVoid, /Balance due: 0\.00 INR/);
+    assert.match(beforeVoid, /Refund due: 0\.00 INR/);
+    let paymentVoidAction = activePaymentVoidActionFrom(beforeVoid);
+
+    let rejected = await submitForm(
+      router,
+      showPath,
+      paymentVoidAction,
+      { reason: 'Reverse the original receipt' },
+      sessionCookie,
+    );
+    assert.equal(rejected.status, 400);
+    let rejectionHtml = await rejected.text();
+    assert.match(
+      rejectionHtml,
+      /role="alert"[^>]*>This payment cannot be voided because active refunds would exceed the remaining active payments\./,
+    );
+    assert.match(rejectionHtml, /name="reason"[^>]*aria-invalid="true"/);
+    let describedError = /<textarea\b[^>]*name="reason"[^>]*aria-describedby="([^"]+)"/.exec(
+      rejectionHtml,
+    );
+    assert.ok(describedError, 'the reason field should describe its error');
+    assert.match(rejectionHtml, new RegExp(`<p id="${describedError![1]}" role="alert"`));
+
+    let afterRejectedVoid = await getHtml(router, showPath, sessionCookie);
+    assert.match(afterRejectedVoid, /Status: Cancelled/);
+    assert.match(afterRejectedVoid, /Amount paid: 10\.00 INR/);
+    assert.match(afterRejectedVoid, /Revised total: 0\.00 INR/);
+    assert.match(afterRejectedVoid, /Balance due: 0\.00 INR/);
+    assert.match(afterRejectedVoid, /Refunded: 10\.00 INR/);
+    assert.match(afterRejectedVoid, /Net paid: 0\.00 INR/);
+    assert.match(afterRejectedVoid, /Refund due: 0\.00 INR/);
+    assert.ok(
+      afterRejectedVoid.includes(paymentVoidAction),
+      'the active payment should remain in the auditable payment history',
+    );
+    assert.match(afterRejectedVoid, /Reference: PAID-BEFORE-CN/);
+    assert.match(afterRejectedVoid, /Reference: FULL-CREDIT-REFUND/);
+    assert.doesNotMatch(afterRejectedVoid, /Voided on:/);
   });
 
   it('derives status from net paid when gross payments and net paid diverge after a refund and a payment void', async () => {

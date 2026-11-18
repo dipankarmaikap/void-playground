@@ -50,7 +50,15 @@ export type RecordInvoicePaymentResult =
 
 export type VoidInvoicePaymentResult =
   | { ok: true }
-  | { ok: false; kind: 'not_found' | 'not_issued' | 'invalid_reason' | 'already_voided' };
+  | {
+      ok: false;
+      kind:
+        | 'not_found'
+        | 'not_issued'
+        | 'invalid_reason'
+        | 'already_voided'
+        | 'refunds_exceed_remaining_payments';
+    };
 
 export const isInvoicePaymentMethod = isInvoiceMoneyMovementMethod;
 export const invoicePaymentMethodLabel = invoiceMoneyMovementMethodLabel;
@@ -238,6 +246,24 @@ export async function voidInvoicePayment(
     });
     if (!payment) return { ok: false, kind: 'not_found' } as const;
     if (payment.voided_at !== null) return { ok: false, kind: 'already_voided' } as const;
+
+    let [activePayments, activeRefunds] = await Promise.all([
+      transaction.findMany(invoicePayments, {
+        where: { organization_id: organizationId, invoice_id: invoiceId, voided_at: null },
+      }),
+      transaction.findMany(invoiceRefunds, {
+        where: { organization_id: organizationId, invoice_id: invoiceId, voided_at: null },
+      }),
+    ]);
+    let remainingActivePaymentsMinor =
+      activePayments.reduce((total, entry) => total + entry.amount_minor, 0) - payment.amount_minor;
+    let activeRefundedMinor = activeRefunds.reduce(
+      (total, refund) => total + refund.amount_minor,
+      0,
+    );
+    if (remainingActivePaymentsMinor < activeRefundedMinor) {
+      return { ok: false, kind: 'refunds_exceed_remaining_payments' } as const;
+    }
 
     let updated = await transaction.updateMany(
       invoicePayments,
