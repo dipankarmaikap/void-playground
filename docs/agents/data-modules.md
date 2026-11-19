@@ -1,6 +1,6 @@
 # Data modules and maintainability
 
-The canonical guide for organizing `app/data/` modules, owning types, choosing test seams, and reviewing file size. Other docs link here; don't restate these rules elsewhere.
+The canonical guide for organizing `app/data/` modules, owning types, choosing test seams, adding a schema migration, and reviewing file size. Other docs link here; don't restate these rules elsewhere.
 
 ## Group modules by domain
 
@@ -10,10 +10,18 @@ The canonical guide for organizing `app/data/` modules, owning types, choosing t
 
 Worked examples on this branch:
 
-- `app/data/db/` — `connection.ts`, `tables.ts`, `row-types.ts`, `schema.ts`, `migrations.ts`, `compatibility.ts` behind the stable `app/data/db.ts` entry, which creates one database instance and runs initialization and migrations in an explicit order.
+- `app/data/db/` — `connection.ts`, `tables.ts`, `row-types.ts` behind the stable `app/data/db.ts` entry, which creates one database instance and re-exports the typed tables and row types; `migrate.ts` is the single migration entry (fail-closed compatibility gate, then the numbered SQL migrations, then the Organization-ownership check) awaited by server startup before it listens and by the shared test bootstrap; `compatibility.ts` is the gate it calls; `migrations/` holds the numbered SQL migration directories the Remix runner applies.
 - `app/data/session/` — `setup.ts` (cookie/scheme), `storage.ts` (hybrid cookie/SQLite storage), `auth-payload.ts` (canonical authenticated payload).
 - `app/data/invoices/` — parsing (`draft.ts`), persistence (`records.ts`), issuance (`issuance.ts`), payments and refunds (`payments.ts`, `refunds.ts`, `money-movements.ts`), rendering (`pdf.ts`, `pdf-artifacts.ts`), and the shared cross-document modules (`documents.ts`, `document-numbers.ts`, `pdf-filenames.ts`).
 - `app/data/organization/` — `access.ts`, `name.ts`, `invoicing.ts`, `gst-presets.ts`: one domain, four distinct responsibilities.
+
+## Adding a migration
+
+- A schema change is one new directory in `app/data/db/migrations/` named `<NNNN>_<slug>` with the next 4-digit prefix; every prefix shares that width so directory sort is apply order. `up.sql` is required; add `down.sql` when the change is meaningfully reversible, dropping added columns, indexes, and tables in reverse dependency order. Omit `down.sql` for irreversible steps — the runner reports those as irreversible (see `0006_invoice_tax_rate_constraints`).
+- Write the migration as its historical step, not the final shape: fresh installs and legacy upgrades replay identical history and end at the same schema. Plain one-shot SQL — the journal owns run-once, so no `IF NOT EXISTS` or has-column guards.
+- Keep `app/data/db/tables.ts` aligned: the typed table declarations stay the app-facing contract. The Client-type CHECK list is inlined in the migration SQL with a comment naming its canonical source (`app/data/client-names.ts`), and a dedicated test reads the migration SQL to keep the two synchronized.
+- The runner wraps each migration in a transaction automatically. A parent-table rebuild that toggles `PRAGMA foreign_keys` must instead start its `up.sql` with `-- data-table/transaction: none` (see `0004` and `0005`): SQLite ignores that PRAGMA inside a transaction, so the default wrapping would leave foreign keys enforced mid-rebuild.
+- DDL lives only in migration files; untrusted values go only through the parameterized `sql` tag. Never run migrations outside the single entry: server startup and `test/db-setup.ts` both await it. The `remix db` CLI reads `remix.json` and the same migrations; its verification steps are recorded in `docs/manual-checks/`.
 
 ## Own types semantically
 
@@ -30,7 +38,7 @@ Examples on this branch:
 
 - Assert observable behavior through the highest useful seam. A test must survive internal reorganization of the module it covers.
 - Direct module tests for focused deterministic behavior: `app/data/invoices/draft.test.ts` asserts minor-unit amounts, totals, and validation outcomes through `parseInvoiceDraft`, not through internal helpers.
-- Data behavior: use the in-memory SQLite adapter (`NODE_ENV=test` swaps the database to `:memory:`). Never test against `data/app.db`; never leak state across test files.
+- Data behavior: use the in-memory SQLite adapter (`NODE_ENV=test` swaps the database to `:memory:`), and import `test/db-setup.ts` — its module load applies the real migration history through the single entry, and its `clearTestTables(...tables)` cleans between tests. Never bootstrap a schema or clean up with hand-written SQL in a test file. Never test against `data/app.db`; never leak state across test files.
 - Request behavior: use `router.fetch` request-flow tests (see `test/`).
 - Don't test private helpers or internal SQL arrangement unless a persistence invariant specifically requires it.
 
@@ -39,7 +47,7 @@ Examples on this branch:
 - Around 500 lines in an authored source file: a review prompt. Ask whether the file still has one cohesive responsibility.
 - Around 1,000 lines: a strong prompt — document why the file remains cohesive, or split it.
 - These are advisory signals, not a cap. Never a lint rule, never a CI failure. Line count alone never requires a split.
-- Split on independent reasons to change, not on size. A large but focused module (for example `app/data/db/schema.ts`, one cohesive set of schema declarations) is fine.
+- Split on independent reasons to change, not on size. A large but focused module (for example `app/data/db/tables.ts`, one cohesive set of typed table declarations) is fine.
 - Apply the same judgment to tests; long integration scenarios are legitimate.
 
 ## When to write an ADR

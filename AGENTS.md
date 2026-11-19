@@ -26,7 +26,7 @@ Refer to ./.agents/skills/remix/SKILL.md for the Remix mental model and how to f
 
 ## Docs
 
-GitHub Issues are the canonical home for feature specs, acceptance criteria, and implementation plans. Use `docs/agents/issue-tracker.md` for the `gh` workflow. Keep durable architectural decisions in `docs/adr/`, project agent guidance in `docs/agents/`, and repeatable browser-only checks in `docs/manual-checks/`.
+GitHub Issues are the canonical home for feature specs, acceptance criteria, and implementation plans. Use `docs/agents/issue-tracker.md` for the `gh` workflow. Keep durable architectural decisions in `docs/adr/`, project agent guidance in `docs/agents/`, and repeatable manual checks (browser-only and CLI) in `docs/manual-checks/`.
 
 ## Agent skills
 
@@ -58,7 +58,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 - `app/actions/home-page.tsx` renders the public welcome screen; the auth pages live in `app/actions/auth/` (login, register, verify, logout), and `app/actions/app/` owns the protected dashboard and settings pages.
 - `app/actions/app/settings/profile/` owns `/app/settings` (identity summary and display-name form); `app/actions/app/settings/sessions/` owns `/app/settings/sessions` (Session list and revoke actions). Both render inside `AppShell`.
 - `app/actions/app/clients/` owns `/app/clients`: the directory and profile controller, the `new/` and `edit/` form pages, the `lifecycle/` archive/restore actions, the shared `client-form.tsx` and `form-values.ts`, the field sections under `sections/`, and the read-only `contact-summary.tsx`, `billing-summary.tsx`, and `tax-summary.tsx` cards. Client pages render inside `AppShell` with the Clients nav destination current.
-- `app/data/` owns the database (`db/` behind the stable `db.ts` entry), password hashing, display-name parsing (`display-name.ts`), and the Session (`session/`), Invoice (`invoices/`), and Organization (`organization/`) domain modules.
+- `app/data/` owns the database (`db/` behind the stable `db.ts` entry, which creates the connection and re-exports the typed tables and row types; numbered SQL migrations live under `db/migrations/` and are applied by the single entry in `db/migrate.ts`, awaited by server startup before it listens and by the shared test bootstrap), password hashing, display-name parsing (`display-name.ts`), and the Session (`session/`), Invoice (`invoices/`), and Organization (`organization/`) domain modules.
 - `app/middleware/` holds custom middleware (e.g. request context).
 - `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller. `app-shell.tsx` renders the authenticated document (sidebar, drawer, Dashboard/Clients/Settings destinations, settings subnavigation, identity, Log out) around page content; `auth-layout.tsx` renders the standalone public/auth card; `button`, `icon`, `field`, `input`, `select`, and `theme` are shared primitives; `identity.ts` bundles a User's email and display name and derives the display name-or-email label; `page-styles.ts` holds the shared page header, notice, form, footer, and text-link styles.
 - `app/actions/public/` contains the browser runtime entry.
@@ -68,4 +68,4 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 
 Protect controllers with `requireAuth()` rather than a path-prefix middleware; controller middleware does not flow into controllers mapped for nested route maps.
 
-Organizing data modules, sharing types, choosing test seams (including the in-memory SQLite test configuration), and the advisory file-size review heuristic: follow `docs/agents/data-modules.md` — the single source of truth.
+Organizing data modules, adding a schema migration, sharing types, choosing test seams (including the in-memory SQLite test configuration), and the advisory file-size review heuristic: follow `docs/agents/data-modules.md` — the single source of truth.
