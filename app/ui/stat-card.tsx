@@ -33,17 +33,20 @@ const toplineStyle = css({
 
 const labelStyle = css({
   color: neutrals.muted,
-  fontSize: '0.6875rem',
+  fontSize: '0.8125rem',
   fontWeight: 600,
 });
 
 const valueStyle = css({
   color: neutrals.ink,
   fontFamily: fontStack,
-  fontSize: 'clamp(1.3125rem, 2.2vw, 1.6875rem)',
+  fontSize: 'clamp(1.5625rem, 2.5vw, 1.9375rem)',
   fontWeight: 800,
   letterSpacing: '-0.035em',
   lineHeight: 1.15,
+  '@media (max-width: 51.25rem)': {
+    fontSize: '1.5rem',
+  },
 });
 
 const footStyle = css({
@@ -52,7 +55,7 @@ const footStyle = css({
   alignItems: 'center',
   gap: '0.35rem',
   color: neutrals.softMuted,
-  fontSize: '0.6875rem',
+  fontSize: '0.75rem',
 });
 
 const iconBaseStyle = css({

@@ -128,7 +128,7 @@ const pillStyle = css({
   background: neutrals.paper,
   color: neutrals.muted,
   fontFamily: fontStack,
-  fontSize: '0.625rem',
+  fontSize: '0.8125rem',
   fontWeight: 700,
   textDecoration: 'none',
   whiteSpace: 'nowrap',
@@ -146,6 +146,7 @@ const pillStyle = css({
 
 const pillCountStyle = css({
   opacity: 0.75,
+  fontSize: '0.6875rem',
 });
 
 const statusNavStyle = css({
@@ -178,7 +179,7 @@ const personInfoStyle = css({
 
 const personLinkStyle = css({
   color: neutrals.ink,
-  fontSize: '0.6875rem',
+  fontSize: '0.8125rem',
   fontWeight: 700,
   textDecoration: 'none',
   overflowWrap: 'anywhere',
@@ -187,7 +188,7 @@ const personLinkStyle = css({
 
 const personMetaStyle = css({
   color: neutrals.softMuted,
-  fontSize: '0.5625rem',
+  fontSize: '0.75rem',
   overflowWrap: 'anywhere',
 });
 
@@ -215,7 +216,7 @@ const emptyHeadingStyle = css({
 const emptyHintStyle = css({
   margin: 0,
   color: neutrals.muted,
-  fontSize: '0.8125rem',
+  fontSize: '0.75rem',
 });
 
 const paginationStyle = css({

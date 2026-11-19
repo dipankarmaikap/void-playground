@@ -34,7 +34,7 @@ export const statusPillBaseStyle = css({
   padding: '5px 9px',
   borderRadius: radii.md,
   fontFamily: fontStack,
-  fontSize: '0.6875rem',
+  fontSize: '0.8125rem',
   fontWeight: 700,
   lineHeight: 1.2,
   whiteSpace: 'nowrap',

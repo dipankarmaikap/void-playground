@@ -11,7 +11,6 @@ import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
 import { DataTable, amountCellStyle } from '../../../ui/data-table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
-import { headingStyle } from '../../../ui/page-header.tsx';
 import { Panel, PanelBody, PanelFooter, PanelHeader } from '../../../ui/panel.tsx';
 import {
   noticeErrorStyle,
@@ -20,7 +19,7 @@ import {
 } from '../../../ui/page-styles.ts';
 import { StatCard, statGridStyle } from '../../../ui/stat-card.tsx';
 import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/status-pill.tsx';
-import { neutrals, primary } from '../../../ui/theme.ts';
+import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
@@ -65,6 +64,17 @@ const detailHeaderStyle = css({
 
 const detailMetaStyle = css({
   minWidth: 0,
+});
+
+// The reference detail heading is one step smaller than the directory page heading.
+const detailHeadingStyle = css({
+  margin: 0,
+  color: neutrals.ink,
+  fontFamily: fontStack,
+  fontSize: '1.75rem',
+  fontWeight: 800,
+  letterSpacing: '-0.02em',
+  lineHeight: 1.2,
 });
 
 const contextStyle = css({
@@ -256,7 +266,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
             <div mix={detailHeaderStyle}>
               <Avatar name={label} size="lg" />
               <div mix={detailMetaStyle}>
-                <h1 mix={headingStyle}>{label}</h1>
+                <h1 mix={detailHeadingStyle}>{label}</h1>
                 <p mix={contextStyle}>{contextLine}</p>
                 <StatusPill tone={archived ? 'draft' : 'paid'}>
                   {archived ? 'Archived client' : 'Active client'}

@@ -23,7 +23,7 @@ export const panelHeaderStyle = css({
 export const panelTitleStyle = css({
   margin: 0,
   color: neutrals.ink,
-  fontSize: '1rem',
+  fontSize: '1.0625rem',
   fontWeight: 700,
   letterSpacing: '-0.01em',
 });

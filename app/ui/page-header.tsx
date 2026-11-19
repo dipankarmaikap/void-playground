@@ -24,7 +24,7 @@ export const eyebrowStyle = css({
   display: 'block',
   marginBottom: '4px',
   color: primary.base,
-  fontSize: '0.6875rem',
+  fontSize: '0.8125rem',
   fontWeight: 800,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
@@ -34,16 +34,19 @@ export const headingStyle = css({
   margin: 0,
   color: neutrals.ink,
   fontFamily: fontStack,
-  fontSize: '1.625rem',
+  fontSize: '2rem',
   fontWeight: 800,
   letterSpacing: '-0.02em',
   lineHeight: 1.2,
+  '@media (max-width: 51.25rem)': {
+    fontSize: '1.6875rem',
+  },
 });
 
 export const introStyle = css({
   margin: '6px 0 0',
   color: neutrals.muted,
-  fontSize: '0.875rem',
+  fontSize: '0.9375rem',
   lineHeight: 1.55,
 });
 

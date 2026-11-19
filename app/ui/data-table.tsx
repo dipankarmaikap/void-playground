@@ -21,7 +21,7 @@ export const headerRowStyle = css({
 export const headerCellStyle = css({
   padding: '11px 14px',
   color: neutrals.softMuted,
-  fontSize: '0.5625rem',
+  fontSize: '0.75rem',
   fontWeight: 700,
   letterSpacing: '0.08em',
   textAlign: 'left',
@@ -39,7 +39,7 @@ export const rowStyle = css({
 export const cellStyle = css({
   padding: '11px 14px',
   color: neutrals.muted,
-  fontSize: '0.6875rem',
+  fontSize: '0.875rem',
   verticalAlign: 'middle',
   '&[data-align="right"]': { textAlign: 'right' },
 });

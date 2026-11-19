@@ -19,7 +19,6 @@ import {
   radii,
   shadows,
   softFills,
-  typography,
 } from './theme.ts';
 
 export type AppSection = 'dashboard' | 'clients' | 'invoices' | 'profile' | 'invoicing' | 'sessions';
@@ -168,9 +167,10 @@ const brandStyle = css({
   gap: '0.625rem',
   alignSelf: 'flex-start',
   color: neutrals.ink,
-  fontSize: '1.0625rem',
+  fontSize: '1.3125rem',
   fontWeight: 800,
-  letterSpacing: typography.headingLetterSpacing,
+  // The reference brand wordmark tracks tighter than the page headings.
+  letterSpacing: '-0.035em',
   textDecoration: 'none',
   '&:hover': {
     color: primary.base,
@@ -187,8 +187,8 @@ const brandMarkStyle = css({
   alignItems: 'center',
   justifyContent: 'center',
   boxSizing: 'border-box',
-  width: '1.875rem',
-  height: '1.875rem',
+  width: '2.125rem',
+  height: '2.125rem',
   borderRadius: radii.lg,
   background: gradients.brandMark,
   boxShadow: shadows.brandMark,
@@ -262,7 +262,7 @@ const navGroupStyle = css({
 const navLabelStyle = css({
   margin: '0 0 0.25rem 0.5rem',
   color: neutrals.softMuted,
-  fontSize: '0.5625rem',
+  fontSize: '0.6875rem',
   fontWeight: 800,
   letterSpacing: '0.11em',
   textTransform: 'uppercase',
@@ -275,7 +275,7 @@ const navLinkStyle = css({
   boxSizing: 'border-box',
   minHeight: '2.5rem',
   padding: '0.5rem 0.6875rem',
-  borderRadius: radii.xl,
+  borderRadius: radii.md,
   color: neutrals.muted,
   fontSize: '0.875rem',
   fontWeight: 600,
