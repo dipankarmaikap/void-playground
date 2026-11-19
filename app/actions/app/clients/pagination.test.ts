@@ -49,7 +49,8 @@ async function seedClient(input: {
 }
 
 function clientItemCount(html: string) {
-  return html.match(/<li\b/g)?.length ?? 0;
+  let body = html.match(/<tbody\b[^>]*>([\s\S]*?)<\/tbody>/);
+  return body ? (body[1].match(/<tr\b/g)?.length ?? 0) : 0;
 }
 
 function nextHref(html: string): string {

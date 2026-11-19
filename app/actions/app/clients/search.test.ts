@@ -284,7 +284,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, indexHref({ q: legalName }), secondCookie);
     assert.match(html, /No clients match your search and filters\./);
-    assert.doesNotMatch(html, /<li\b/);
+    assert.doesNotMatch(html, /<tbody\b/);
   });
 
   it('distinguishes an empty Client book from an empty search result', async () => {
@@ -341,7 +341,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, new RegExp(`<title>Clients \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Clients | ${APP_NAME}</title>`));
   });
 
   it('treats percent and underscore as literal search characters', async () => {

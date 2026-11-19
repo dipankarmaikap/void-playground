@@ -4,6 +4,7 @@ import { redirect } from 'remix/response/redirect';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
+import { getClientDirectoryFacts } from '../../../data/client-directory-facts.ts';
 import {
   createClient,
   findClient,
@@ -24,6 +25,7 @@ import { EditClientPage } from './edit/page.tsx';
 import { clientFormValuesOf } from './form-values.ts';
 import { parseClientForm } from './parse-client-form.ts';
 import { ClientsIndexPage } from './index-page.tsx';
+import type { ClientFollowUpFilter } from './index-page.tsx';
 import { NewClientPage } from './new/page.tsx';
 import { ClientProfilePage } from './show-page.tsx';
 
@@ -43,21 +45,38 @@ export default createController(routes.app.clients, {
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
       let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
-      let directory = await listClients(context.db, organization.id, {
-        q: query,
-        type,
-        status,
-        page,
-      });
+      let followUpParam = context.url.searchParams.get('followup');
+      let followUp: ClientFollowUpFilter =
+        followUpParam === 'overdue' || followUpParam === 'current' ? followUpParam : 'all';
+      let [directory, facts] = await Promise.all([
+        listClients(context.db, organization.id, {
+          q: query,
+          type,
+          status,
+          page,
+        }),
+        getClientDirectoryFacts(context.db, organization.id),
+      ]);
+      let visibleClients =
+        followUp === 'all'
+          ? directory.clients
+          : directory.clients.filter((client) => {
+              let clientFacts = facts.clients.get(client.id);
+              return followUp === 'overdue'
+                ? Boolean(clientFacts?.hasOverdueInvoice)
+                : !clientFacts?.hasOverdueInvoice;
+            });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
           organizationName={organization.name}
-          clients={directory.clients}
+          clients={visibleClients}
           query={query}
           type={type}
           status={status}
+          followUp={followUp}
+          facts={facts}
           page={directory.page}
           hasPrevious={directory.hasPrevious}
           hasNext={directory.hasNext}
