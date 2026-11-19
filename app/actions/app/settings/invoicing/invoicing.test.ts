@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../../../config.ts';
 import {
   organizationInvoicingProfiles,
   organizationMemberships,
@@ -46,7 +47,7 @@ describe('organization invoicing settings', () => {
     let path = routes.app.settings.invoicing.index.href();
     let html = await getHtml(router, path, sessionCookie);
 
-    assert.match(html, /<title>Invoicing \| My Remix App<\/title>/);
+    assert.match(html, new RegExp(`<title>Invoicing \\| ${APP_NAME}<\\/title>`));
     assert.match(
       html,
       /<nav aria-label="Settings"[\s\S]*?Profile[\s\S]*?Invoicing[\s\S]*?Sessions[\s\S]*?<\/nav>/,

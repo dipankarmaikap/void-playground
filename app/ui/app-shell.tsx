@@ -9,7 +9,18 @@ import { Icon } from './icon.tsx';
 import type { IconName } from './icon.tsx';
 import { identityOf } from './identity.ts';
 import type { UserIdentity } from './identity.ts';
-import { colors, fontFamily, radius, shadow } from './theme.ts';
+import {
+  avatarColors,
+  focus,
+  fontStack,
+  gradients,
+  neutrals,
+  primary,
+  radii,
+  shadows,
+  softFills,
+  typography,
+} from './theme.ts';
 
 export type AppSection = 'dashboard' | 'clients' | 'invoices' | 'profile' | 'invoicing' | 'sessions';
 
@@ -31,11 +42,16 @@ interface NavItem {
   active: boolean;
 }
 
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
 interface SidebarProps {
   csrfToken: string;
   identity: UserIdentity;
   organizationName?: string;
-  mainNav: NavItem[];
+  mainNavGroups: NavGroup[];
   settingsNav: NavItem[];
   settingsActive: boolean;
   variant: 'desktop' | 'mobile';
@@ -47,14 +63,18 @@ const skipLinkStyle = css({
   left: '1rem',
   zIndex: 30,
   padding: '0.5rem 0.875rem',
-  border: `1px solid ${colors.accent}`,
-  borderRadius: radius.md,
-  background: colors.surface,
-  color: colors.accent,
+  border: `1px solid ${primary.base}`,
+  borderRadius: radii.md,
+  background: neutrals.paper,
+  color: primary.base,
   fontWeight: 600,
   textDecoration: 'none',
   '&:focus': {
     top: '1rem',
+  },
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
   },
 });
 
@@ -62,11 +82,11 @@ const layoutStyle = css({
   minHeight: '100vh',
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',
-  background: colors.background,
-  color: colors.text,
-  fontFamily,
+  background: neutrals.canvas,
+  color: neutrals.ink,
+  fontFamily: fontStack,
   '@media (min-width: 48rem)': {
-    gridTemplateColumns: '16rem minmax(0, 1fr)',
+    gridTemplateColumns: '15.375rem minmax(0, 1fr)',
   },
 });
 
@@ -83,10 +103,10 @@ const menuStyle = css({
   gap: '0.5rem',
   margin: '0.75rem',
   padding: '0.5rem 0.875rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.md,
-  background: colors.surface,
-  color: colors.text,
+  border: `1px solid ${neutrals.line}`,
+  borderRadius: radii.md,
+  background: neutrals.paper,
+  color: neutrals.ink,
   fontSize: '0.9375rem',
   fontWeight: 600,
   cursor: 'pointer',
@@ -96,6 +116,10 @@ const menuStyle = css({
   },
   '&::-webkit-details-marker': {
     display: 'none',
+  },
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
   },
   '@media (min-width: 48rem)': {
     display: 'none',
@@ -107,9 +131,9 @@ const sidebarBaseStyle = {
   boxSizing: 'border-box',
   flexDirection: 'column',
   gap: '1.25rem',
-  padding: '1.25rem',
-  borderRight: `1px solid ${colors.border}`,
-  background: colors.surface,
+  padding: '1.5rem 0.9375rem 1rem',
+  borderRight: `1px solid ${neutrals.line}`,
+  background: neutrals.paper,
 } as const;
 
 const desktopSidebarStyle = css({
@@ -132,45 +156,91 @@ const mobileSidebarStyle = css({
   width: '17rem',
   maxWidth: '85vw',
   overflowY: 'auto',
-  boxShadow: shadow.card,
+  boxShadow: shadows.large,
   '@media (min-width: 48rem)': {
     display: 'none',
   },
 });
 
 const brandStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.625rem',
   alignSelf: 'flex-start',
-  color: colors.text,
+  color: neutrals.ink,
   fontSize: '1.0625rem',
   fontWeight: 800,
-  letterSpacing: '-0.02em',
+  letterSpacing: typography.headingLetterSpacing,
   textDecoration: 'none',
   '&:hover': {
-    color: colors.accent,
+    color: primary.base,
+  },
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
+    borderRadius: radii.md,
   },
 });
 
-const organizationStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.125rem',
-  minWidth: 0,
-  padding: '0.75rem',
-  borderRadius: radius.md,
-  background: colors.accentSoft,
+const brandMarkStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxSizing: 'border-box',
+  width: '1.875rem',
+  height: '1.875rem',
+  borderRadius: radii.lg,
+  background: gradients.brandMark,
+  boxShadow: shadows.brandMark,
+  color: neutrals.paper,
+  fontSize: '0.875rem',
+  fontWeight: 800,
 });
 
-const organizationLabelStyle = css({
-  color: colors.muted,
-  fontSize: '0.6875rem',
+const workspaceStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.625rem',
+  minWidth: 0,
+  padding: '0.625rem',
+  border: `1px solid ${neutrals.line}`,
+  borderRadius: radii.xl,
+  background: neutrals.paper,
+});
+
+const workspaceAvatarStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  boxSizing: 'border-box',
+  width: '2rem',
+  height: '2rem',
+  borderRadius: radii.md,
+  background: softFills.workspaceAvatar.background,
+  color: softFills.workspaceAvatar.color,
+  fontSize: '0.875rem',
+  fontWeight: 800,
+});
+
+const workspaceMetaStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.0625rem',
+  minWidth: 0,
+});
+
+const workspaceLabelStyle = css({
+  color: neutrals.softMuted,
+  fontSize: '0.625rem',
   fontWeight: 700,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.08em',
   textTransform: 'uppercase',
 });
 
-const organizationNameStyle = css({
-  color: colors.text,
-  fontSize: '0.875rem',
+const workspaceNameStyle = css({
+  color: neutrals.ink,
+  fontSize: '0.8125rem',
   fontWeight: 700,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -180,73 +250,138 @@ const organizationNameStyle = css({
 const navStyle = css({
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.25rem',
+  gap: '1rem',
+});
+
+const navGroupStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.125rem',
+});
+
+const navLabelStyle = css({
+  margin: '0 0 0.25rem 0.5rem',
+  color: neutrals.softMuted,
+  fontSize: '0.5625rem',
+  fontWeight: 800,
+  letterSpacing: '0.11em',
+  textTransform: 'uppercase',
 });
 
 const navLinkStyle = css({
   display: 'flex',
   alignItems: 'center',
-  gap: '0.625rem',
-  padding: '0.625rem 0.75rem',
-  borderRadius: radius.md,
-  color: colors.muted,
-  fontSize: '0.9375rem',
-  fontWeight: 500,
+  gap: '0.6875rem',
+  boxSizing: 'border-box',
+  minHeight: '2.5rem',
+  padding: '0.5rem 0.6875rem',
+  borderRadius: radii.xl,
+  color: neutrals.muted,
+  fontSize: '0.875rem',
+  fontWeight: 600,
   textDecoration: 'none',
   '&:hover': {
-    background: colors.accentSoft,
-    color: colors.text,
+    background: primary.soft,
+    color: primary.base,
   },
   '&[data-active="true"]': {
-    background: colors.accentSoft,
-    color: colors.accent,
+    background: primary.soft,
+    color: primary.base,
     fontWeight: 700,
+  },
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
+  },
+});
+
+const navIconStyle = css({
+  display: 'inline-flex',
+  flexShrink: 0,
+  '& svg': {
+    width: '1.0625rem',
+    height: '1.0625rem',
   },
 });
 
 const subnavStyle = css({
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.25rem',
-});
-
-const subnavHeadingStyle = css({
-  margin: '0 0 0.25rem 0.75rem',
-  color: colors.muted,
-  fontSize: '0.6875rem',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  gap: '0.125rem',
 });
 
 const footerStyle = css({
   marginTop: 'auto',
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.75rem',
+  gap: '0.875rem',
   paddingTop: '1rem',
-  borderTop: `1px solid ${colors.border}`,
+  borderTop: `1px solid ${neutrals.line}`,
 });
 
-const identityStyle = css({
+const helpCardStyle = css({
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.125rem',
+  gap: '0.375rem',
+  padding: '0.875rem',
+  borderRadius: radii.xl,
+  background: gradients.helpCard,
+  color: neutrals.ink,
+});
+
+const helpTitleStyle = css({
+  fontSize: '0.8125rem',
+  fontWeight: 800,
+});
+
+const helpTextStyle = css({
+  margin: 0,
+  color: neutrals.muted,
+  fontSize: '0.75rem',
+  lineHeight: 1.45,
+});
+
+const profileStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.625rem',
+  minWidth: 0,
+});
+
+const avatarStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  boxSizing: 'border-box',
+  width: '2rem',
+  height: '2rem',
+  borderRadius: '999px',
+  background: avatarColors.default.background,
+  color: avatarColors.default.color,
+  fontSize: '0.625rem',
+  fontWeight: 800,
+});
+
+const profileNameStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.0625rem',
   minWidth: 0,
 });
 
 const identityNameStyle = css({
-  color: colors.text,
-  fontSize: '0.875rem',
-  fontWeight: 600,
+  color: neutrals.ink,
+  fontSize: '0.8125rem',
+  fontWeight: 700,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 });
 
 const identityEmailStyle = css({
-  color: colors.muted,
-  fontSize: '0.8125rem',
+  color: neutrals.muted,
+  fontSize: '0.75rem',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
@@ -257,17 +392,123 @@ const logoutFormStyle = css({
   '& button': {
     width: '100%',
   },
+  '& button:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
+  },
+});
+
+const mainAreaStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+});
+
+const topbarStyle = css({
+  position: 'sticky',
+  top: 0,
+  zIndex: 3,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '1rem',
+  boxSizing: 'border-box',
+  minHeight: '4.25rem',
+  padding: '0 2.25rem',
+  borderBottom: `1px solid ${neutrals.line}`,
+  background: neutrals.paper,
+  '@media (max-width: 47.999rem)': {
+    position: 'static',
+    minHeight: '3.5rem',
+    padding: '0 1rem',
+  },
+});
+
+const breadcrumbStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: '0.5rem',
+  minWidth: 0,
+  fontSize: '0.8125rem',
+});
+
+const breadcrumbSegmentStyle = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  minWidth: 0,
+});
+
+const breadcrumbSeparatorStyle = css({
+  color: neutrals.softMuted,
+});
+
+const breadcrumbLinkStyle = css({
+  color: neutrals.muted,
+  textDecoration: 'none',
+  '&:hover': {
+    color: primary.base,
+  },
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
+    borderRadius: radii.sm,
+  },
+});
+
+const breadcrumbCurrentStyle = css({
+  color: neutrals.ink,
+  fontWeight: 700,
+});
+
+const topbarIdentityStyle = css({
+  color: neutrals.muted,
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 });
 
 const mainStyle = css({
   boxSizing: 'border-box',
   width: '100%',
-  maxWidth: '60rem',
-  padding: '1.5rem',
-  '@media (min-width: 48rem)': {
-    padding: '2.5rem 3rem',
+  maxWidth: '90rem',
+  margin: '0 auto',
+  padding: '2rem 2.25rem 3.4375rem',
+  '@media (max-width: 47.999rem)': {
+    padding: '1.5rem 1rem 2.5rem',
   },
 });
+
+function initialsOf(value: string) {
+  let parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+function NavLink(handle: Handle<NavItem>) {
+  return () => {
+    let { href, label, icon, current, active } = handle.props;
+
+    return (
+      <a
+        href={href}
+        data-rmx-document=""
+        aria-current={current ? 'page' : undefined}
+        data-active={active ? 'true' : undefined}
+        mix={navLinkStyle}
+      >
+        <span aria-hidden="true" mix={navIconStyle}>
+          <Icon name={icon} />
+        </span>
+        <span>{label}</span>
+      </a>
+    );
+  };
+}
 
 function AppSidebar(handle: Handle<SidebarProps>) {
   return () => {
@@ -275,61 +516,69 @@ function AppSidebar(handle: Handle<SidebarProps>) {
       csrfToken,
       identity: userIdentity,
       organizationName,
-      mainNav,
+      mainNavGroups,
       settingsNav,
       settingsActive,
       variant,
     } = handle.props;
     let identity = identityOf(userIdentity);
+    let workspaceInitial = organizationName?.trim().charAt(0).toUpperCase() ?? '';
 
     return (
-      <aside mix={variant === 'desktop' ? desktopSidebarStyle : mobileSidebarStyle}>
+      <aside
+        aria-label={`${APP_NAME} workspace`}
+        mix={variant === 'desktop' ? desktopSidebarStyle : mobileSidebarStyle}
+      >
         <a href={routes.app.dashboard.href()} data-rmx-document="" mix={brandStyle}>
-          {APP_NAME}
+          <span aria-hidden="true" mix={brandMarkStyle}>
+            {APP_NAME.charAt(0)}
+          </span>
+          <span>{APP_NAME}</span>
         </a>
         {organizationName ? (
-          <div role="group" aria-label="Current Organization" mix={organizationStyle}>
-            <span mix={organizationLabelStyle}>Organization</span>
-            <span mix={organizationNameStyle}>{organizationName}</span>
+          <div role="group" aria-label="Current Organization" mix={workspaceStyle}>
+            <span aria-hidden="true" mix={workspaceAvatarStyle}>
+              {workspaceInitial}
+            </span>
+            <span mix={workspaceMetaStyle}>
+              <span mix={workspaceLabelStyle}>Organization</span>
+              <strong mix={workspaceNameStyle}>{organizationName}</strong>
+            </span>
           </div>
         ) : null}
         <nav aria-label="Main" mix={navStyle}>
-          {mainNav.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              data-rmx-document=""
-              aria-current={item.current ? 'page' : undefined}
-              data-active={item.active ? 'true' : undefined}
-              mix={navLinkStyle}
-            >
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-            </a>
+          {mainNavGroups.map((group) => (
+            <div key={group.label} mix={navGroupStyle}>
+              <span mix={navLabelStyle}>{group.label}</span>
+              {group.items.map((item) => (
+                <NavLink key={item.label} {...item} />
+              ))}
+            </div>
           ))}
         </nav>
         {settingsActive ? (
           <nav aria-label="Settings" mix={subnavStyle}>
-            <p mix={subnavHeadingStyle}>Settings</p>
+            <span mix={navLabelStyle}>Settings</span>
             {settingsNav.map((item) => (
-              <a
-                key={item.label}
-                href={item.href}
-                data-rmx-document=""
-                aria-current={item.current ? 'page' : undefined}
-                data-active={item.active ? 'true' : undefined}
-                mix={navLinkStyle}
-              >
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-              </a>
+              <NavLink key={item.label} {...item} />
             ))}
           </nav>
         ) : null}
         <div mix={footerStyle}>
-          <div mix={identityStyle}>
-            <span mix={identityNameStyle}>{identity.name}</span>
-            {identity.email ? <span mix={identityEmailStyle}>{identity.email}</span> : null}
+          <div mix={helpCardStyle}>
+            <strong mix={helpTitleStyle}>A little help?</strong>
+            <p mix={helpTextStyle}>
+              Manage your Clients, Invoices, and Organization settings from one place.
+            </p>
+          </div>
+          <div mix={profileStyle}>
+            <span aria-hidden="true" mix={avatarStyle}>
+              {initialsOf(identity.name)}
+            </span>
+            <span mix={profileNameStyle}>
+              <strong mix={identityNameStyle}>{identity.name}</strong>
+              {identity.email ? <span mix={identityEmailStyle}>{identity.email}</span> : null}
+            </span>
           </div>
           <form method="post" action={routes.auth.logout.href()} mix={logoutFormStyle}>
             <input type="hidden" name="_csrf" value={csrfToken} />
@@ -355,6 +604,7 @@ export function AppShell(handle: Handle<AppShellProps>) {
       description,
       children,
     } = handle.props;
+    let identity = identityOf(userIdentity);
     let settingsActive =
       section === 'profile' || section === 'invoicing' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
@@ -363,35 +613,56 @@ export function AppShell(handle: Handle<AppShellProps>) {
     let profileHref = routes.app.settings.profile.index.href();
     let invoicingHref = routes.app.settings.invoicing.index.href();
     let sessionsHref = routes.app.settings.sessions.index.href();
-    let mainNav: NavItem[] = [
+
+    let mainNavGroups: NavGroup[] = [
       {
-        href: dashboardHref,
-        label: 'Dashboard',
-        icon: 'home',
-        current: section === 'dashboard',
-        active: section === 'dashboard',
+        label: 'Overview',
+        items: [
+          {
+            href: dashboardHref,
+            label: 'Dashboard',
+            icon: 'home',
+            current: section === 'dashboard',
+            active: section === 'dashboard',
+          },
+        ],
       },
       {
-        href: clientsHref,
-        label: 'Clients',
-        icon: 'users',
-        current: section === 'clients',
-        active: section === 'clients',
+        label: 'Manage',
+        items: [
+          {
+            href: clientsHref,
+            label: 'Clients',
+            icon: 'users',
+            current: section === 'clients',
+            active: section === 'clients',
+          },
+        ],
       },
       {
-        href: invoicesHref,
-        label: 'Invoices',
-        icon: 'receipt',
-        current: section === 'invoices',
-        active: section === 'invoices',
+        label: 'Invoicing',
+        items: [
+          {
+            href: invoicesHref,
+            label: 'Invoices',
+            icon: 'receipt',
+            current: section === 'invoices',
+            active: section === 'invoices',
+          },
+        ],
       },
       {
-        // The Settings main destination intentionally opens Profile.
-        href: profileHref,
-        label: 'Settings',
-        icon: 'settings',
-        current: section === 'profile',
-        active: settingsActive,
+        label: 'Workspace',
+        items: [
+          {
+            // The Settings main destination intentionally opens Profile.
+            href: profileHref,
+            label: 'Settings',
+            icon: 'settings',
+            current: section === 'profile',
+            active: settingsActive,
+          },
+        ],
       },
     ];
     let settingsNav: NavItem[] = [
@@ -418,6 +689,25 @@ export function AppShell(handle: Handle<AppShellProps>) {
       },
     ];
 
+    // The breadcrumb is derived from the section and the page title only.
+    let breadcrumbParents: { label: string; href: string }[] = [];
+    if (section === 'clients' && title !== 'Clients') {
+      breadcrumbParents.push({ label: 'Clients', href: clientsHref });
+    } else if (section === 'invoices' && title !== 'Invoices') {
+      breadcrumbParents.push({ label: 'Invoices', href: invoicesHref });
+    } else if (settingsActive) {
+      breadcrumbParents.push({ label: 'Settings', href: profileHref });
+    }
+
+    let sidebarProps = {
+      csrfToken,
+      identity: userIdentity,
+      organizationName,
+      mainNavGroups,
+      settingsNav,
+      settingsActive,
+    };
+
     return (
       <Document title={title} description={description} noindex>
         <a href="#main" mix={skipLinkStyle}>
@@ -429,28 +719,40 @@ export function AppShell(handle: Handle<AppShellProps>) {
               <Icon name="menu" />
               <span>Menu</span>
             </summary>
-            <AppSidebar
-              csrfToken={csrfToken}
-              identity={userIdentity}
-              organizationName={organizationName}
-              mainNav={mainNav}
-              settingsNav={settingsNav}
-              settingsActive={settingsActive}
-              variant="mobile"
-            />
+            <AppSidebar {...sidebarProps} variant="mobile" />
           </details>
-          <AppSidebar
-            csrfToken={csrfToken}
-            identity={userIdentity}
-            organizationName={organizationName}
-            mainNav={mainNav}
-            settingsNav={settingsNav}
-            settingsActive={settingsActive}
-            variant="desktop"
-          />
-          <main id="main" mix={mainStyle}>
-            {children}
-          </main>
+          <AppSidebar {...sidebarProps} variant="desktop" />
+          <div mix={mainAreaStyle}>
+            <header mix={topbarStyle}>
+              <nav aria-label="Breadcrumb" mix={breadcrumbStyle}>
+                <a href={dashboardHref} data-rmx-document="" mix={breadcrumbLinkStyle}>
+                  {APP_NAME}
+                </a>
+                {breadcrumbParents.map((parent) => (
+                  <span key={parent.href} mix={breadcrumbSegmentStyle}>
+                    <span aria-hidden="true" mix={breadcrumbSeparatorStyle}>
+                      /
+                    </span>
+                    <a href={parent.href} data-rmx-document="" mix={breadcrumbLinkStyle}>
+                      {parent.label}
+                    </a>
+                  </span>
+                ))}
+                <span mix={breadcrumbSegmentStyle}>
+                  <span aria-hidden="true" mix={breadcrumbSeparatorStyle}>
+                    /
+                  </span>
+                  <strong aria-current="page" mix={breadcrumbCurrentStyle}>
+                    {title}
+                  </strong>
+                </span>
+              </nav>
+              <span mix={topbarIdentityStyle}>{identity.name}</span>
+            </header>
+            <main id="main" mix={mainStyle}>
+              {children}
+            </main>
+          </div>
         </div>
       </Document>
     );
