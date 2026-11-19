@@ -12,6 +12,7 @@
     "hmr": "cross-env NODE_ENV=development node hmr.ts",
     "start": "cross-env NODE_ENV=production node --import remix/node-tsx server.ts",
     "test": "cross-env NODE_ENV=test remix test",
+    "test:e2e": "cross-env NODE_ENV=test remix test --type browser --type e2e",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint"
   },
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/node": "latest",
     "oxlint": "^1.90.0",
+    "playwright": "^1.65.1",
     "typescript": "latest"
   },
   "trustedDependencies": [
