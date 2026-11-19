@@ -15,7 +15,6 @@ import {
 import type { CreditNoteDraftIssue } from '../../../../../data/invoices/credit-notes.ts';
 import {
   newCreditNoteFormValues,
-  readCreditNoteFormValues,
 } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { CreditNoteFormValues } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { Invoice, Organization, User } from '../../../../../data/db.ts';
@@ -26,6 +25,7 @@ import {
 } from '../../../../../middleware/organization-context.ts';
 import { todayInKolkata } from '../../../../../data/invoices/dates.ts';
 import { routes } from '../../../../../routes.ts';
+import { parseCreditNoteFormValues } from '../public/schema.ts';
 import { CreditNoteDraftPage } from './page.tsx';
 
 type CreditNoteRequestContext = RequestContext<AnyParams, ContextEntries> & {
@@ -136,7 +136,7 @@ export default createController(routes.app.invoices.creditNotes.new, {
         });
       }
 
-      let values = readCreditNoteFormValues(context.formData);
+      let values = parseCreditNoteFormValues(context.formData);
       let result = await createCreditNoteDraft(organization.id, invoice.id, values);
       if (!result.ok && result.kind === 'not_found') {
         return new Response('Invoice not found', { status: 404 });

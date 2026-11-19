@@ -5,6 +5,7 @@ import { suggestDueDate } from '../../../data/invoices/dates.ts';
 import { findIndiaStateByCode, INDIA_STATES } from '../../../data/india-states.ts';
 import { isIndiaCountry } from '../../../data/client-tax.ts';
 import type { InvoicingProfileView } from '../../../data/organization/invoicing.ts';
+import { LINE_FIELDS } from './public/schema.ts';
 
 /** One editable free-form service line as it appears in a submitted form. */
 export type InvoiceLineFormValue = InvoiceDraftLineInput;
@@ -15,20 +16,6 @@ export interface InvoiceFormValues extends InvoiceDraftInput {
   /** Carried for redisplay only; the saved name is always derived from the State/UT code. */
   recipient_tax_state_name: string;
 }
-
-const LINE_FIELDS = [
-  'description',
-  'sac',
-  'quantity',
-  'unit_price',
-  'discount_mode',
-  'discount_value',
-  'tax_treatment',
-  'gst_rate',
-  'foreign_tax_label',
-  'foreign_tax_mode',
-  'foreign_tax_value',
-] as const;
 
 export function emptyInvoiceFormValues(): InvoiceFormValues {
   return {
@@ -63,19 +50,7 @@ export function emptyInvoiceFormValues(): InvoiceFormValues {
     invoice_discount_value: '',
     round_off: '',
     lines: [
-      {
-        description: '',
-        sac: '',
-        quantity: '',
-        unit_price: '',
-        discount_mode: '',
-        discount_value: '',
-        tax_treatment: '',
-        gst_rate: '',
-        foreign_tax_label: '',
-        foreign_tax_mode: '',
-        foreign_tax_value: '',
-      },
+      Object.fromEntries(LINE_FIELDS.map((field) => [field, ''])) as unknown as InvoiceLineFormValue,
     ],
   };
 }
@@ -174,61 +149,6 @@ export function invoiceFormValuesOf(
             ? formatMinorInput(BigInt(line.foreign_tax_amount_minor), invoice.currency)
             : '',
     })),
-  };
-}
-
-function readText(formData: FormData, name: string): string {
-  let value = formData.get(name);
-  return typeof value === 'string' ? value : '';
-}
-
-/** Reads repeated `line_*` fields back into a stable array of service lines. */
-export function readInvoiceFormValues(formData: FormData): InvoiceFormValues {
-  let descriptions = formData.getAll('line_description');
-  let count = Math.max(1, descriptions.length);
-  let lines: InvoiceLineFormValue[] = [];
-  for (let index = 0; index < count; index += 1) {
-    let line = {} as InvoiceLineFormValue;
-    for (let field of LINE_FIELDS) {
-      let values = formData.getAll(`line_${field}`);
-      let value = values[index];
-      line[field] = typeof value === 'string' ? value : '';
-    }
-    lines.push(line);
-  }
-
-  return {
-    client_id: readText(formData, 'client_id'),
-    currency: readText(formData, 'currency'),
-    invoice_date: readText(formData, 'invoice_date'),
-    due_date: readText(formData, 'due_date'),
-    payment_term: readText(formData, 'payment_term'),
-    custom_payment_terms: readText(formData, 'custom_payment_terms'),
-    recipient_legal_name: readText(formData, 'recipient_legal_name'),
-    recipient_billing_line1: readText(formData, 'recipient_billing_line1'),
-    recipient_billing_locality: readText(formData, 'recipient_billing_locality'),
-    recipient_billing_region: readText(formData, 'recipient_billing_region'),
-    recipient_billing_postal_code: readText(formData, 'recipient_billing_postal_code'),
-    recipient_billing_country: readText(formData, 'recipient_billing_country'),
-    recipient_tax_country: readText(formData, 'recipient_tax_country'),
-    recipient_tax_type: readText(formData, 'recipient_tax_type'),
-    recipient_tax_value: readText(formData, 'recipient_tax_value'),
-    recipient_tax_state_code: readText(formData, 'recipient_tax_state_code'),
-    recipient_tax_state_name: readText(formData, 'recipient_tax_state_name'),
-    gst_mode: readText(formData, 'gst_mode'),
-    supply_type: readText(formData, 'supply_type'),
-    place_of_supply_state_code: readText(formData, 'place_of_supply_state_code'),
-    place_of_supply_country: readText(formData, 'place_of_supply_country'),
-    recipient_gstin_applicable: readText(formData, 'recipient_gstin_applicable'),
-    reverse_charge: readText(formData, 'reverse_charge'),
-    export_reference: readText(formData, 'export_reference'),
-    payment_instructions: readText(formData, 'payment_instructions'),
-    customer_notes: readText(formData, 'customer_notes'),
-    internal_note: readText(formData, 'internal_note'),
-    invoice_discount_mode: readText(formData, 'invoice_discount_mode'),
-    invoice_discount_value: readText(formData, 'invoice_discount_value'),
-    round_off: readText(formData, 'round_off'),
-    lines,
   };
 }
 

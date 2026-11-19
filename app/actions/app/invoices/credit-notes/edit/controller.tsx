@@ -16,7 +16,6 @@ import {
 import type { CreditNoteDraftIssue } from '../../../../../data/invoices/credit-notes.ts';
 import {
   creditNoteFormValuesOf,
-  readCreditNoteFormValues,
 } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { CreditNoteFormValues } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { Invoice, Organization, User } from '../../../../../data/db.ts';
@@ -27,6 +26,7 @@ import {
 } from '../../../../../middleware/organization-context.ts';
 import { todayInKolkata } from '../../../../../data/invoices/dates.ts';
 import { routes } from '../../../../../routes.ts';
+import { parseCreditNoteFormValues } from '../public/schema.ts';
 import { CreditNoteDraftPage } from './page.tsx';
 
 type CreditNoteEditRequestContext = RequestContext<AnyParams, ContextEntries> & {
@@ -140,7 +140,7 @@ export default createController(routes.app.invoices.creditNotes.edit, {
       if (invoice.status !== 'issued') {
         return new Response('Credit note Drafts require an issued invoice', { status: 409 });
       }
-      let values = readCreditNoteFormValues(context.formData);
+      let values = parseCreditNoteFormValues(context.formData);
       let result = await updateCreditNoteDraft(
         organization.id,
         invoice.id,
