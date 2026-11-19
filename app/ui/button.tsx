@@ -19,7 +19,7 @@ const buttonStyle = css({
   border: '1px solid transparent',
   borderRadius: radius.md,
   background: colors.accent,
-  color: '#ffffff',
+  color: colors.onPrimary,
   fontFamily,
   fontSize: '0.9375rem',
   fontWeight: 600,
@@ -39,10 +39,10 @@ const buttonStyle = css({
   },
   '&[data-variant="danger"]': {
     background: colors.danger,
-    color: '#ffffff',
+    color: colors.onPrimary,
   },
   '&[data-variant="danger"]:hover': {
-    background: '#991b1b',
+    background: colors.dangerHover,
   },
 });
 
@@ -57,7 +57,7 @@ export const linkButtonStyle = css({
   border: '1px solid transparent',
   borderRadius: radius.md,
   background: colors.accent,
-  color: '#ffffff',
+  color: colors.onPrimary,
   fontFamily,
   fontSize: '0.9375rem',
   fontWeight: 600,
@@ -77,10 +77,10 @@ export const linkButtonStyle = css({
   },
   '&[data-variant="danger"]': {
     background: colors.danger,
-    color: '#ffffff',
+    color: colors.onPrimary,
   },
   '&[data-variant="danger"]:hover': {
-    background: '#991b1b',
+    background: colors.dangerHover,
   },
 });
 
