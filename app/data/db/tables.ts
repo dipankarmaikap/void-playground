@@ -19,8 +19,9 @@ const NON_NEGATIVE_INVOICE_AMOUNTS = [
 function trimText<T extends Record<string, unknown>>(value: T, fields: Array<keyof T & string>): T {
   let next = { ...value };
   for (let field of fields) {
-    if (typeof next[field] === 'string') {
-      next[field] = (next[field] as string).trim();
+    let text = next[field];
+    if (typeof text === 'string') {
+      next[field] = text.trim() as T[typeof field];
     }
   }
   return next;
@@ -583,6 +584,26 @@ export const invoicePayments = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    return { value: trimText(value, ['payment_method', 'reference', 'void_reason']) };
+  },
+  validate({ value }) {
+    let issues: Array<{ message: string; path: Array<string | number> }> = [];
+    if (value.amount_minor !== undefined && value.amount_minor !== null && value.amount_minor <= 0) {
+      issues.push({ message: 'Payment amounts must be positive.', path: ['amount_minor'] });
+    }
+    if (value.voided_at !== undefined && value.void_reason !== undefined) {
+      let voided = value.voided_at != null;
+      let reason = value.void_reason;
+      if (voided && (reason == null || String(reason).trim() === '')) {
+        issues.push({ message: 'A voided payment requires a reason.', path: ['void_reason'] });
+      }
+      if (!voided && reason != null) {
+        issues.push({ message: 'A void reason requires a timestamp.', path: ['voided_at'] });
+      }
+    }
+    return issues.length > 0 ? { issues } : { value };
+  },
 });
 
 /** A manual refund belonging to one over-credited invoice in the same Organization. */
@@ -602,6 +623,26 @@ export const invoiceRefunds = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    return { value: trimText(value, ['refund_method', 'reference', 'void_reason']) };
+  },
+  validate({ value }) {
+    let issues: Array<{ message: string; path: Array<string | number> }> = [];
+    if (value.amount_minor !== undefined && value.amount_minor !== null && value.amount_minor <= 0) {
+      issues.push({ message: 'Refund amounts must be positive.', path: ['amount_minor'] });
+    }
+    if (value.voided_at !== undefined && value.void_reason !== undefined) {
+      let voided = value.voided_at != null;
+      let reason = value.void_reason;
+      if (voided && (reason == null || String(reason).trim() === '')) {
+        issues.push({ message: 'A voided refund requires a reason.', path: ['void_reason'] });
+      }
+      if (!voided && reason != null) {
+        issues.push({ message: 'A void reason requires a timestamp.', path: ['voided_at'] });
+      }
+    }
+    return issues.length > 0 ? { issues } : { value };
+  },
 });
 
 /** A free-form service line belonging to one invoice in the same Organization. */
@@ -688,6 +729,75 @@ export const creditNotes = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    return { value: trimText(value, ['status', 'credit_note_number', 'reason']) };
+  },
+  validate({ operation, value }) {
+    let issues: Array<{ message: string; path: Array<string | number> }> = [];
+    if (operation === 'create' && value.status === undefined) {
+      issues.push({ message: 'A Credit Note requires a status.', path: ['status'] });
+    }
+    let status = value.status;
+    if (status !== undefined && status !== 'draft' && status !== 'issued') {
+      issues.push({ message: 'Credit Note status must be draft or issued.', path: ['status'] });
+    }
+    let number = value.credit_note_number;
+    let issuedAt = value.issued_at;
+    if (status === 'draft') {
+      if (number != null) {
+        issues.push({ message: 'A Draft carries no credit note number.', path: ['credit_note_number'] });
+      }
+      if (issuedAt != null) {
+        issues.push({ message: 'A Draft carries no issue timestamp.', path: ['issued_at'] });
+      }
+    } else if (
+      status === 'issued' &&
+      (operation === 'create' || number !== undefined || issuedAt !== undefined)
+    ) {
+      if (number == null || String(number).trim() === '') {
+        issues.push({ message: 'An issued Credit Note requires its number.', path: ['credit_note_number'] });
+      }
+      if (issuedAt == null) {
+        issues.push({ message: 'An issued Credit Note requires its issue timestamp.', path: ['issued_at'] });
+      }
+    }
+
+    if (operation === 'create' && typeof value.reason !== 'string') {
+      issues.push({ message: 'A Credit Note requires a reason.', path: ['reason'] });
+    }
+    if (typeof value.reason === 'string' && value.reason.trim() === '') {
+      issues.push({ message: 'A Credit Note requires a reason.', path: ['reason'] });
+    }
+
+    for (let field of ['subtotal_minor', 'line_discount_total_minor', 'invoice_discount_minor', 'net_subtotal_minor', 'tax_total_minor'] as const) {
+      let amount = value[field];
+      if (amount !== undefined && amount !== null && amount < 0) {
+        issues.push({ message: 'Credit Note amounts cannot be negative.', path: [field] });
+      }
+    }
+    if (value.total_minor !== undefined && value.total_minor !== null && value.total_minor < 1) {
+      issues.push({ message: 'A Credit Note must credit a positive amount.', path: ['total_minor'] });
+    }
+
+    let subtotal = value.subtotal_minor;
+    let lineDiscountTotal = value.line_discount_total_minor;
+    let invoiceDiscount = value.invoice_discount_minor;
+    let netSubtotal = value.net_subtotal_minor;
+    if (
+      subtotal !== undefined &&
+      lineDiscountTotal !== undefined &&
+      invoiceDiscount !== undefined &&
+      netSubtotal !== undefined &&
+      subtotal !== lineDiscountTotal + invoiceDiscount + netSubtotal
+    ) {
+      issues.push({
+        message: 'The subtotal must equal the line and invoice discounts plus the net subtotal.',
+        path: ['subtotal_minor'],
+      });
+    }
+
+    return issues.length > 0 ? { issues } : { value };
+  },
 });
 
 /** A credited service line, tied to both its Credit Note and original invoice line. */
@@ -726,6 +836,30 @@ export const creditNoteLines = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    return {
+      value: trimText(value, ['description', 'sac', 'tax_treatment', 'foreign_tax_label']),
+    };
+  },
+  validate({ operation, value }) {
+    let issues: Array<{ message: string; path: Array<string | number> }> = [];
+    if (operation === 'create' && typeof value.description !== 'string') {
+      issues.push({ message: 'A credited line requires a description.', path: ['description'] });
+    }
+    if (typeof value.description === 'string' && value.description.trim() === '') {
+      issues.push({ message: 'A credited line requires a description.', path: ['description'] });
+    }
+    if (value.position !== undefined && value.position !== null && value.position < 0) {
+      issues.push({ message: 'Line positions cannot be negative.', path: ['position'] });
+    }
+    for (let field of ['amount_minor', 'line_discount_minor', 'allocated_invoice_discount_minor', 'net_minor'] as const) {
+      let amount = value[field];
+      if (amount !== undefined && amount !== null && amount < 0) {
+        issues.push({ message: 'Line amounts cannot be negative.', path: [field] });
+      }
+    }
+    return issues.length > 0 ? { issues } : { value };
+  },
 });
 
 /** The exact PDF bytes captured when a Credit Note is issued. */
