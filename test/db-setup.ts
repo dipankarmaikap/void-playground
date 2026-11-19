@@ -1,5 +1,6 @@
 import type { AnyTable } from 'remix/data-table';
 import { createSqliteDatabase } from 'remix/data-table/sqlite';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { migrateDatabase } from '../app/data/db/migrate.ts';
 
@@ -16,15 +17,18 @@ export const testDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: 
 await migrateDatabase(testDb);
 
 /**
- * The shared between-test cleanup: removes every row from exactly the named tables, so each call
- * site stays scoped to what its own tests dirty and no hand-written SQL cleanup accumulates. The
- * query builder's where-less `delete()` is the typed API's explicit full-table delete; the CRUD
- * helpers reject it so accidental wipes cannot slip through a `where` typo. When several tables
- * are named, child tables must come before the parents they reference: foreign keys stay
- * enforced.
+ * The shared between-test cleanup: removes every row from exactly the named tables of the
+ * caller's database, so each call site stays scoped to what its own tests dirty and no
+ * hand-written SQL cleanup accumulates. The query builder's where-less `delete()` is the
+ * typed API's explicit full-table delete; the CRUD helpers reject it so accidental wipes
+ * cannot slip through a `where` typo. When several tables are named, child tables must come
+ * before the parents they reference: foreign keys stay enforced.
  */
-export async function clearTestTables(...tables: AnyTable[]): Promise<void> {
+export async function clearTestTables(
+  db: SqliteDatabase,
+  ...tables: AnyTable[]
+): Promise<void> {
   for (let table of tables) {
-    await testDb.query(table).delete();
+    await db.query(table).delete();
   }
 }

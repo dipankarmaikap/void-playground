@@ -2,12 +2,11 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
-import { createAppRouter } from '../app/router.ts';
-import { testDb } from './db-setup.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
 import { createUserAndLogin, extractCsrf, origin } from './http.ts';
 
-const router = createAppRouter({ db: testDb });
+const { router, db } = await createTestRouter();
 
 describe('browser asset graph', () => {
   it('allows only the shared route contract and its browser-safe route modules', async () => {
@@ -81,7 +80,7 @@ describe('browser asset graph', () => {
   it('renders current import-map, preload, and entry metadata on each document response', async () => {
     let originalGetScriptEntry = assets.getScriptEntry;
     let version = 1;
-    let sessionCookie = await createUserAndLogin(router, 'asset-refresh');
+    let sessionCookie = await createUserAndLogin(router, db, 'asset-refresh');
 
     assets.getScriptEntry = async function (path) {
       let entry = await originalGetScriptEntry.call(assets, path);

@@ -3,18 +3,17 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 
-import { createAppRouter } from '../../../router.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 describe('Client invoice links', () => {
   it('links Active and Archived Clients to only their Organization-scoped invoices', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'client-invoice-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'client-invoice-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'client-invoice-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'client-invoice-other');
     let activeClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Active Invoice Client ${crypto.randomUUID()}`,
@@ -34,11 +33,11 @@ describe('Client invoice links', () => {
       legal_name: `Foreign Invoice Client ${crypto.randomUUID()}`,
     });
 
-    await seedInvoice(owner.organizationId, activeClient.id, {
+    await seedInvoice(db, owner.organizationId, activeClient.id, {
       id: 'active-client-invoice',
       recipientName: 'Active invoice',
     });
-    await seedInvoice(
+    await seedInvoice(db,
       owner.organizationId,
       archivedClient.id,
       {
@@ -46,7 +45,7 @@ describe('Client invoice links', () => {
         recipientName: 'Archived invoice',
       },
     );
-    await seedInvoice(
+    await seedInvoice(db,
       owner.organizationId,
       anotherClient.id,
       {
@@ -54,7 +53,7 @@ describe('Client invoice links', () => {
         recipientName: 'Another Client invoice',
       },
     );
-    await seedInvoice(
+    await seedInvoice(db,
       other.organizationId,
       foreignClient.id,
       {

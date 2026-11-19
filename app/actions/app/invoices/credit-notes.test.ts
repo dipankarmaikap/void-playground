@@ -9,10 +9,9 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import { issueCreditNoteDraft } from '../../../data/invoices/credit-notes.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -21,7 +20,7 @@ import {
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function createIssuedInvoice(
   organizationId: string,
@@ -31,7 +30,7 @@ async function createIssuedInvoice(
   let invoiceId = crypto.randomUUID();
   let lineId = crypto.randomUUID();
   let now = Date.now();
-  await seedInvoice(organizationId, clientId, {
+  await seedInvoice(db, organizationId, clientId, {
     id: invoiceId,
     recipientName: 'Credit Note Recipient',
     invoiceDate,
@@ -172,6 +171,7 @@ describe('credit notes', () => {
   it('starts a Credit Note Draft from an issued invoice snapshot and its remaining service lines', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-prefill',
     );
     let client = await createClient(db, organizationId, {
@@ -202,6 +202,7 @@ describe('credit notes', () => {
   it('creates a Draft with the submitted reason, date, and partial quantity', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-create',
     );
     let client = await createClient(db, organizationId, {
@@ -244,6 +245,7 @@ describe('credit notes', () => {
   it('requires a non-blank reason and a credit-note date on or after the invoice date', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-validation',
     );
     let client = await createClient(db, organizationId, {
@@ -287,6 +289,7 @@ describe('credit notes', () => {
   it('edits only a Draft and keeps its parent invoice balance and status unchanged', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-edit',
     );
     let client = await createClient(db, organizationId, {
@@ -344,6 +347,7 @@ describe('credit notes', () => {
   it('discards a Credit Note Draft without changing its issued parent invoice', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-discard',
     );
     let client = await createClient(db, organizationId, {
@@ -398,6 +402,7 @@ describe('credit notes', () => {
   it('previews a watermarked Draft Credit Note PDF without allocating its CN number', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-preview',
     );
     let client = await createClient(db, organizationId, {
@@ -460,6 +465,7 @@ describe('credit notes', () => {
   it('issues a Credit Note with its configured FY number and serves the immutable stored PDF', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-issue',
     );
     await db.create(organizationInvoicingProfiles, {
@@ -559,6 +565,7 @@ describe('credit notes', () => {
   it('rolls back numbering and issuance when its immutable PDF cannot be stored', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-finalizer-rollback',
     );
     let client = await createClient(db, organizationId, {
@@ -623,6 +630,7 @@ describe('credit notes', () => {
   it('reduces the parent balance and derives Partially Paid and Paid from credits plus payments', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-parent-balance',
     );
     let client = await createClient(db, organizationId, {
@@ -720,6 +728,7 @@ describe('credit notes', () => {
   it('marks a fully credited invoice Cancelled while retaining its original and credit-note links', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-cancelled',
     );
     let client = await createClient(db, organizationId, {
@@ -771,6 +780,7 @@ describe('credit notes', () => {
   it('rechecks cumulative line and total credit caps atomically before allocating a number', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-credit-cap',
     );
     let client = await createClient(db, organizationId, {
@@ -853,6 +863,7 @@ describe('credit notes', () => {
   it('allocates distinct Credit Note numbers for concurrent valid issue actions', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-concurrent-issue',
     );
     let client = await createClient(db, organizationId, {
@@ -902,6 +913,7 @@ describe('credit notes', () => {
   it('allocates independent Credit Note sequences for the Indian financial year boundaries', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-financial-years',
     );
     let client = await createClient(db, organizationId, {
@@ -964,6 +976,7 @@ describe('credit notes', () => {
   it('reverses frozen CGST/SGST, IGST, and manual foreign tax on credited service lines', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-tax-breakdown',
     );
     let client = await createClient(db, organizationId, {
@@ -1016,6 +1029,7 @@ describe('credit notes', () => {
   it('preserves original line discounts, invoice discounts, and round-off on a full credit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-full-rounding',
     );
     let client = await createClient(db, organizationId, {
@@ -1074,6 +1088,7 @@ describe('credit notes', () => {
   it('labels the credited invoice discount with the original percent mode in the Credit Note PDF', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-percent-discount-label',
     );
     let client = await createClient(db, organizationId, {
@@ -1124,6 +1139,7 @@ describe('credit notes', () => {
   it('lists linked Credit Note numbers beside each invoice in the directory', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'credit-note-directory-links',
     );
     let client = await createClient(db, organizationId, {
@@ -1150,8 +1166,8 @@ describe('credit notes', () => {
   });
 
   it('scopes Credit Note Drafts, issue actions, and PDFs to the authenticated Organization', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'credit-note-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'credit-note-scope-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'credit-note-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'credit-note-scope-other');
     let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Credit Note Client ${crypto.randomUUID()}`,

@@ -3,9 +3,8 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import { invoices } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
 import { addDays, todayInKolkata } from '../../../data/invoices/dates.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -14,7 +13,7 @@ import {
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function createIssuedInvoice(
   organizationId: string,
@@ -22,7 +21,7 @@ async function createIssuedInvoice(
   dueDate = addDays(todayInKolkata(), 1),
 ): Promise<string> {
   let id = crypto.randomUUID();
-  await seedInvoice(organizationId, clientId, {
+  await seedInvoice(db, organizationId, clientId, {
     id,
     recipientName: `Payment Recipient ${id}`,
     invoiceDate: todayInKolkata(),
@@ -63,6 +62,7 @@ describe('invoice payments', () => {
   it('records a partial offline payment and shows its remaining balance as Partially Paid', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-partial',
     );
     let client = await createClient(db, organizationId, {
@@ -144,6 +144,7 @@ describe('invoice payments', () => {
   it('keeps Overdue ahead of Partially Paid after the due date', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-overdue',
     );
     let client = await createClient(db, organizationId, {
@@ -205,6 +206,7 @@ describe('invoice payments', () => {
   it('accepts payment amounts at the invoice currency precision', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-currency',
     );
     let client = await createClient(db, organizationId, {
@@ -240,6 +242,7 @@ describe('invoice payments', () => {
   it('does not accept concurrent payments that together exceed the balance due', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-concurrent',
     );
     let client = await createClient(db, organizationId, {
@@ -272,6 +275,7 @@ describe('invoice payments', () => {
   it('requires a reason to void a payment and preserves the void audit history', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-void',
     );
     let client = await createClient(db, organizationId, {
@@ -342,6 +346,7 @@ describe('invoice payments', () => {
   it('rejects invalid, excessive, and Draft invoice payments', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-payment-rejections',
     );
     let client = await createClient(db, organizationId, {
@@ -373,7 +378,7 @@ describe('invoice payments', () => {
     assert.match(issuedDetail, /No payments recorded/);
 
     let draftInvoiceId = crypto.randomUUID();
-    await seedInvoice(organizationId, client.id, {
+    await seedInvoice(db, organizationId, client.id, {
       id: draftInvoiceId,
       recipientName: `Draft Payment Recipient ${draftInvoiceId}`,
       invoiceDate: today,
@@ -389,8 +394,8 @@ describe('invoice payments', () => {
   });
 
   it('scopes payment recording and voiding to the authenticated Organization', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-payment-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-payment-scope-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-payment-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-payment-scope-other');
     let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Payment Client ${crypto.randomUUID()}`,

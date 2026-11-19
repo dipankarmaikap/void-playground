@@ -1,10 +1,10 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
-import { clients } from '../../../data/db.ts';
-import { testDb as db, clearTestTables } from '../../../../test/db-setup.ts';
+import { clients, invoices } from '../../../data/db.ts';
+import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -13,14 +13,14 @@ import {
   postForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 type ClientFixture = Partial<Client> & Pick<Client, 'type' | 'legal_name'>;
 
 let organizationId: string;
 
 async function createSearchUser() {
-  let tenant = await createUserAndLoginWithOrganization(router, 'search');
+  let tenant = await createUserAndLoginWithOrganization(router, db, 'search');
   organizationId = tenant.organizationId;
   return tenant.sessionCookie;
 }
@@ -57,7 +57,7 @@ function includes(html: string, value: string) {
 }
 
 beforeEach(async () => {
-  await clearTestTables(clients);
+  await clearTestTables(db, invoices, clients);
 });
 
 describe('client directory search and filters', () => {

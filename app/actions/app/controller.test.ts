@@ -1,18 +1,17 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { createAppRouter } from '../../router.ts';
+import { createTestRouter } from '../../../test/router.ts';
 import { routes } from '../../routes.ts';
 import { organizationMemberships, users } from '../../data/db.ts';
-import { testDb as db } from '../../../test/db-setup.ts';
 import { findOrganizationForUser } from '../../data/organization/access.ts';
 import { createUser, login, origin, postForm } from '../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function loginNewUser(displayName: string | null = null) {
   let email = `app-${crypto.randomUUID()}@example.com`;
-  let userId = await createUser(email, 'password123', true, displayName);
+  let userId = await createUser(db, email, 'password123', true, displayName);
   let sessionCookie = await login(router, email, 'password123');
   return { email, userId, sessionCookie };
 }

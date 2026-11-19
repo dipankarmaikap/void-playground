@@ -2,13 +2,12 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { createAppRouter } from '../../../../router.ts';
-import { testDb as db } from '../../../../../test/db-setup.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
 import { invoicingFormFields } from './test-fields.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 let index = routes.app.settings.invoicing.index.href();
 let action = routes.app.settings.invoicing.action.href();
@@ -23,7 +22,7 @@ let signature = imageDataUrl('image/jpeg', Buffer.from('a small jpeg signature')
 
 describe('organization logo and authorized signature settings', () => {
   it('starts with no logo or signature image', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'inv-image-default');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'inv-image-default');
     let html = await getHtml(router, index, sessionCookie);
 
     assert.match(html, /name="logo"[^>]*value=""/);
@@ -35,6 +34,7 @@ describe('organization logo and authorized signature settings', () => {
   it('saves, renders, and replaces the logo, signature, and signatory details', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-image-save',
     );
 
@@ -90,6 +90,7 @@ describe('organization logo and authorized signature settings', () => {
   it('removes the logo and signature and clears the signatory block', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-image-remove',
     );
     let saved = await postForm(
@@ -133,6 +134,7 @@ describe('organization logo and authorized signature settings', () => {
   it('rejects unsafe MIME types and malformed data URLs with 400s that preserve the draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-image-mime',
     );
     let badLogo = imageDataUrl('image/gif', Buffer.from('gif'));
@@ -161,6 +163,7 @@ describe('organization logo and authorized signature settings', () => {
   it('rejects logo and signature images above the byte limit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-image-size',
     );
     let oversized = imageDataUrl('image/png', Buffer.alloc(128 * 1024 + 1, 1));
@@ -182,6 +185,7 @@ describe('organization logo and authorized signature settings', () => {
   it('rejects overlong signatory text without storing it', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-image-signatory',
     );
     let longName = 'N'.repeat(121);
@@ -206,8 +210,8 @@ describe('organization logo and authorized signature settings', () => {
   });
 
   it('keeps image settings private and ignores a forged Organization id', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'inv-image-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'inv-image-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'inv-image-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'inv-image-other');
 
     let saved = await postForm(
       router,
@@ -244,7 +248,7 @@ describe('organization logo and authorized signature settings', () => {
   });
 
   it('rejects image settings changes without a CSRF token', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'inv-image-csrf');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'inv-image-csrf');
     let page = await getHtml(router, index, sessionCookie);
     assert.ok(page);
 

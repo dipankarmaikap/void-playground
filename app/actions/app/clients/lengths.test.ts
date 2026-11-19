@@ -2,12 +2,11 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { clients } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { createUserAndLogin, postForm, submitForm } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 const clientTextLimits = [
   { field: 'legal_name', limit: 120 },
@@ -64,7 +63,7 @@ function uniqueName(prefix: string) {
 
 describe('Client free-text length limits', () => {
   it('accepts each free-text field at its documented maximum length', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let values = maxLengthValues();
     let response = await postForm(
       router,
@@ -87,7 +86,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('rejects every over-limit field with feedback and preserves the submitted value', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
 
     for (let { field, limit } of clientTextLimits) {
       let value = 'X'.repeat(limit + 1);
@@ -137,7 +136,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('rejects over-limit name submissions before trimming whitespace', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let cases = [
       {
         field: 'legal_name',
@@ -179,7 +178,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('reveals invalid Business-only fields on an Individual form', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let fields = {
       type: 'individual',
       legal_name: uniqueName('Individual with hidden values'),
@@ -207,7 +206,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('preserves stored Client data when edit fields exceed their limits', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let values = maxLengthValues();
     let created = await postForm(
       router,

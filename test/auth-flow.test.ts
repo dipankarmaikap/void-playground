@@ -1,14 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { createAppRouter } from '../app/router.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
 import {
   organizationMemberships,
   organizations,
   users,
 } from '../app/data/db.ts';
-import { testDb as db } from './db-setup.ts';
 import { findOrganizationForUser } from '../app/data/organization/access.ts';
 
 import {
@@ -20,7 +19,7 @@ import {
   postForm,
 } from './http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function register(body: Record<string, string>) {
   let response = await postForm(router, routes.auth.register.action.href(), body);
@@ -60,7 +59,7 @@ describe('login return-to redirect', () => {
 
   it('returns the User to their destination after signing in', async () => {
     let email = `return-to-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
     let destination = routes.app.clients.index.href(
       {},
       { searchParams: { status: 'archived' } },
@@ -92,7 +91,7 @@ describe('login return-to redirect', () => {
 
   it('falls back to the dashboard for an off-site returnTo', async () => {
     let email = `off-site-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
 
     let loginHref = routes.auth.login.index.href(undefined, {
       searchParams: { returnTo: 'https://evil.example/phish' },
@@ -105,7 +104,7 @@ describe('login return-to redirect', () => {
 
   it('falls back to the dashboard for a protocol-relative returnTo', async () => {
     let email = `protocol-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
 
     let loginHref = routes.auth.login.index.href(undefined, {
       searchParams: { returnTo: '//evil.example/phish' },
@@ -118,7 +117,7 @@ describe('login return-to redirect', () => {
 
   it('falls back to the dashboard for a non-path returnTo', async () => {
     let email = `scheme-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
 
     let loginHref = routes.auth.login.index.href(undefined, {
       searchParams: { returnTo: 'javascript:alert(1)' },
@@ -410,8 +409,8 @@ describe('auth flow', () => {
   it('fails closed instead of trusting a browser-supplied Organization ID', async () => {
     let email = `unassociated-${crypto.randomUUID()}@example.com`;
     let foreignEmail = `foreign-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
-    let foreignUserId = await createUser(foreignEmail, 'password123');
+    let userId = await createUser(db, email, 'password123');
+    let foreignUserId = await createUser(db, foreignEmail, 'password123');
     let foreignMembership = await db.findOne(organizationMemberships, {
       where: { user_id: foreignUserId },
     });
@@ -440,7 +439,7 @@ describe('auth flow', () => {
 
   it('fails closed when an Organization selector would be needed', async () => {
     let email = `multiple-organizations-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let organizationId = crypto.randomUUID();
     let now = Date.now();
     await db.create(organizations, {

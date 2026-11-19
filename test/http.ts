@@ -1,4 +1,5 @@
 import * as assert from 'remix/assert';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import {
   organizationMemberships,
@@ -7,7 +8,6 @@ import {
   users,
   userPasswords,
 } from '../app/data/db.ts';
-import { testDb as db } from './db-setup.ts';
 import { hashPassword } from '../app/data/password.ts';
 import { defaultGstPresetRows } from '../app/data/organization/gst-presets.ts';
 import { routes } from '../app/routes.ts';
@@ -31,6 +31,7 @@ export function cookieFromResponse(res: Response): string {
 }
 
 export async function createUser(
+  db: SqliteDatabase,
   email: string,
   password: string,
   verified = true,
@@ -122,29 +123,35 @@ export async function login(app: TestApp, email: string, password: string): Prom
 
 /**
  * Creates a verified User whose email starts with `emailPrefix`, then signs them in.
- * The unique suffix keeps test files independent when they share the in-memory database.
+ * Pass the database the router under test was built around (from `createTestRouter()`).
  */
 export async function createUserAndLogin(
   app: TestApp,
+  db: SqliteDatabase,
   emailPrefix: string,
   displayName: string | null = null,
 ): Promise<string> {
   let { sessionCookie } = await createUserAndLoginWithOrganization(
     app,
+    db,
     emailPrefix,
     displayName,
   );
   return sessionCookie;
 }
 
-/** Creates a verified User and signs in, returning its server-provisioned Organization ID. */
+/**
+ * Creates a verified User and signs in, returning its server-provisioned Organization ID.
+ * Pass the database the router under test was built around (from `createTestRouter()`).
+ */
 export async function createUserAndLoginWithOrganization(
   app: TestApp,
+  db: SqliteDatabase,
   emailPrefix: string,
   displayName: string | null = null,
 ): Promise<{ sessionCookie: string; organizationId: string }> {
   let email = `${emailPrefix}-${crypto.randomUUID()}@example.com`;
-  let userId = await createUser(email, 'password123', true, displayName);
+  let userId = await createUser(db, email, 'password123', true, displayName);
   let membership = await db.findOne(organizationMemberships, { where: { user_id: userId } });
   assert.ok(membership, 'the test User should have an OrganizationMembership');
   return {

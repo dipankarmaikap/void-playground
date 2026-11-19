@@ -2,11 +2,10 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createUser, login, origin } from '../../test/http.ts';
-import { createAppRouter } from '../router.ts';
-import { testDb } from '../../test/db-setup.ts';
+import { createTestRouter } from '../../test/router.ts';
 import { routes } from '../routes.ts';
 
-const router = createAppRouter({ db: testDb });
+const { router, db } = await createTestRouter();
 
 describe('root controller', () => {
   it('GET / returns the home page', async () => {
@@ -63,7 +62,7 @@ describe('root controller', () => {
 
   it('GET / remains public for an authenticated user and links to every destination', async () => {
     let email = `home-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let response = await router.fetch(new URL(routes.home.href(), origin), {

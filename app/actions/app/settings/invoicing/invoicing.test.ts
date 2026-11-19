@@ -6,9 +6,8 @@ import {
   organizationMemberships,
   organizations,
 } from '../../../../data/db.ts';
-import { testDb as db } from '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { createAppRouter } from '../../../../router.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -18,7 +17,7 @@ import {
   postForm,
 } from '../../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 function invoicingFields(overrides: Record<string, string> = {}) {
   return {
@@ -38,6 +37,7 @@ describe('organization invoicing settings', () => {
   it('opens Invoicing from Settings with the Organization name as the default seller and incomplete readiness', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-nav',
     );
     let organization = await db.find(organizations, organizationId);
@@ -65,6 +65,7 @@ describe('organization invoicing settings', () => {
   it('saves the seller profile and shows the Organization as ready to issue', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-save',
     );
 
@@ -116,6 +117,7 @@ describe('organization invoicing settings', () => {
   it('updates saved values and falls back to the Organization name when the override is cleared', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-update',
     );
     let organization = await db.find(organizations, organizationId);
@@ -185,6 +187,7 @@ describe('organization invoicing settings', () => {
   it('returns accessible 400 feedback and preserves values for an incomplete address', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-partial',
     );
 
@@ -221,6 +224,7 @@ describe('organization invoicing settings', () => {
   it('rejects invalid and overlong inputs while keeping the submitted draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-invalid',
     );
     let overlongLegalName = 'L'.repeat(121);
@@ -257,6 +261,7 @@ describe('organization invoicing settings', () => {
   it('keeps stored values when a later edit fails validation', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-stable',
     );
     await postForm(
@@ -300,8 +305,8 @@ describe('organization invoicing settings', () => {
   });
 
   it('keeps each Organization’s profile private and ignores a forged Organization id', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-other');
     let secretName = 'Secret Owner Legal LLP';
     let secretAddress = '77 Private Owner Lane';
 
@@ -365,6 +370,7 @@ describe('organization invoicing settings', () => {
   it('redirects anonymous requests and rejects missing CSRF tokens', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-anon',
     );
 
@@ -394,7 +400,7 @@ describe('organization invoicing settings', () => {
   });
 
   it('fails closed for a User without an OrganizationMembership', async () => {
-    let tenant = await createUserAndLoginWithOrganization(router, 'invoice-no-membership');
+    let tenant = await createUserAndLoginWithOrganization(router, db, 'invoice-no-membership');
     let page = await getHtml(router, routes.app.settings.invoicing.index.href(), tenant.sessionCookie);
     let csrf = extractCsrf(page);
     assert.ok(csrf);

@@ -3,9 +3,8 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import { invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -15,7 +14,7 @@ import {
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function createIssuedInvoice(
   organizationId: string,
@@ -24,7 +23,7 @@ async function createIssuedInvoice(
   let invoiceId = crypto.randomUUID();
   let lineId = crypto.randomUUID();
   let now = Date.now();
-  await seedInvoice(organizationId, clientId, {
+  await seedInvoice(db, organizationId, clientId, {
     id: invoiceId,
     recipientName: `Refund Recipient ${invoiceId}`,
     invoiceDate: todayInKolkata(),
@@ -168,6 +167,7 @@ describe('invoice refunds', () => {
   it('surfaces refund due after a post-payment full credit note and records a full refund', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-full',
     );
     let client = await createClient(db, organizationId, {
@@ -208,6 +208,7 @@ describe('invoice refunds', () => {
   it('tracks refund due after a partial post-payment credit note across multiple refunds', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-partial-cn',
     );
     let client = await createClient(db, organizationId, {
@@ -251,6 +252,7 @@ describe('invoice refunds', () => {
   it('rejects over-refunds, refunds without a refund due, invalid entries, and Draft invoices', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-rejections',
     );
     let client = await createClient(db, organizationId, {
@@ -284,7 +286,7 @@ describe('invoice refunds', () => {
     assert.match(await noRefundDue.text(), /There is no refund due on this invoice/);
 
     let draftId = crypto.randomUUID();
-    await seedInvoice(organizationId, client.id, {
+    await seedInvoice(db, organizationId, client.id, {
       id: draftId,
       recipientName: `Draft Refund Recipient ${draftId}`,
       invoiceDate: todayInKolkata(),
@@ -297,6 +299,7 @@ describe('invoice refunds', () => {
   it('rejects voiding the only payment after a full credit and refund', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-payment-void-invariant',
     );
     let client = await createClient(db, organizationId, {
@@ -367,6 +370,7 @@ describe('invoice refunds', () => {
   it('derives status from net paid when gross payments and net paid diverge after a refund and a payment void', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-net-paid-status',
     );
     let client = await createClient(db, organizationId, {
@@ -420,6 +424,7 @@ describe('invoice refunds', () => {
   it('voids a refund with a reason, restoring refund due while retaining the audit history', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-void',
     );
     let client = await createClient(db, organizationId, {
@@ -480,6 +485,7 @@ describe('invoice refunds', () => {
   it('restores refund due and keeps balances consistent when a refund is voided', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-void-balances',
     );
     let client = await createClient(db, organizationId, {
@@ -524,8 +530,8 @@ describe('invoice refunds', () => {
   });
 
   it('scopes refund recording, voiding, and views to the authenticated Organization', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-refund-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-refund-scope-other');
     let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Refund Client ${crypto.randomUUID()}`,
@@ -598,6 +604,7 @@ describe('invoice refunds', () => {
   it('rejects refund mutations without a CSRF token', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-csrf',
     );
     let client = await createClient(db, organizationId, {
