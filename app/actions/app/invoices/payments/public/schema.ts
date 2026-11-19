@@ -1,6 +1,7 @@
 import * as s from 'remix/data-schema';
 import * as f from 'remix/data-schema/form-data';
 
+import { voidReasonForm } from '../../public/void-reason-form.ts';
 import type { FormFieldDescriptor } from '../../../../../ui/public/form-field.ts';
 
 /** Longest payment reference the form accepts; the schema's bound and the browser share it. */
@@ -26,13 +27,11 @@ export const paymentFormFields = {
 } satisfies Record<string, FormFieldDescriptor>;
 
 /** The payment void form, described once. */
-export const PaymentVoidForm = f.object({
-  reason: f.field(s.defaulted(s.string(), '')),
-});
+const voidReason = voidReasonForm(PAYMENT_VOID_REASON_MAX_LENGTH);
 
-export const paymentVoidFormFields = {
-  reason: { control: 'textarea', required: true, maxLength: PAYMENT_VOID_REASON_MAX_LENGTH },
-} satisfies Record<string, FormFieldDescriptor>;
+export const PaymentVoidForm = voidReason.schema;
+
+export const paymentVoidFormFields = voidReason.fields;
 
 /** Reads a payment submission, failing closed to blank values if it cannot be read as text. */
 export function paymentValuesOf(formData: FormData) {
