@@ -1,7 +1,7 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -12,6 +12,7 @@ import { todayInKolkata } from '../../../../data/invoices/dates.ts';
 import { createDraftInvoice } from '../../../../data/invoices/records.ts';
 import { ensureGstPresets, findGstPresets } from '../../../../data/organization/gst-presets.ts';
 import { getInvoicingProfileView } from '../../../../data/organization/invoicing.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -23,7 +24,7 @@ import { NewInvoicePage } from './page.tsx';
 
 export default createController(routes.app.invoices.new, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

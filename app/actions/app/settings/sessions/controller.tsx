@@ -1,7 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { requireAuth } from 'remix/middleware/auth';
 import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
@@ -11,12 +10,13 @@ import { db, sessions } from '../../../../data/db.ts';
 import type { User } from '../../../../data/db.ts';
 import { findOrganizationForUser } from '../../../../data/organization/access.ts';
 import { browserLabel } from '../../../../data/user-agent.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import { routes } from '../../../../routes.ts';
 import { SessionsPage } from './page.tsx';
 import type { SessionView } from './page.tsx';
 
 export default createController(routes.app.settings.sessions, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [requireAuth()],
   actions: {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;

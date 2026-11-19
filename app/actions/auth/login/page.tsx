@@ -20,6 +20,7 @@ import { Document } from '../../document.tsx';
 
 export interface LoginPageProps {
   csrfToken: string;
+  action: string;
   error?: string;
   message?: string;
   email?: string;
@@ -27,7 +28,7 @@ export interface LoginPageProps {
 
 export function LoginPage(handle: Handle<LoginPageProps>) {
   return () => {
-    let { csrfToken, error, message, email } = handle.props;
+    let { csrfToken, action, error, message, email } = handle.props;
 
     return (
       <Document title="Log in" description={`Log in to ${APP_NAME} to open your dashboard.`}>
@@ -46,7 +47,7 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
               {message}
             </p>
           ) : null}
-          <form method="post" action={routes.auth.login.action.href()} mix={formStackStyle}>
+          <form method="post" action={action} mix={formStackStyle}>
             <input type="hidden" name="_csrf" value={csrfToken} />
             <Field label="Email">
               <Input

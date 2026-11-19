@@ -332,7 +332,9 @@ describe('client directory search and filters', () => {
 
     let anonymous = await router.fetch(new URL(path, origin));
     assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    let location = new URL(anonymous.headers.get('Location') ?? '', origin);
+    assert.equal(location.pathname, routes.auth.login.index.href());
+    assert.equal(location.searchParams.get('returnTo'), path);
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);

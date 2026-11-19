@@ -1,7 +1,6 @@
 import { createController } from 'remix/router';
-import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -25,6 +24,7 @@ import {
   sellerFromInvoicingProfile,
 } from '../../../data/invoices/pdf.ts';
 import { getInvoicingProfileView } from '../../../data/organization/invoicing.ts';
+import { requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -35,7 +35,7 @@ import { InvoiceShowPage } from './show-page.tsx';
 
 export default createController(routes.app.invoices, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

@@ -1,10 +1,8 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { requireAuth } from 'remix/middleware/auth';
-
 import { archiveClient, restoreClient } from '../../../../data/client-status.ts';
-import type { User } from '../../../../data/db.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -13,7 +11,7 @@ import { routes } from '../../../../routes.ts';
 
 export default createController(routes.app.clients.lifecycle, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

@@ -1,7 +1,6 @@
 import { createController } from 'remix/router';
-import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -15,6 +14,7 @@ import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
 import type { User } from '../../../data/db.ts';
 import { countClientInvoices } from '../../../data/invoices/records.ts';
+import { requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -25,7 +25,7 @@ import { ClientProfilePage } from './show-page.tsx';
 
 export default createController(routes.app.clients, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

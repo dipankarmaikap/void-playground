@@ -11,6 +11,7 @@ import { db, users, userPasswords } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
 import { setAuthPayload } from '../../../data/session/auth-payload.ts';
 import { verifyPassword } from '../../../data/password.ts';
+import { getLoginRedirectURL, getPostAuthRedirect } from '../../../middleware/auth.ts';
 import { routes } from '../../../routes.ts';
 import { LoginPage } from './page.tsx';
 
@@ -43,7 +44,7 @@ export default createController(routes.auth.login, {
     async index(context) {
       let auth = context.get(Auth) as AuthState<User>;
       if (auth?.ok) {
-        return redirect(routes.app.dashboard.href());
+        return redirect(getPostAuthRedirect(context.url));
       }
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
@@ -51,6 +52,7 @@ export default createController(routes.auth.login, {
       return context.render(
         <LoginPage
           csrfToken={csrfToken}
+          action={getLoginRedirectURL(context.url)}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,
@@ -60,11 +62,11 @@ export default createController(routes.auth.login, {
       let user = await verifyCredentials(credentialsProvider, context);
       if (!user) {
         context.session.flash('error', 'Invalid email or password');
-        return redirect(routes.auth.login.index.href());
+        return redirect(getLoginRedirectURL(context.url));
       }
       let session = completeAuth(context);
       setAuthPayload(session, { userId: user.id });
-      return redirect(routes.app.dashboard.href());
+      return redirect(getPostAuthRedirect(context.url));
     },
   },
 });

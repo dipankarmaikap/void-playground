@@ -1,20 +1,17 @@
 import { createController } from 'remix/router';
-import { redirect } from 'remix/response/redirect';
-
-import { requireAuth } from 'remix/middleware/auth';
 
 import {
   findCreditNote,
   findCreditNoteLines,
   findIssuedCreditNotePdfBytes,
 } from '../../../../data/invoices/credit-notes.ts';
-import type { User } from '../../../../data/db.ts';
 import {
   renderCreditNotePdf,
   sellerFromInvoiceSnapshot,
 } from '../../../../data/invoices/pdf.ts';
 import { creditNotePdfFilename } from '../../../../data/invoices/credit-note-pdf-artifacts.ts';
 import { findInvoice } from '../../../../data/invoices/records.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -23,7 +20,7 @@ import { routes } from '../../../../routes.ts';
 
 export default createController(routes.app.invoices.creditNotes, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

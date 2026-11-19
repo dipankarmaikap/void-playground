@@ -2,7 +2,7 @@ import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
@@ -20,6 +20,7 @@ import {
 import type { CreditNoteFormValues } from '../../../../../data/invoices/credit-note-form-values.ts';
 import type { Invoice, Organization, User } from '../../../../../data/db.ts';
 import { findInvoice, findInvoiceLines } from '../../../../../data/invoices/records.ts';
+import { requireAuth } from '../../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -68,7 +69,7 @@ async function renderCreditNoteForm(
 
 export default createController(routes.app.invoices.creditNotes.new, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

@@ -405,7 +405,9 @@ describe('business clients', () => {
 
     let anonymous = await router.fetch(new URL(location, origin));
     assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    let loginLocation = new URL(anonymous.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), location);
   });
 
   it('rejects Business mutations without a CSRF token', async () => {

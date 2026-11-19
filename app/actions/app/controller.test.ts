@@ -58,11 +58,13 @@ describe('app controller', () => {
       let response = await router.fetch(new URL(path, origin));
 
       assert.equal(response.status, 302, `${path} should redirect`);
+      let location = new URL(response.headers.get('Location') ?? '', origin);
       assert.equal(
-        response.headers.get('Location'),
+        location.pathname,
         routes.auth.login.index.href(),
         `${path} should redirect to login`,
       );
+      assert.equal(location.searchParams.get('returnTo'), path, 'login keeps the destination');
     }
   });
 

@@ -220,9 +220,12 @@ describe('draft invoices', () => {
   });
 
   it('redirects anonymous visitors from the invoice directory to login', async () => {
-    let response = await router.fetch(new URL(routes.app.invoices.index.href(), origin));
+    let path = routes.app.invoices.index.href();
+    let response = await router.fetch(new URL(path, origin));
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+    let location = new URL(response.headers.get('Location') ?? '', origin);
+    assert.equal(location.pathname, routes.auth.login.index.href());
+    assert.equal(location.searchParams.get('returnTo'), path);
   });
 
   it('prefills recipient, currency, dates, and notes from the Client and Organization defaults', async () => {
