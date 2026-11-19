@@ -98,6 +98,8 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
 
 export const taxSection: ClientFormSection = {
   key: 'tax',
+  title: 'Tax identifier',
+  hint: 'Optional. Recorded for invoice documents.',
   render: (props) => (
     <TaxFields
       values={props.values}

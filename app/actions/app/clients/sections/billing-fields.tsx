@@ -145,6 +145,8 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
 
 export const billingSection: ClientFormSection = {
   key: 'billing',
+  title: 'Billing address',
+  hint: 'Shown on invoices sent to this client.',
   render: (props) => (
     <BillingFields
       values={props.values}

@@ -11,7 +11,7 @@ import {
 } from './db.ts';
 import type { Client, Invoice } from './db.ts';
 import { clearTestTables, testDb } from '../../test/db-setup.ts';
-import { getClientDirectoryFacts } from './client-directory-facts.ts';
+import { getClientDirectoryFacts, getClientProfileFacts } from './client-directory-facts.ts';
 
 let organizationId: string;
 
@@ -247,5 +247,52 @@ describe('client directory facts', () => {
     assert.equal(facts.summary.averageCollectionDays, 3);
     assert.equal(facts.clients.size, 1);
     assert.equal(facts.clients.get(foreignClient.id), undefined);
+  });
+});
+
+describe('client profile facts', () => {
+  it('derives one Client’s totals, paid count and history from real Invoices and Payments', async () => {
+    let client = await seedClient();
+    let otherClient = await seedClient();
+    let paid = await seedInvoice({
+      client_id: client.id,
+      total_minor: 50_000,
+      invoice_date: '2026-09-01',
+      due_date: '2026-09-15',
+    });
+    let unpaid = await seedInvoice({ client_id: client.id, total_minor: 100_000 });
+    await seedPayment(paid.id, '2026-09-10', 50_000);
+    await seedInvoice({ client_id: otherClient.id, total_minor: 900_000 });
+
+    let facts = await getClientProfileFacts(testDb, organizationId, client.id, '2026-11-19');
+
+    assert.equal(facts.currency, 'INR');
+    assert.equal(facts.invoiceCount, 2);
+    assert.equal(facts.totalInvoicedMinor, 150_000);
+    assert.equal(facts.outstandingBalanceMinor, 100_000);
+    assert.equal(facts.paidInvoiceCount, 1);
+    assert.equal(facts.averageCollectionDays, 9);
+    assert.deepEqual(
+      facts.invoices.map((invoice) => invoice.id),
+      [unpaid.id, paid.id],
+      'most recent Invoice first, and no other Client’s Invoice',
+    );
+    assert.deepEqual(
+      facts.invoices.map((invoice) => invoice.status),
+      ['overdue', 'paid'],
+    );
+  });
+
+  it('reports an empty collection average and no history when the Client has no Invoices', async () => {
+    let client = await seedClient();
+
+    let facts = await getClientProfileFacts(testDb, organizationId, client.id, '2026-11-19');
+
+    assert.equal(facts.invoiceCount, 0);
+    assert.equal(facts.totalInvoicedMinor, 0);
+    assert.equal(facts.outstandingBalanceMinor, 0);
+    assert.equal(facts.paidInvoiceCount, 0);
+    assert.equal(facts.averageCollectionDays, null);
+    assert.equal(facts.invoices.length, 0);
   });
 });
