@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
 import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
@@ -17,6 +18,7 @@ import {
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
 import { ProfilePage } from './page.tsx';
+import { DisplayNameForm, OrganizationNameForm } from './public/schema.ts';
 
 const DISPLAY_NAME_DRAFT_FLASH_KEY = 'display_name_draft';
 const ORGANIZATION_NAME_DRAFT_FLASH_KEY = 'organization_name_draft';
@@ -64,17 +66,17 @@ export default createController(routes.app.settings.profile, {
       let auth = context.get(Auth) as GoodAuth<User>;
 
       async function renameOrganization() {
-        let value = context.formData.get('organization_name');
-        let submitted = typeof value === 'string' ? value : '';
-        let parsed = parseOrganizationName(submitted);
+        let parsed = s.parseSafe(OrganizationNameForm, context.formData);
+        let submitted = parsed.success ? parsed.value.organization_name : '';
+        let result = parseOrganizationName(submitted);
 
-        if (!parsed.ok) {
-          context.session.flash(ORGANIZATION_ERROR_FLASH_KEY, parsed.error);
+        if (!result.ok) {
+          context.session.flash(ORGANIZATION_ERROR_FLASH_KEY, result.error);
           context.session.flash(ORGANIZATION_NAME_DRAFT_FLASH_KEY, submitted);
           return redirect(routes.app.settings.profile.index.href());
         }
 
-        let organization = await renameOwnedOrganizationForUser(auth.identity, parsed.value);
+        let organization = await renameOwnedOrganizationForUser(auth.identity, result.value);
         if (!organization) {
           return new Response('Organization owner access unavailable', { status: 403 });
         }
@@ -84,17 +86,17 @@ export default createController(routes.app.settings.profile, {
       }
 
       async function updateDisplayName() {
-        let value = context.formData.get('display_name');
-        let submitted = typeof value === 'string' ? value : '';
-        let parsed = parseDisplayName(submitted);
+        let parsed = s.parseSafe(DisplayNameForm, context.formData);
+        let submitted = parsed.success ? parsed.value.display_name : '';
+        let result = parseDisplayName(submitted);
 
-        if (!parsed.ok) {
-          context.session.flash('error', parsed.error);
+        if (!result.ok) {
+          context.session.flash('error', result.error);
           context.session.flash(DISPLAY_NAME_DRAFT_FLASH_KEY, submitted);
           return redirect(routes.app.settings.profile.index.href());
         }
 
-        await db.update(users, auth.identity.id, { display_name: parsed.value });
+        await db.update(users, auth.identity.id, { display_name: result.value });
         context.session.flash('message', 'Profile updated');
         return redirect(routes.app.settings.profile.index.href());
       }

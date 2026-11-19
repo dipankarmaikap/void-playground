@@ -1,6 +1,7 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
 import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
@@ -26,7 +27,11 @@ import {
 } from '../../../../middleware/organization-context.ts';
 import { isValidIsoDate } from '../../../../data/invoices/dates.ts';
 import { routes } from '../../../../routes.ts';
-import { formText } from '../form-text.ts';
+import {
+  PAYMENT_VOID_REASON_MAX_LENGTH,
+  PaymentVoidForm,
+  paymentValuesOf,
+} from '../payments/public/schema.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps, PaymentFormValues } from '../show-page.tsx';
 
@@ -80,12 +85,7 @@ export default createController(routes.app.invoices.payments, {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let paymentFormValues: PaymentFormValues = {
-        amount: formText(context, 'amount'),
-        payment_date: formText(context, 'payment_date'),
-        payment_method: formText(context, 'payment_method'),
-        reference: formText(context, 'reference'),
-      };
+      let paymentFormValues: PaymentFormValues = paymentValuesOf(context.formData);
       if (invoice.status !== 'issued') {
         return renderPaymentError(context, organization, invoice, {
           paymentFormValues,
@@ -148,7 +148,8 @@ export default createController(routes.app.invoices.payments, {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let reason = formText(context, 'reason');
+      let parsedReason = s.parseSafe(PaymentVoidForm, context.formData);
+      let reason = parsedReason.success ? parsedReason.value.reason : '';
       let voidPaymentError = (
         message: string,
       ): NonNullable<InvoiceShowPageProps['voidPaymentError']> => ({
@@ -161,7 +162,7 @@ export default createController(routes.app.invoices.payments, {
           voidPaymentError: voidPaymentError('Enter a reason for voiding this payment.'),
         });
       }
-      if (reason.trim().length > 1000) {
+      if (reason.trim().length > PAYMENT_VOID_REASON_MAX_LENGTH) {
         return renderPaymentError(context, organization, invoice, {
           voidPaymentError: voidPaymentError('Reason must be 1,000 characters or fewer.'),
         });

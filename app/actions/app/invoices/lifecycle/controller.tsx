@@ -1,6 +1,7 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
 import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
@@ -24,6 +25,7 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
+import { INTERNAL_NOTE_MAX_LENGTH, InternalNoteForm } from '../public/schema.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps } from '../show-page.tsx';
 
@@ -124,15 +126,14 @@ export default createController(routes.app.invoices.lifecycle, {
         return new Response('Internal notes can be updated only after issue', { status: 409 });
       }
 
-      let submittedNote = context.formData.get('internal_note');
-      let internalNote = typeof submittedNote === 'string' ? submittedNote : '';
-      if (typeof submittedNote !== 'string' || internalNote.length > 1000) {
+      let parsed = s.parseSafe(InternalNoteForm, context.formData);
+      let internalNote = parsed.success ? parsed.value.internal_note : '';
+      if (!parsed.success || internalNote.length > INTERNAL_NOTE_MAX_LENGTH) {
         return renderInvoiceShowPageError(context, organization, invoice, {
           internalNoteValue: internalNote,
-          internalNoteError:
-            typeof submittedNote === 'string'
-              ? 'Internal note must be 1,000 characters or fewer.'
-              : 'Enter the internal note as text.',
+          internalNoteError: parsed.success
+            ? 'Internal note must be 1,000 characters or fewer.'
+            : 'Enter the internal note as text.',
         });
       }
 

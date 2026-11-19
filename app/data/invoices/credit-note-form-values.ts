@@ -13,29 +13,6 @@ export interface CreditNoteFormValues {
 
 export type CreditNoteDraftInput = CreditNoteFormValues;
 
-function textValue(value: FormDataEntryValue | null): string {
-  return typeof value === 'string' ? value : '';
-}
-
-/** Reads repeated source-line IDs and quantities without trusting their values. */
-export function readCreditNoteFormValues(formData: FormData): CreditNoteFormValues {
-  let ids = formData.getAll('line_id');
-  let quantities = formData.getAll('line_quantity');
-  let count = Math.max(ids.length, quantities.length);
-  let lines: CreditNoteLineInput[] = [];
-  for (let index = 0; index < count; index += 1) {
-    lines.push({
-      invoice_line_id: textValue(ids[index] ?? null),
-      quantity: textValue(quantities[index] ?? null),
-    });
-  }
-  return {
-    credit_date: textValue(formData.get('credit_date')),
-    reason: textValue(formData.get('reason')),
-    lines,
-  };
-}
-
 /** Prefills every still-creditable original service line for a new Credit Note Draft. */
 export function newCreditNoteFormValues(
   invoice: Pick<Invoice, 'invoice_date'>,

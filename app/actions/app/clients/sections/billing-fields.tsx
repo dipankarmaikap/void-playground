@@ -10,10 +10,11 @@ import {
   parseClientBilling,
   suggestCurrencyForCountry,
 } from '../../../../data/client-billing.ts';
-import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
-import { issueFor, readText } from '../form-values.ts';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
+import { issueFor } from '../form-values.ts';
+import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const addressGroupStyle = css({
@@ -50,11 +51,10 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_line1"
-              maxLength={CLIENT_TEXT_LIMITS.billing_line1}
               autoComplete="address-line1"
               defaultValue={values.billing_line1}
-              aria-invalid={line1Issue ? true : undefined}
               variant={line1Issue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.billing_line1, line1Issue)}
             />
           </Field>
           <Field
@@ -64,11 +64,10 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_locality"
-              maxLength={CLIENT_TEXT_LIMITS.billing_locality}
               autoComplete="address-level2"
               defaultValue={values.billing_locality}
-              aria-invalid={localityIssue ? true : undefined}
               variant={localityIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.billing_locality, localityIssue)}
             />
           </Field>
           <Field
@@ -78,21 +77,19 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_region"
-              maxLength={CLIENT_TEXT_LIMITS.billing_region}
               autoComplete="address-level1"
               defaultValue={values.billing_region}
-              aria-invalid={regionIssue ? true : undefined}
               variant={regionIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.billing_region, regionIssue)}
             />
           </Field>
           <Field label="Postal code" hint="Optional." error={postalCodeIssue?.message}>
             <Input
               name="billing_postal_code"
-              maxLength={CLIENT_TEXT_LIMITS.billing_postal_code}
               autoComplete="postal-code"
               defaultValue={values.billing_postal_code}
-              aria-invalid={postalCodeIssue ? true : undefined}
               variant={postalCodeIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.billing_postal_code, postalCodeIssue)}
             />
           </Field>
           <Field
@@ -102,14 +99,13 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="billing_country"
-              maxLength={CLIENT_TEXT_LIMITS.billing_country}
               list="billing-countries"
               autoComplete="country-name"
               defaultValue={
                 countryIssue ? values.billing_country : countryName(values.billing_country)
               }
-              aria-invalid={countryIssue ? true : undefined}
               variant={countryIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.billing_country, countryIssue)}
             />
             <datalist id="billing-countries">
               {COUNTRIES.map((option) => (
@@ -125,15 +121,14 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="billing_currency"
-            maxLength={CLIENT_TEXT_LIMITS.billing_currency}
             list="billing-currencies"
             defaultValue={
               currencyIssue
                 ? values.billing_currency
                 : values.billing_currency.trim().toUpperCase()
             }
-            aria-invalid={currencyIssue ? true : undefined}
             variant={currencyIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.billing_currency, currencyIssue)}
           />
           <datalist id="billing-currencies">
             {CURRENCIES.map((currency) => (
@@ -156,15 +151,15 @@ export const billingSection: ClientFormSection = {
       issues={props.issues}
     />
   ),
-  parse(formData) {
+  parse(values) {
     // Only the billing fields this section owns; other sections fill in the rest.
     let parsed = parseClientBilling({
-      billing_line1: readText(formData, 'billing_line1'),
-      billing_locality: readText(formData, 'billing_locality'),
-      billing_region: readText(formData, 'billing_region'),
-      billing_postal_code: readText(formData, 'billing_postal_code'),
-      billing_country: readText(formData, 'billing_country'),
-      billing_currency: readText(formData, 'billing_currency'),
+      billing_line1: values.billing_line1,
+      billing_locality: values.billing_locality,
+      billing_region: values.billing_region,
+      billing_postal_code: values.billing_postal_code,
+      billing_country: values.billing_country,
+      billing_currency: values.billing_currency,
     });
 
     if (!parsed.ok) {

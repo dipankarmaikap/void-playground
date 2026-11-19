@@ -6,6 +6,7 @@ import { AuthLayout } from '../../../ui/auth-layout.tsx';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import {
   authHeaderStyle,
   authHeadingStyle,
@@ -17,6 +18,7 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { Document } from '../../document.tsx';
+import { loginFormFields } from './public/schema.ts';
 
 export interface LoginPageProps {
   csrfToken: string;
@@ -52,14 +54,12 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
             <Field label="Email">
               <Input
                 name="email"
-                type="email"
-                autoComplete="email"
                 defaultValue={email ?? ''}
-                required
+                {...formFieldAttributes(loginFormFields.email)}
               />
             </Field>
             <Field label="Password">
-              <Input name="password" type="password" autoComplete="current-password" required />
+              <Input name="password" {...formFieldAttributes(loginFormFields.password)} />
             </Field>
             <Button type="submit">Log in</Button>
           </form>

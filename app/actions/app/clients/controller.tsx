@@ -24,7 +24,7 @@ import {
 } from '../../../middleware/organization-context.ts';
 import { routes } from '../../../routes.ts';
 import { EditClientPage } from './edit/page.tsx';
-import { clientFormValuesOf, readClientFormValues } from './form-values.ts';
+import { clientFormValuesOf } from './form-values.ts';
 import { parseClientForm } from './parse-client-form.ts';
 import { ClientsIndexPage } from './index-page.tsx';
 import { NewClientPage } from './new/page.tsx';
@@ -120,7 +120,7 @@ export default createController(routes.app.clients, {
     },
     async create(context) {
       let organization = context.get(CurrentOrganization);
-      let { issues, changes, warning } = await parseClientForm(context.formData, {
+      let { values, issues, changes, warning } = await parseClientForm(context.formData, {
         organizationId: organization.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -133,7 +133,7 @@ export default createController(routes.app.clients, {
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
             organizationName={organization.name}
-            values={readClientFormValues(context.formData)}
+            values={values}
             issues={issues}
           />,
           { status: 400 },
@@ -152,7 +152,7 @@ export default createController(routes.app.clients, {
       let client = await findClient(organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
-      let { issues, changes, warning } = await parseClientForm(context.formData, {
+      let { values, issues, changes, warning } = await parseClientForm(context.formData, {
         organizationId: organization.id,
         clientId: client.id,
       });
@@ -167,7 +167,7 @@ export default createController(routes.app.clients, {
             identity={{ email: identity.email, displayName: identity.display_name }}
             organizationName={organization.name}
             client={client}
-            values={readClientFormValues(context.formData)}
+            values={values}
             issues={issues}
           />,
           { status: 400 },

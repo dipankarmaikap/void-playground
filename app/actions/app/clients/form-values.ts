@@ -84,37 +84,6 @@ export function clientFormValuesOf(client: Client): ClientFormValues {
   };
 }
 
-export function readClientFormValues(formData: FormData): ClientFormValues {
-  return {
-    type: readText(formData, 'type'),
-    legal_name: readText(formData, 'legal_name'),
-    preferred_name: readText(formData, 'preferred_name'),
-    trading_name: readText(formData, 'trading_name'),
-    industry: readText(formData, 'industry'),
-    email: readText(formData, 'email'),
-    phone: readText(formData, 'phone'),
-    contact_name: readText(formData, 'contact_name'),
-    contact_role: readText(formData, 'contact_role'),
-    contact_email: readText(formData, 'contact_email'),
-    contact_phone: readText(formData, 'contact_phone'),
-    tax_country: readText(formData, 'tax_country'),
-    tax_type: readText(formData, 'tax_type'),
-    tax_value: readText(formData, 'tax_value'),
-    tax_state_code: readText(formData, 'tax_state_code'),
-    billing_line1: readText(formData, 'billing_line1'),
-    billing_locality: readText(formData, 'billing_locality'),
-    billing_region: readText(formData, 'billing_region'),
-    billing_postal_code: readText(formData, 'billing_postal_code'),
-    billing_country: readText(formData, 'billing_country'),
-    billing_currency: readText(formData, 'billing_currency'),
-  };
-}
-
-export function readText(formData: FormData, name: string): string {
-  let value = formData.get(name);
-  return typeof value === 'string' ? value : '';
-}
-
 export function issueFor(issues: readonly Issue[], field: string): Issue | undefined {
   return issues.find((issue) => issue.path?.[0] === field);
 }

@@ -18,8 +18,8 @@ const hmrProxyPort = process.env.HMR_PROXY_PORT
 const isHmr = process.env.REMIX_NODE_HMR === '1';
 
 // Migrations are applied before the HTTP server starts listening, so no request ever sees a
-// half-migrated schema. A legacy database fails closed here with the operator clean-start
-// message instead of reaching the runner.
+// half-migrated schema. The dev database is disposable (ADR-0003): a stale or unrecognized
+// file is deleted by an operator, never upgraded in place.
 await migrateDatabase(db);
 
 const server = createServer(createRequestListener(router.fetch, getNodeRequestListenerOptions()));

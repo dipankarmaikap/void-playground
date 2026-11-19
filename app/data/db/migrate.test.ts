@@ -10,14 +10,48 @@ import { CLIENT_TYPES } from '../client-names.ts';
 
 import {
   clients,
+  creditNoteLines,
+  creditNotePdfArtifacts,
   creditNotes,
+  documentSequences,
+  invoiceLines,
+  invoicePayments,
+  invoicePdfArtifacts,
+  invoiceRefunds,
   invoices,
+  organizationGstRatePresets,
+  organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
+  sessions,
+  userPasswords,
   users,
 } from './tables.ts';
-import { appTables, migrationJournalTableName } from './compatibility.ts';
 import { migrateDatabase, migrationsDirectory } from './migrate.ts';
+
+/**
+ * Every typed app table, in one list. The migration suite asserts the fresh-install schema
+ * contains them all — so adding a table touches `tables.ts`, a migration, and this list.
+ */
+const appTables = [
+  clients,
+  creditNoteLines,
+  creditNotePdfArtifacts,
+  creditNotes,
+  documentSequences,
+  invoiceLines,
+  invoicePayments,
+  invoicePdfArtifacts,
+  invoiceRefunds,
+  invoices,
+  organizationGstRatePresets,
+  organizationInvoicingProfiles,
+  organizationMemberships,
+  organizations,
+  sessions,
+  userPasswords,
+  users,
+];
 
 /** Observes the resulting schema: does the named index exist right now? */
 async function indexExists(database: SqliteDatabase, name: string): Promise<boolean> {
@@ -131,7 +165,7 @@ describe('migrateDatabase', () => {
     // edited up.sql after application surfaces as a mismatch; plant the mismatch on the
     // journal side, which the untouched files then disagree with.
     await freshDb.executeScript(
-      `UPDATE ${migrationJournalTableName} SET checksum = 'rewritten-history' WHERE id = '0003'`,
+      `UPDATE data_table_migrations SET checksum = 'rewritten-history' WHERE id = '0003'`,
     );
 
     let rejected = false;
@@ -204,38 +238,6 @@ describe('migrateDatabase', () => {
     assert.equal(rerun.applied.length, 0, 'the journal still holds every applied migration');
 
     await freshDb.close();
-  });
-
-  it('rejects a pre-Organization legacy database before any migration SQL runs', async () => {
-    let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
-    await legacyDb.executeScript(`
-      CREATE TABLE clients (id TEXT PRIMARY KEY NOT NULL, legal_name TEXT NOT NULL);
-      INSERT INTO clients (id, legal_name) VALUES ('legacy-client', 'Preserved Legacy Client');
-    `);
-
-    let rejected = false;
-    let message = '';
-    try {
-      await migrateDatabase(legacyDb);
-    } catch (error) {
-      rejected = true;
-      message = error instanceof Error ? error.message : '';
-    }
-    assert.equal(rejected, true, 'a pre-Organization schema fails closed');
-    assert.match(message, /operator-managed clean start/);
-
-    let preservedClient = await legacyDb.exec('SELECT legal_name FROM clients');
-    assert.equal(preservedClient.rows?.[0]?.legal_name, 'Preserved Legacy Client');
-    let migratedTables = await legacyDb.exec(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'organizations'",
-    );
-    assert.equal(
-      (migratedTables.rows ?? []).length,
-      0,
-      'no migration SQL ran against the rejected database',
-    );
-
-    await legacyDb.close();
   });
 
   it('keeps the migration CHECK list synchronized with the canonical Client types', async () => {

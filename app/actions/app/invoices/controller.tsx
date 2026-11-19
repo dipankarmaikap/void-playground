@@ -38,13 +38,10 @@ import {
 import { routes } from '../../../routes.ts';
 import { EditInvoicePage } from './edit/page.tsx';
 import { isAddLineIntent, withAdditionalLine } from './form-intent.ts';
-import {
-  draftFormValuesFor,
-  invoiceFormValuesOf,
-  readInvoiceFormValues,
-} from './form-values.ts';
+import { draftFormValuesFor, invoiceFormValuesOf } from './form-values.ts';
 import { InvoicesIndexPage } from './index-page.tsx';
 import { NewInvoicePage } from './new/page.tsx';
+import { parseInvoiceFormValues } from './public/schema.ts';
 import { InvoiceShowPage } from './show-page.tsx';
 
 export default createController(routes.app.invoices, {
@@ -223,7 +220,7 @@ export default createController(routes.app.invoices, {
     async create(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let values = readInvoiceFormValues(context.formData);
+      let { values, issues: formIssues } = parseInvoiceFormValues(context.formData);
       let profile = await getInvoicingProfileView(organization);
       let gstRatePresets = profile.gst_registered
         ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
@@ -275,6 +272,22 @@ export default createController(routes.app.invoices, {
         );
       }
 
+      if (formIssues.length > 0) {
+        return context.render(
+          <NewInvoicePage
+            csrfToken={csrfToken}
+            identity={identity}
+            organizationName={organization.name}
+            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            selectedClient={client}
+            values={values}
+            issues={formIssues}
+            gstRatePresets={gstRatePresets}
+          />,
+          { status: 400 },
+        );
+      }
+
       let parsed = parseInvoiceDraft(values, taxConfig);
       if (!parsed.ok) {
         return context.render(
@@ -308,7 +321,7 @@ export default createController(routes.app.invoices, {
 
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
-      let values = readInvoiceFormValues(context.formData);
+      let { values, issues: formIssues } = parseInvoiceFormValues(context.formData);
       let profile = await getInvoicingProfileView(organization);
       let gstRatePresets = profile.gst_registered
         ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
@@ -331,6 +344,24 @@ export default createController(routes.app.invoices, {
             values={withAdditionalLine(values)}
             gstRatePresets={gstRatePresets}
           />,
+        );
+      }
+
+      if (formIssues.length > 0) {
+        let client = await findClient(organization.id, invoice.client_id);
+        return context.render(
+          <EditInvoicePage
+            csrfToken={csrfToken}
+            identity={identity}
+            organizationName={organization.name}
+            invoice={invoice}
+            client={client}
+            lines={savedLines}
+            values={values}
+            issues={formIssues}
+            gstRatePresets={gstRatePresets}
+          />,
+          { status: 400 },
         );
       }
 

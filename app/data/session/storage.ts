@@ -6,8 +6,7 @@ import type { Session, SessionStorage } from 'remix/session';
 import { createCookieSessionStorage } from 'remix/session-storage/cookie';
 
 import { db, sessions } from '../db.ts';
-import { AUTH_SESSION_KEY } from './auth-payload.ts';
-import type { AuthPayload } from './auth-payload.ts';
+import { readAuthPayload } from './auth-payload.ts';
 
 export interface SessionRequestContext {
   ip: string;
@@ -63,10 +62,9 @@ export function createHybridSessionStorage(): SessionStorage {
         return null;
       }
 
-      // Tolerant read: a Session's serialized data may predate the canonical
-      // payload shape, so treat every payload field as optional here.
-      let auth = session.get(AUTH_SESSION_KEY) as Partial<AuthPayload> | undefined;
-      let userId = auth?.userId;
+      // The payload must have the canonical shape login writes; per ADR-0003 an older,
+      // partial payload is never tolerated — the dev database is deleted instead.
+      let userId = readAuthPayload(session)?.userId ?? null;
 
       if (userId) {
         let now = Date.now();

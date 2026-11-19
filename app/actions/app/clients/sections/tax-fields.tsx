@@ -6,12 +6,13 @@ import {
   findClientWithTaxValue,
   parseClientTax,
 } from '../../../../data/client-tax.ts';
-import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { INDIA_STATES } from '../../../../data/india-states.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { Select } from '../../../../ui/select.tsx';
-import { issueFor, readText } from '../form-values.ts';
+import { issueFor } from '../form-values.ts';
+import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const taxGroupStyle = css({
@@ -37,10 +38,9 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_country"
-            maxLength={CLIENT_TEXT_LIMITS.tax_country}
             defaultValue={values.tax_country}
-            aria-invalid={countryIssue ? true : undefined}
             variant={countryIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.tax_country, countryIssue)}
           />
         </Field>
         <Field
@@ -50,10 +50,9 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_type"
-            maxLength={CLIENT_TEXT_LIMITS.tax_type}
             defaultValue={values.tax_type}
-            aria-invalid={typeIssue ? true : undefined}
             variant={typeIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.tax_type, typeIssue)}
           />
         </Field>
         <Field
@@ -63,10 +62,9 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="tax_value"
-            maxLength={CLIENT_TEXT_LIMITS.tax_value}
             defaultValue={values.tax_value}
-            aria-invalid={valueIssue ? true : undefined}
             variant={valueIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.tax_value, valueIssue)}
           />
         </Field>
         <Field
@@ -76,8 +74,8 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Select
             name="tax_state_code"
-            aria-invalid={stateIssue ? true : undefined}
             variant={stateIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.tax_state_code, stateIssue)}
           >
             <option value="" selected={!values.tax_state_code}>
               Not recorded
@@ -106,12 +104,12 @@ export const taxSection: ClientFormSection = {
       issues={props.issues}
     />
   ),
-  async parse(formData, context) {
+  async parse(values, context) {
     let parsed = parseClientTax({
-      tax_country: readText(formData, 'tax_country'),
-      tax_type: readText(formData, 'tax_type'),
-      tax_value: readText(formData, 'tax_value'),
-      tax_state_code: readText(formData, 'tax_state_code'),
+      tax_country: values.tax_country,
+      tax_type: values.tax_type,
+      tax_value: values.tax_value,
+      tax_state_code: values.tax_state_code,
     });
 
     if (!parsed.ok) {
