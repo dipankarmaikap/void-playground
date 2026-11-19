@@ -94,7 +94,7 @@ export function NewInvoicePage(handle: Handle<NewInvoicePageProps>) {
         {selectedClient ? (
           <InvoiceForm
             csrfToken={csrfToken}
-            action={routes.app.invoices.new.action.href()}
+            action={routes.app.invoices.create.href()}
             submitLabel="Create draft"
             values={values!}
             issues={issues}
@@ -114,7 +114,7 @@ export function NewInvoicePage(handle: Handle<NewInvoicePageProps>) {
                 {clients.map((client) => (
                   <li key={client.id}>
                     <a
-                      href={routes.app.invoices.new.index.href({}, {
+                      href={routes.app.invoices.new.href({}, {
                         searchParams: { clientId: client.id },
                       })}
                       mix={clientLinkStyle}

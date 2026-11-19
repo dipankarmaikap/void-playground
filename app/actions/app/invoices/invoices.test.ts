@@ -27,6 +27,7 @@ async function submitDraft(
   actionUrl: string,
   fields: DraftFields,
   cookie: string,
+  method: 'POST' | 'PUT' = 'POST',
 ): Promise<Response> {
   let page = await router.fetch(new URL(pageUrl, origin), {
     headers: { Cookie: cookie },
@@ -39,6 +40,7 @@ async function submitDraft(
     else body.append(name, value);
   }
   body.append('_csrf', csrf);
+  if (method !== 'POST') body.append('_method', method);
   return router.fetch(new URL(actionUrl, origin), {
     method: 'POST',
     headers: {
@@ -86,7 +88,7 @@ async function createDraft(
 ): Promise<Response> {
   return submitDraft(
     newDraftPath(clientId),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -153,7 +155,7 @@ function expectedDueDate(invoiceDate: string, days: number): string {
 }
 
 function newDraftPath(clientId: string): string {
-  return routes.app.invoices.new.index.href({}, { searchParams: { clientId } });
+  return routes.app.invoices.new.href({}, { searchParams: { clientId } });
 }
 
 describe('draft invoices', () => {
@@ -202,7 +204,7 @@ describe('draft invoices', () => {
 
     for (let path of [
       newDraftPath(client.id),
-      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(created) }),
+      routes.app.invoices.edit.href({ invoiceId: draftIdFrom(created) }),
     ]) {
       let response = await router.fetch(new URL(path, origin), {
         headers: { Cookie: sessionCookie },
@@ -364,7 +366,7 @@ describe('draft invoices', () => {
     assert.match(detail, /Total: 159\.30 INR/);
     let edit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(edit, /CGST @ 9%: 12\.15 INR/);
@@ -449,7 +451,7 @@ describe('draft invoices', () => {
 
     let edit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(edit, /Current GST summary/);
@@ -546,7 +548,7 @@ describe('draft invoices', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: client.id }),
-      {},
+      { _method: 'PUT' },
       first.sessionCookie,
     );
     assert.equal(archived.status, 302);
@@ -903,7 +905,7 @@ describe('draft invoices', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(
@@ -948,10 +950,11 @@ describe('draft invoices', () => {
       round_off: ['-0.25'],
     });
     let added = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       { ...fields, _intent: 'add_line' },
       sessionCookie,
+      'PUT',
     );
     assert.equal(added.status, 200);
     let addedHtml = await added.text();
@@ -962,7 +965,7 @@ describe('draft invoices', () => {
 
     let savedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(savedEditPage, /name="line_discount_value"[^>]*value="10"/);
@@ -999,10 +1002,11 @@ describe('draft invoices', () => {
       round_off: ['-0.25'],
     });
     let invalid = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       fields,
       sessionCookie,
+      'PUT',
     );
     assert.equal(invalid.status, 400);
     let invalidHtml = await invalid.text();
@@ -1030,8 +1034,8 @@ describe('draft invoices', () => {
       }),
     );
     let updated = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         line_description: ['Consulting'],
         line_quantity: ['2'],
@@ -1043,6 +1047,7 @@ describe('draft invoices', () => {
         round_off: ['-0.25'],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(updated.status, 302);
     let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
@@ -1073,7 +1078,7 @@ describe('draft invoices', () => {
 
     let foreignEdit = await submitDraft(
       routes.app.dashboard.href(),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(ownClient.id, {
         line_discount_mode: ['fixed'],
         line_discount_value: ['99'],
@@ -1082,6 +1087,7 @@ describe('draft invoices', () => {
         round_off: ['99'],
       }),
       other.sessionCookie,
+      'PUT',
     );
     assert.equal(foreignEdit.status, 404);
     let after = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), first.sessionCookie);
@@ -1105,7 +1111,7 @@ describe('draft invoices', () => {
       if (Array.isArray(value)) value.forEach((entry) => body.append(name, entry));
       else if (value != null) body.append(name, value);
     }
-    let noCsrf = await router.fetch(new URL(routes.app.invoices.new.action.href(), origin), {
+    let noCsrf = await router.fetch(new URL(routes.app.invoices.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1278,7 +1284,7 @@ describe('draft invoices', () => {
 
     let added = await submitDraft(
       newDraftPath(client.id),
-      routes.app.invoices.new.action.href(),
+      routes.app.invoices.create.href(),
       draftFields(client.id, { ...threeLines, _intent: 'add_line' }),
       sessionCookie,
     );
@@ -1314,8 +1320,8 @@ describe('draft invoices', () => {
     let id = draftIdFrom(await createDraft(sessionCookie, client.id));
 
     let added = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         _intent: 'add_line',
         line_description: ['Consulting services', '', ''],
@@ -1323,6 +1329,7 @@ describe('draft invoices', () => {
         line_unit_price: ['100.0000', '', ''],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(added.status, 200);
     let html = await added.text();
@@ -1330,7 +1337,7 @@ describe('draft invoices', () => {
     assert.match(html, /name="line_description"[^>]*value="Consulting services"/);
     let savedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.equal((savedEditPage.match(/name="line_description"/g) ?? []).length, 3);
@@ -1452,10 +1459,11 @@ describe('draft invoices', () => {
     let before = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
     assert.match(before, /Total: 150\.00 INR/);
     let edited = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, oversized),
       sessionCookie,
+      'PUT',
     );
     assert.equal(edited.status, 400);
     assert.match(await edited.text(), /too large to store exactly/i);
@@ -1525,7 +1533,7 @@ describe('draft invoices', () => {
       if (Array.isArray(value)) value.forEach((entry) => body.append(name, entry));
       else body.append(name, value);
     }
-    let response = await router.fetch(new URL(routes.app.invoices.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.invoices.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1559,7 +1567,7 @@ describe('draft invoices', () => {
 
     let foreign = await submitDraft(
       newDraftPath(ownClient.id),
-      routes.app.invoices.new.action.href(),
+      routes.app.invoices.create.href(),
       draftFields(foreignClient.id),
       first.sessionCookie,
     );
@@ -1614,16 +1622,17 @@ describe('draft invoices', () => {
     let created = await createDraft(sessionCookie, client.id);
     let id = draftIdFrom(created);
 
-    let editPage = await getHtml(router, routes.app.invoices.edit.index.href({ invoiceId: id }), sessionCookie);
+    let editPage = await getHtml(router, routes.app.invoices.edit.href({ invoiceId: id }), sessionCookie);
     assert.match(editPage, /name="recipient_legal_name"[^>]*value="Draft Recipient"/);
     assert.match(editPage, /name="line_description"[^>]*value="Consulting services"/);
     assert.match(editPage, /name="line_quantity"[^>]*value="1.5"/);
 
     let invalid = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { line_quantity: ['0'] }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(invalid.status, 400);
     assert.match(await invalid.text(), /positive quantity/);
@@ -1636,8 +1645,8 @@ describe('draft invoices', () => {
     assert.match(afterInvalid, /Consulting services/);
 
     let updated = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         currency: 'USD',
         recipient_legal_name: 'Edited Recipient',
@@ -1648,6 +1657,7 @@ describe('draft invoices', () => {
         line_unit_price: ['10.0000', '4.0000'],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(updated.status, 302);
 
@@ -1662,7 +1672,7 @@ describe('draft invoices', () => {
 
     let updatedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(updatedEditPage, new RegExp(`name="client_id"[^>]*value="${client.id}"`));
@@ -1682,7 +1692,7 @@ describe('draft invoices', () => {
       first.sessionCookie,
     );
 
-    let show = await router.fetch(new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin), {
+    let show = await router.fetch(new URL(routes.app.invoices.edit.href({ invoiceId: id }), origin), {
       headers: { Cookie: other.sessionCookie },
     });
     assert.equal(show.status, 404);
@@ -1692,9 +1702,10 @@ describe('draft invoices', () => {
 
     let edit = await submitDraft(
       routes.app.dashboard.href(),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { recipient_legal_name: 'Hacked Recipient' }),
       other.sessionCookie,
+      'PUT',
     );
     assert.equal(edit.status, 404);
     assert.ok(!(await edit.text()).includes('Hacked Recipient'));
@@ -1723,7 +1734,7 @@ describe('draft invoices', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: client.id }),
-      {},
+      { _method: 'PUT' },
       sessionCookie,
     );
     assert.equal(archived.status, 302);
@@ -1741,16 +1752,17 @@ describe('draft invoices', () => {
     assert.match(await show.text(), /Archived/);
 
     let editPage = await router.fetch(
-      new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin),
+      new URL(routes.app.invoices.edit.href({ invoiceId: id }), origin),
       { headers: { Cookie: sessionCookie } },
     );
     assert.equal(editPage.status, 200);
 
     let edited = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { internal_note: 'Still editable' }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(edited.status, 302);
     let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
@@ -1910,7 +1922,7 @@ describe('draft invoices', () => {
     assert.match(exportIgstDetail, /Total: 177\.00 INR/);
     let exportEdit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: exportIgstId }),
+      routes.app.invoices.edit.href({ invoiceId: exportIgstId }),
       sessionCookie,
     );
     assert.match(exportEdit, /name="supply_type"[\s\S]*?<option value="export_igst" selected/);
@@ -1939,7 +1951,7 @@ describe('draft invoices', () => {
     assert.match(reverseDetail, /Total: 150\.00 INR/);
     let reverseEdit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(reverseCharge) }),
+      routes.app.invoices.edit.href({ invoiceId: draftIdFrom(reverseCharge) }),
       sessionCookie,
     );
     assert.match(reverseEdit, /name="reverse_charge"[^>]*checked/);
@@ -1983,7 +1995,7 @@ describe('draft invoices', () => {
       assert.doesNotMatch(detail, /CGST|SGST|IGST/);
       let edit = await getHtml(
         router,
-        routes.app.invoices.edit.index.href({ invoiceId }),
+        routes.app.invoices.edit.href({ invoiceId }),
         sessionCookie,
       );
       assert.match(edit, /value="foreign_manual" selected/);

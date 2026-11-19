@@ -430,7 +430,7 @@ describe('app controller', () => {
     let { sessionCookie } = await loginNewUser();
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: `Cache Client ${crypto.randomUUID()}` },
       sessionCookie,
     );
@@ -446,8 +446,8 @@ describe('app controller', () => {
       routes.app.settings.sessions.index.href(),
       routes.app.clients.index.href(),
       clientPath,
-      routes.app.clients.new.index.href(),
-      routes.app.clients.edit.index.href({ clientId }),
+      routes.app.clients.new.href(),
+      routes.app.clients.edit.href({ clientId }),
     ];
 
     for (let path of paths) {

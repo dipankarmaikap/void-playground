@@ -8,12 +8,14 @@ import {
   noticeErrorStyle,
   noticeSpacingStyle,
 } from '../../../ui/page-styles.ts';
+import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import type { ClientFormValues } from './form-values.ts';
 import { clientFormSections } from './sections/registry.ts';
 
 export interface ClientFormProps {
   csrfToken: string;
   action: string;
+  method?: 'POST' | 'PUT';
   submitLabel: string;
   values: ClientFormValues;
   issues?: readonly Issue[];
@@ -27,10 +29,10 @@ const sectionStyle = css({
 
 export function ClientForm(handle: Handle<ClientFormProps>) {
   return () => {
-    let { csrfToken, action, submitLabel, values, issues = [] } = handle.props;
+    let { csrfToken, action, method = 'POST', submitLabel, values, issues = [] } = handle.props;
 
     return (
-      <form method="post" action={action} mix={formStackStyle}>
+      <RestfulForm method={method} action={action} mix={formStackStyle}>
         <input type="hidden" name="_csrf" value={csrfToken} />
         {issues.length > 0 ? (
           <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
@@ -45,7 +47,7 @@ export function ClientForm(handle: Handle<ClientFormProps>) {
         <div>
           <Button type="submit">{submitLabel}</Button>
         </div>
-      </form>
+      </RestfulForm>
     );
   };
 }

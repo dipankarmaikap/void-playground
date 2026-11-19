@@ -273,7 +273,7 @@ describe('client directory search and filters', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       firstCookie,
     );

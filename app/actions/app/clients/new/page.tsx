@@ -44,7 +44,7 @@ export function NewClientPage(handle: Handle<NewClientPageProps>) {
         </header>
         <ClientForm
           csrfToken={csrfToken}
-          action={routes.app.clients.new.action.href()}
+          action={routes.app.clients.create.href()}
           submitLabel="Create client"
           values={values}
           issues={issues}

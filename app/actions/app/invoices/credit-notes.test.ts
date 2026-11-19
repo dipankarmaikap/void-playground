@@ -88,8 +88,8 @@ async function createCreditNoteDraft(
 ): Promise<string> {
   let response = await submitForm(
     router,
-    routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-    routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+    routes.app.invoices.creditNotes.new.href({ invoiceId }),
+    routes.app.invoices.creditNotes.create.href({ invoiceId }),
     {
       credit_date: creditDate,
       reason,
@@ -111,7 +111,7 @@ async function issueCreditNote(
 ): Promise<Response> {
   return submitForm(
     router,
-    routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+    routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
     routes.app.invoices.creditNotes.lifecycle.issue.href({ invoiceId, creditNoteId }),
     {},
     sessionCookie,
@@ -182,7 +182,7 @@ describe('credit notes', () => {
 
     let html = await getHtml(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
       sessionCookie,
     );
 
@@ -213,8 +213,8 @@ describe('credit notes', () => {
 
     let created = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: creditDate,
         reason: 'Reduced scope',
@@ -230,7 +230,7 @@ describe('credit notes', () => {
 
     let edit = await getHtml(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
       sessionCookie,
     );
     assert.match(edit, /Edit credit note draft/);
@@ -259,8 +259,8 @@ describe('credit notes', () => {
 
     let invalidDate = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: '2026-09-30',
         reason: ' \t ',
@@ -297,8 +297,8 @@ describe('credit notes', () => {
     let creditDate = todayInKolkata();
     let created = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: creditDate,
         reason: 'Original scope',
@@ -314,9 +314,10 @@ describe('credit notes', () => {
 
     let edited = await submitForm(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
-      routes.app.invoices.creditNotes.edit.action.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.update.href({ invoiceId, creditNoteId }),
       {
+        _method: 'PUT',
         credit_date: creditDate,
         reason: 'Reduced scope after review',
         line_id: lineId,
@@ -327,7 +328,7 @@ describe('credit notes', () => {
     assert.equal(edited.status, 302);
     let detail = await getHtml(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
       sessionCookie,
     );
     assert.match(detail, /Reduced scope after review/);
@@ -352,8 +353,8 @@ describe('credit notes', () => {
     let { invoiceId, lineId } = await createIssuedInvoice(organizationId, client.id);
     let created = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: todayInKolkata(),
         reason: 'Temporary adjustment',
@@ -369,7 +370,7 @@ describe('credit notes', () => {
 
     let discarded = await submitForm(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
       routes.app.invoices.creditNotes.lifecycle.discard.href({ invoiceId, creditNoteId }),
       {},
       sessionCookie,
@@ -382,7 +383,7 @@ describe('credit notes', () => {
 
     let missingDraft = await router.fetch(
       new URL(
-        routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+        routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
         'https://test.invalid',
       ),
       { headers: { Cookie: sessionCookie } },
@@ -407,8 +408,8 @@ describe('credit notes', () => {
     let creditDate = todayInKolkata();
     let created = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: creditDate,
         reason: 'Half of the scope was cancelled',
@@ -476,8 +477,8 @@ describe('credit notes', () => {
     let creditDate = todayInKolkata();
     let created = await submitForm(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-      routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
+      routes.app.invoices.creditNotes.create.href({ invoiceId }),
       {
         credit_date: creditDate,
         reason: 'Service scope reduced',
@@ -497,7 +498,7 @@ describe('credit notes', () => {
     });
     let issued = await submitForm(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
       issuePath,
       {},
       sessionCookie,
@@ -603,7 +604,7 @@ describe('credit notes', () => {
     );
     let draft = await getHtml(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+      routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
       sessionCookie,
     );
     assert.match(draft, /Edit credit note draft/);
@@ -664,12 +665,12 @@ describe('credit notes', () => {
     assert.match(
       partiallyPaid,
       new RegExp(
-        `href="${routes.app.invoices.creditNotes.new.index.href({ invoiceId })}"[^>]*>\\s*Create credit note`,
+        `href="${routes.app.invoices.creditNotes.new.href({ invoiceId })}"[^>]*>\\s*Create credit note`,
       ),
     );
     let nextDraft = await getHtml(
       router,
-      routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
+      routes.app.invoices.creditNotes.new.href({ invoiceId }),
       sessionCookie,
     );
     assert.match(nextDraft, /name="line_quantity"[^>]*max="0\.6"[^>]*value="0\.6"/);
@@ -758,7 +759,7 @@ describe('credit notes', () => {
 
     let noRemainingCredit = await router.fetch(
       new URL(
-        routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
+        routes.app.invoices.creditNotes.new.href({ invoiceId }),
         'https://test.invalid',
       ),
       { headers: { Cookie: sessionCookie } },
@@ -807,15 +808,16 @@ describe('credit notes', () => {
 
     let corrected = await submitForm(
       router,
-      routes.app.invoices.creditNotes.edit.index.href({
+      routes.app.invoices.creditNotes.edit.href({
         invoiceId,
         creditNoteId: secondDraft,
       }),
-      routes.app.invoices.creditNotes.edit.action.href({
+      routes.app.invoices.creditNotes.update.href({
         invoiceId,
         creditNoteId: secondDraft,
       }),
       {
+        _method: 'PUT',
         credit_date: todayInKolkata(),
         reason: 'Second credit corrected',
         line_id: lineId,
@@ -1187,7 +1189,7 @@ describe('credit notes', () => {
 
     let foreignEdit = await router.fetch(
       new URL(
-        routes.app.invoices.creditNotes.edit.index.href({
+        routes.app.invoices.creditNotes.edit.href({
           invoiceId: ownerInvoice.invoiceId,
           creditNoteId: ownerDraft,
         }),

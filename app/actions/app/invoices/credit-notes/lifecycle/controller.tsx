@@ -63,10 +63,11 @@ async function renderIssueError(
       lines={sourceLines}
       creditableQuantities={creditableQuantities}
       creditDate={creditNote.credit_date}
-      action={routes.app.invoices.creditNotes.edit.action.href({
+      action={routes.app.invoices.creditNotes.update.href({
         invoiceId: invoice.id,
         creditNoteId: creditNote.id,
       })}
+      method="PUT"
       heading="Edit credit note draft"
       submitLabel="Save credit note draft"
       values={creditNoteFormValuesOf(creditNote, sourceLines, savedLines)}

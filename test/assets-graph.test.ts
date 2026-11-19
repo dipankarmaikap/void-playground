@@ -80,14 +80,14 @@ describe('browser asset graph', () => {
       }
 
       let formPage = await router.fetch(
-        new URL(routes.app.clients.new.index.href(), origin),
+        new URL(routes.app.clients.new.href(), origin),
         { headers: { Cookie: sessionCookie } },
       );
       let csrf = extractCsrf(await formPage.text());
 
       version = 3;
       let validation = await router.fetch(
-        new URL(routes.app.clients.new.action.href(), origin),
+        new URL(routes.app.clients.create.href(), origin),
         {
           method: 'POST',
           headers: {

@@ -9,12 +9,14 @@ import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import { MIN_VISIBLE_LINES } from './form-intent.ts';
 import type { InvoiceFormValues } from './form-values.ts';
 
 export interface InvoiceFormProps {
   csrfToken: string;
   action: string;
+  method?: 'POST' | 'PUT';
   submitLabel: string;
   values: InvoiceFormValues;
   issues?: readonly Issue[];
@@ -113,6 +115,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
     let {
       csrfToken,
       action,
+      method = 'POST',
       submitLabel,
       values,
       issues = [],
@@ -123,7 +126,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
     let linesIssue = firstIssue(issues, 'lines');
 
     return (
-      <form method="post" action={action} mix={formStyle}>
+      <RestfulForm method={method} action={action} mix={formStyle}>
         <input type="hidden" name="_csrf" value={csrfToken} />
         <input type="hidden" name="client_id" value={values.client_id} />
         <input
@@ -701,7 +704,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </Button>
           <Button type="submit">{submitLabel}</Button>
         </div>
-      </form>
+      </RestfulForm>
     );
   };
 }

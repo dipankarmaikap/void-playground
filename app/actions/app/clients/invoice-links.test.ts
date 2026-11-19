@@ -77,7 +77,7 @@ describe('Client invoice links', () => {
       {},
       { searchParams: { clientId: archivedClient.id } },
     );
-    let activeNewDraftHref = routes.app.invoices.new.index.href(
+    let activeNewDraftHref = routes.app.invoices.new.href(
       {},
       { searchParams: { clientId: activeClient.id } },
     );
@@ -88,7 +88,7 @@ describe('Client invoice links', () => {
     assert.ok(archivedProfile.includes(`href="${archivedDirectoryHref}"`));
     assert.ok(
       !archivedProfile.includes(
-        `href="${routes.app.invoices.new.index.href({}, { searchParams: { clientId: archivedClient.id } })}"`,
+        `href="${routes.app.invoices.new.href({}, { searchParams: { clientId: archivedClient.id } })}"`,
       ),
       'Archived Clients cannot start a new Draft from their profile',
     );

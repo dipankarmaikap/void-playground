@@ -118,7 +118,8 @@ export function EditInvoicePage(handle: Handle<EditInvoicePageProps>) {
         ) : null}
         <InvoiceForm
           csrfToken={csrfToken}
-          action={routes.app.invoices.edit.action.href({ invoiceId: invoice.id })}
+          action={routes.app.invoices.update.href({ invoiceId: invoice.id })}
+          method="PUT"
           submitLabel="Save draft"
           values={values}
           issues={issues}
