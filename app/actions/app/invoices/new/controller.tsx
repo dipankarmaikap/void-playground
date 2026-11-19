@@ -132,7 +132,7 @@ export default createController(routes.app.invoices.new, {
         );
       }
 
-      let invoice = await createDraftInvoice(organization.id, client.id, parsed.value);
+      let invoice = await createDraftInvoice(context.db, organization.id, client.id, parsed.value);
       if (!invoice) return new Response('Invoice could not be created', { status: 500 });
       context.session.flash('message', 'Invoice draft created');
       return redirect(routes.app.invoices.show.href({ invoiceId: invoice.id }));

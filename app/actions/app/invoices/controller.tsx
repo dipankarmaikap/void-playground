@@ -48,7 +48,7 @@ export default createController(routes.app.invoices, {
       let status = parseInvoiceStatusFilter(context.url.searchParams.get('status'));
       let from = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('from'));
       let to = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('to'));
-      let directory = await listInvoices(organization.id, {
+      let directory = await listInvoices(context.db, organization.id, {
         q: query,
         clientId,
         status,
@@ -80,13 +80,13 @@ export default createController(routes.app.invoices, {
     async show(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
 
       let [lines, client, paymentData] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
         findClient(context.db, organization.id, invoice.client_id),
-        invoiceActivityData(organization.id, invoice),
+        invoiceActivityData(context.db, organization.id, invoice),
       ]);
       let message = context.session.get('message');
       return context.render(
@@ -104,7 +104,7 @@ export default createController(routes.app.invoices, {
     },
     async pdf(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
 
       let filename = invoicePdfFilename(invoice);
@@ -112,7 +112,7 @@ export default createController(routes.app.invoices, {
       // Issued invoices download the exact bytes preserved at issue time; a missing artifact is a
       // 404 rather than a regeneration so the historical document can never drift.
       if (invoice.status !== 'draft') {
-        let stored = await findIssuedInvoicePdfBytes(organization.id, invoice.id);
+        let stored = await findIssuedInvoicePdfBytes(context.db, organization.id, invoice.id);
         if (!stored) return new Response('Invoice PDF not found', { status: 404 });
         return new Response(new Blob([stored as BlobPart]), {
           headers: {
@@ -127,7 +127,7 @@ export default createController(routes.app.invoices, {
       // cannot reach the renderer.
       let { internal_note: _internalNote, ...draftDocument } = invoice;
       let [lines, profileView] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
         getInvoicingProfileView(context.db, organization),
       ]);
       let pdf = renderInvoicePdf({

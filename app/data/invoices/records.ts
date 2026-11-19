@@ -1,6 +1,7 @@
 import { gte, ilike, lte, or } from 'remix/data-table';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import { db, invoiceLines, invoices } from '../db.ts';
+import { invoiceLines, invoices } from '../db.ts';
 import type { Invoice, InvoiceLine } from '../db.ts';
 import { invoiceDisplayStatus } from './issuance.ts';
 import type { InvoiceDisplayStatus } from './issuance.ts';
@@ -87,6 +88,7 @@ export const NO_DISPLAY_STATUS = '__no_display_status__';
  * currently have no assigned number.
  */
 export async function listInvoices(
+  db: SqliteDatabase,
   organizationId: string,
   filter: InvoiceListFilter = {},
 ): Promise<InvoiceDirectoryPage> {
@@ -150,10 +152,10 @@ export async function listInvoices(
       .offset(offset)
       .all();
     let [paymentTotals, creditTotals, refundTotals, creditNoteLabels] = await Promise.all([
-      activeInvoicePaymentTotals(organizationId),
-      activeInvoiceCreditNoteTotals(organizationId),
-      activeInvoiceRefundTotals(organizationId),
-      invoiceCreditNoteLabels(organizationId),
+      activeInvoicePaymentTotals(db, organizationId),
+      activeInvoiceCreditNoteTotals(db, organizationId),
+      activeInvoiceRefundTotals(db, organizationId),
+      invoiceCreditNoteLabels(db, organizationId),
     ]);
     return {
       invoices: rows
@@ -168,10 +170,10 @@ export async function listInvoices(
   }
 
   let [paymentTotals, creditTotals, refundTotals, creditNoteLabels] = await Promise.all([
-    activeInvoicePaymentTotals(organizationId),
-    activeInvoiceCreditNoteTotals(organizationId),
-    activeInvoiceRefundTotals(organizationId),
-    invoiceCreditNoteLabels(organizationId),
+    activeInvoicePaymentTotals(db, organizationId),
+    activeInvoiceCreditNoteTotals(db, organizationId),
+    activeInvoiceRefundTotals(db, organizationId),
+    invoiceCreditNoteLabels(db, organizationId),
   ]);
   let matches: InvoiceDirectoryItem[] = [];
   let scanned = 0;
@@ -280,19 +282,31 @@ function matchesInvoiceQuery(invoice: InvoiceDirectoryRow, q: string): boolean {
 }
 
 /** Finds one invoice only within the Organization resolved from the authenticated membership. */
-export function findInvoice(organizationId: string, id: string): Promise<Invoice | null> {
+export function findInvoice(
+  db: SqliteDatabase,
+  organizationId: string,
+  id: string,
+): Promise<Invoice | null> {
   return db.findOne(invoices, { where: { id, organization_id: organizationId } });
 }
 
 /** Counts one Client's invoices without crossing either its Organization or Client boundary. */
-export function countClientInvoices(organizationId: string, clientId: string): Promise<number> {
+export function countClientInvoices(
+  db: SqliteDatabase,
+  organizationId: string,
+  clientId: string,
+): Promise<number> {
   return db.count(invoices, {
     where: { organization_id: organizationId, client_id: clientId, document_type: 'invoice' },
   });
 }
 
 /** Reads an invoice's service lines in their saved order, scoped to the same Organization. */
-export function findInvoiceLines(organizationId: string, invoiceId: string): Promise<InvoiceLine[]> {
+export function findInvoiceLines(
+  db: SqliteDatabase,
+  organizationId: string,
+  invoiceId: string,
+): Promise<InvoiceLine[]> {
   return db.findMany(invoiceLines, {
     where: { organization_id: organizationId, invoice_id: invoiceId },
     orderBy: [['position', 'asc']],
@@ -344,6 +358,7 @@ function invoiceLineValues(
 
 /** Inserts a Draft and its service lines atomically. Organization id always comes from the server. */
 export async function createDraftInvoice(
+  db: SqliteDatabase,
   organizationId: string,
   clientId: string,
   changes: InvoiceDraftChanges,
@@ -366,11 +381,12 @@ export async function createDraftInvoice(
       await tx.create(invoiceLines, invoiceLineValues(organizationId, id, line, now));
     }
   });
-  return findInvoice(organizationId, id);
+  return findInvoice(db, organizationId, id);
 }
 
 /** Replaces a Draft's editable fields and service lines atomically, scoped to its Organization. */
 export async function updateDraftInvoice(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
   changes: InvoiceDraftChanges,
@@ -393,11 +409,12 @@ export async function updateDraftInvoice(
     }
   });
   if (!updated) return null;
-  return findInvoice(organizationId, id);
+  return findInvoice(db, organizationId, id);
 }
 
 /** Discards a Draft and its lines. Issued documents are never deletable through this path. */
 export async function discardDraftInvoice(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
 ): Promise<boolean> {
@@ -410,6 +427,7 @@ export async function discardDraftInvoice(
 
 /** Changes only the private note on an issued invoice; all Client-facing fields stay locked. */
 export async function updateIssuedInvoiceInternalNote(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
   internalNote: string | null,

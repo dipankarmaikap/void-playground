@@ -52,9 +52,9 @@ async function renderInvoiceShowPageError(
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
+    findInvoiceLines(context.db, organization.id, invoice.id),
     findClient(context.db, organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -80,6 +80,7 @@ export default createController(routes.app.invoices.lifecycle, {
     async issue(context) {
       let organization = context.get(CurrentOrganization);
       let result = await issueDraftInvoice(
+        context.db,
         organization.id,
         context.params.invoiceId,
         storeIssuedInvoicePdf,
@@ -91,7 +92,7 @@ export default createController(routes.app.invoices.lifecycle, {
         return new Response('Only a Draft invoice can be issued', { status: 409 });
       }
       if (!result.ok) {
-        let invoice = await findInvoice(organization.id, context.params.invoiceId);
+        let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
         if (!invoice) return new Response('Invoice not found', { status: 404 });
         return renderInvoiceShowPageError(context, organization, invoice, {
           validationErrors: result.errors,
@@ -103,13 +104,13 @@ export default createController(routes.app.invoices.lifecycle, {
     },
     async discard(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be discarded', { status: 409 });
       }
 
-      let discarded = await discardDraftInvoice(organization.id, invoice.id);
+      let discarded = await discardDraftInvoice(context.db, organization.id, invoice.id);
       if (!discarded) {
         return new Response('Only a Draft invoice can be discarded', { status: 409 });
       }
@@ -119,7 +120,7 @@ export default createController(routes.app.invoices.lifecycle, {
     },
     async internalNote(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'issued') {
         return new Response('Internal notes can be updated only after issue', { status: 409 });
@@ -138,6 +139,7 @@ export default createController(routes.app.invoices.lifecycle, {
       }
 
       let updated = await updateIssuedInvoiceInternalNote(
+        context.db,
         organization.id,
         invoice.id,
         internalNote.trim() || null,

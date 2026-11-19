@@ -29,14 +29,14 @@ export default createController(routes.app.invoices.edit, {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be edited', { status: 409 });
       }
 
       let [lines, client] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
         findClient(context.db, organization.id, invoice.client_id),
       ]);
       let profile = await getInvoicingProfileView(context.db, organization);
@@ -59,7 +59,7 @@ export default createController(routes.app.invoices.edit, {
     async action(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be edited', { status: 409 });
@@ -77,7 +77,7 @@ export default createController(routes.app.invoices.edit, {
         gstStateCode: profile.gst_state_code,
         gstRatePresets,
       };
-      let savedLines = await findInvoiceLines(organization.id, invoice.id);
+      let savedLines = await findInvoiceLines(context.db, organization.id, invoice.id);
       if (isAddLineIntent(context.formData)) {
         return context.render(
           <EditInvoicePage
@@ -113,7 +113,7 @@ export default createController(routes.app.invoices.edit, {
       }
 
       // The Client is fixed for this Draft; a forged `client_id` in the form is ignored.
-      let updated = await updateDraftInvoice(organization.id, invoice.id, parsed.value);
+      let updated = await updateDraftInvoice(context.db, organization.id, invoice.id, parsed.value);
       if (!updated) return new Response('Only a Draft invoice can be edited', { status: 409 });
 
       context.session.flash('message', 'Invoice draft updated');

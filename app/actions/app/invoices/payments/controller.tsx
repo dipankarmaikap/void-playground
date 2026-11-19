@@ -49,9 +49,9 @@ async function renderPaymentError(
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
+    findInvoiceLines(context.db, organization.id, invoice.id),
     findClient(context.db, organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -76,7 +76,7 @@ export default createController(routes.app.invoices.payments, {
   actions: {
     async record(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -117,7 +117,7 @@ export default createController(routes.app.invoices.payments, {
         });
       }
 
-      let result = await recordInvoicePayment(organization.id, invoice.id, {
+      let result = await recordInvoicePayment(context.db, organization.id, invoice.id, {
         paymentDate: paymentFormValues.payment_date,
         amountMinor: amountMinor!,
         method: paymentFormValues.payment_method as InvoicePaymentMethod,
@@ -144,7 +144,7 @@ export default createController(routes.app.invoices.payments, {
     },
     async void(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -169,6 +169,7 @@ export default createController(routes.app.invoices.payments, {
       }
 
       let result = await voidInvoicePayment(
+        context.db,
         organization.id,
         invoice.id,
         context.params.paymentId,

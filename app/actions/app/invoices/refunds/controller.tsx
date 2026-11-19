@@ -49,9 +49,9 @@ async function renderRefundError(
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
+    findInvoiceLines(context.db, organization.id, invoice.id),
     findClient(context.db, organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -76,7 +76,7 @@ export default createController(routes.app.invoices.refunds, {
   actions: {
     async record(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -117,7 +117,7 @@ export default createController(routes.app.invoices.refunds, {
         });
       }
 
-      let result = await recordInvoiceRefund(organization.id, invoice.id, {
+      let result = await recordInvoiceRefund(context.db, organization.id, invoice.id, {
         refundDate: refundFormValues.refund_date,
         amountMinor: amountMinor!,
         method: refundFormValues.refund_method as InvoiceRefundMethod,
@@ -144,7 +144,7 @@ export default createController(routes.app.invoices.refunds, {
     },
     async void(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -169,6 +169,7 @@ export default createController(routes.app.invoices.refunds, {
       }
 
       let result = await voidInvoiceRefund(
+        context.db,
         organization.id,
         invoice.id,
         context.params.refundId,

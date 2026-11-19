@@ -599,7 +599,7 @@ describe('invoice issue flow', () => {
     let failed = false;
 
     try {
-      await issueDraftInvoice(organizationId, invoiceId, async ({ invoice, lines }) => {
+      await issueDraftInvoice(db, organizationId, invoiceId, async ({ invoice, lines }) => {
         finalizerCalled = true;
         assert.equal(invoice.status, 'issued');
         assert.equal(invoice.invoice_number, 'NS/26-27/0050');
@@ -740,7 +740,7 @@ describe('invoice issue flow', () => {
     assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
     let showPath = routes.app.invoices.show.href({ invoiceId });
     let before = await db.find(invoices, invoiceId);
-    let beforeLines = await findInvoiceLines(organizationId, invoiceId);
+    let beforeLines = await findInvoiceLines(db, organizationId, invoiceId);
     assert.ok(before);
 
     let editPage = await router.fetch(new URL(
@@ -778,10 +778,10 @@ describe('invoice issue flow', () => {
     let parsed = parseInvoiceDraft(readInvoiceFormValues(formDataOf(draftFields(client.id))));
     assert.equal(parsed.ok, true);
     if (parsed.ok) {
-      let directEdit = await updateDraftInvoice(organizationId, invoiceId, parsed.value);
+      let directEdit = await updateDraftInvoice(db, organizationId, invoiceId, parsed.value);
       assert.equal(directEdit, null, 'the stale Draft update must not mutate an issued invoice');
     }
-    assert.deepEqual(await findInvoiceLines(organizationId, invoiceId), beforeLines);
+    assert.deepEqual(await findInvoiceLines(db, organizationId, invoiceId), beforeLines);
 
     let noCsrf = await router.fetch(
       new URL(routes.app.invoices.lifecycle.internalNote.href({ invoiceId }), origin),
@@ -814,7 +814,7 @@ describe('invoice issue flow', () => {
     assert.equal(after?.recipient_legal_name, before.recipient_legal_name);
     assert.equal(after?.invoice_date, before.invoice_date);
     assert.equal(after?.internal_note, 'Follow up after client call');
-    assert.deepEqual(await findInvoiceLines(organizationId, invoiceId), beforeLines);
+    assert.deepEqual(await findInvoiceLines(db, organizationId, invoiceId), beforeLines);
 
     let detail = await getHtml(router, showPath, sessionCookie);
     assert.match(detail, /Follow up after client call/);

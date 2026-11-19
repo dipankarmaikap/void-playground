@@ -69,7 +69,7 @@ export default createController(routes.app.clients, {
       let organization = context.get(CurrentOrganization);
       let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
-      let invoiceCount = await countClientInvoices(organization.id, client.id);
+      let invoiceCount = await countClientInvoices(context.db, organization.id, client.id);
 
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;

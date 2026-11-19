@@ -575,7 +575,7 @@ describe('credit notes', () => {
     let finalizerCalled = false;
     let failed = false;
     try {
-      await issueCreditNoteDraft(organizationId, invoiceId, creditNoteId, async ({ creditNote }) => {
+      await issueCreditNoteDraft(db, organizationId, invoiceId, creditNoteId, async ({ creditNote }) => {
         finalizerCalled = true;
         assert.equal(creditNote.credit_note_number, 'CN/26-27/0001');
         throw new Error('PDF storage failed');

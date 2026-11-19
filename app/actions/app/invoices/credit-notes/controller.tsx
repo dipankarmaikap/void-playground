@@ -29,11 +29,12 @@ export default createController(routes.app.invoices.creditNotes, {
   actions: {
     async pdf(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
       let creditNote = await findCreditNote(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
@@ -49,6 +50,7 @@ export default createController(routes.app.invoices.creditNotes, {
 
       if (creditNote.status === 'issued') {
         let bytes = await findIssuedCreditNotePdfBytes(
+          context.db,
           organization.id,
           invoice.id,
           creditNote.id,
@@ -61,7 +63,7 @@ export default createController(routes.app.invoices.creditNotes, {
         return new Response('Credit note PDF not found', { status: 404 });
       }
       let { internal_note: _internalNote, ...invoiceDocument } = invoice;
-      let lines = await findCreditNoteLines(organization.id, invoice.id, creditNote.id);
+      let lines = await findCreditNoteLines(context.db, organization.id, invoice.id, creditNote.id);
       let pdf = renderCreditNotePdf({
         invoice: invoiceDocument,
         creditNote,

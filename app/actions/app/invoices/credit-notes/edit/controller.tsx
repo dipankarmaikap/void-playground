@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 
 import { Auth, requireAuth } from 'remix/middleware/auth';
@@ -30,6 +31,7 @@ import { routes } from '../../../../../routes.ts';
 import { CreditNoteDraftPage } from './page.tsx';
 
 type CreditNoteEditRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  db: SqliteDatabase;
   formData: FormData;
   render: RenderFunction;
 };
@@ -43,10 +45,11 @@ async function renderEditPage(
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, creditNote] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
-    findCreditNote(organization.id, invoice.id, context.params.creditNoteId),
+    findInvoiceLines(context.db, organization.id, invoice.id),
+    findCreditNote(context.db, organization.id, invoice.id, context.params.creditNoteId),
   ]);
   let creditableQuantities = await remainingCreditNoteLineCapacity(
+    context.db,
     organization.id,
     invoice,
     lines,
@@ -82,7 +85,7 @@ export default createController(routes.app.invoices.creditNotes.edit, {
   actions: {
     async index(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -90,6 +93,7 @@ export default createController(routes.app.invoices.creditNotes.edit, {
         return new Response('Credit note Drafts require an issued invoice', { status: 409 });
       }
       let creditNote = await findCreditNote(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
@@ -100,10 +104,11 @@ export default createController(routes.app.invoices.creditNotes.edit, {
       }
 
       let [sourceLines, savedLines] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
-        findCreditNoteLines(organization.id, invoice.id, creditNote.id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
+        findCreditNoteLines(context.db, organization.id, invoice.id, creditNote.id),
       ]);
       let creditableQuantities = await remainingCreditNoteLineCapacity(
+        context.db,
         organization.id,
         invoice,
         sourceLines,
@@ -133,7 +138,7 @@ export default createController(routes.app.invoices.creditNotes.edit, {
     },
     async action(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -142,6 +147,7 @@ export default createController(routes.app.invoices.creditNotes.edit, {
       }
       let values = readCreditNoteFormValues(context.formData);
       let result = await updateCreditNoteDraft(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
