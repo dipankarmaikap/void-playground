@@ -13,11 +13,9 @@ import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Avatar } from '../../../ui/avatar.tsx';
-import { Button, linkButtonStyle } from '../../../ui/button.tsx';
+import { linkButtonStyle } from '../../../ui/button.tsx';
 import { DataTable, amountCellStyle } from './ui/data-table.tsx';
-import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
-import { Input } from '../../../ui/input.tsx';
 import { PageHeader } from './ui/page-header.tsx';
 import { Panel, PanelBody, PanelFooter, PanelHeader } from './ui/panel.tsx';
 import {
@@ -26,10 +24,9 @@ import {
   noticeStatusStyle,
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
-import { Select } from '../../../ui/select.tsx';
 import { StatCard, statGridStyle, trendUpStyle } from './ui/stat-card.tsx';
 import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
-import { fontStack, neutrals, primary, radii, softFills } from '../../../ui/theme.ts';
+import { focus, fontStack, neutrals, primary, radii, shadows, softFills } from '../../../ui/theme.ts';
 
 export interface ClientsIndexPageProps {
   csrfToken: string;
@@ -72,41 +69,65 @@ function directoryHref({ q, type, status, followUp = 'all', page }: DirectoryFil
     : routes.app.clients.index.href({}, { searchParams });
 }
 
+/** The reference's `.btn.btn-primary` treatment for the page's Add client action. */
 const addClientStyle = css({
-  minHeight: '38px',
-  padding: '0 15px',
-  fontSize: '0.8125rem',
+  minHeight: '42px',
+  padding: '0 17px',
+  fontSize: '1rem',
+  fontWeight: 700,
+  lineHeight: 1,
+  boxShadow: shadows.primary,
   whiteSpace: 'nowrap',
+  transition: 'transform 160ms ease, box-shadow 160ms ease, background 160ms ease',
+  '&:hover': {
+    transform: 'translateY(-1px)',
+    boxShadow: shadows.primaryHover,
+  },
 });
 
 const toolbarStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
-  alignItems: 'flex-end',
+  alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '12px',
+  gap: '14px',
   marginBottom: '15px',
 });
 
-const filterFormStyle = css({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-  alignItems: 'end',
-  gap: '10px',
-  flex: '1 1 320px',
+/** Reference `.toolbar-search`: a slim labelled search box, icon on the inside. */
+const searchLabelStyle = css({
+  position: 'relative',
+  display: 'block',
+  width: 'min(250px, 100%)',
 });
 
-const filterActionsStyle = css({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: '0.5rem',
+const searchIconStyle = css({
+  position: 'absolute',
+  top: '10px',
+  left: '10px',
+  width: '15px',
+  height: '15px',
+  pointerEvents: 'none',
+  fill: 'none',
+  stroke: neutrals.softMuted,
+  strokeWidth: '1.8',
 });
 
-const submitButtonStyle = css({
-  minHeight: '36px',
-  padding: '0 12px',
-  fontSize: '0.75rem',
+const searchInputStyle = css({
+  boxSizing: 'border-box',
+  width: '100%',
+  height: '36px',
+  padding: '0 11px 0 33px',
+  border: `1px solid ${neutrals.line}`,
+  borderRadius: radii.md,
+  background: neutrals.paper,
+  color: neutrals.ink,
+  fontFamily: fontStack,
+  fontSize: '0.875rem',
+  '&:focus-visible': {
+    outline: focus.outline,
+    outlineOffset: focus.offset,
+  },
 });
 
 const filterRowStyle = css({
@@ -485,46 +506,36 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                 method="get"
                 action={routes.app.clients.index.href()}
                 role="search"
-                aria-label="Search and filter clients"
-                mix={filterFormStyle}
+                aria-label="Search clients"
               >
-                <Field label="Search clients" hint="Search names, email, or phone numbers.">
-                  <Input name="q" type="search" defaultValue={query} />
-                </Field>
-                <Field label="Client type">
-                  <Select name="type">
-                    <option value="all" selected={type === 'all'}>
-                      All types
-                    </option>
-                    <option value="individual" selected={type === 'individual'}>
-                      Individual
-                    </option>
-                    <option value="business" selected={type === 'business'}>
-                      Business
-                    </option>
-                  </Select>
-                </Field>
-                <Field label="Status">
-                  <Select name="status">
-                    <option value="active" selected={!archived}>
-                      Active
-                    </option>
-                    <option value="archived" selected={archived}>
-                      Archived
-                    </option>
-                  </Select>
-                </Field>
+                {/*
+                  The type, archived-status, and follow-up views have no controls of their
+                  own, so a search must carry them forward as hidden inputs.
+                */}
+                {type !== 'all' ? <input type="hidden" name="type" value={type} /> : null}
+                {archived ? <input type="hidden" name="status" value="archived" /> : null}
                 {followUp === 'overdue' || followUp === 'current' ? (
                   <input type="hidden" name="followup" value={followUp} />
                 ) : null}
-                <div mix={filterActionsStyle}>
-                  <Button type="submit" mix={submitButtonStyle}>
-                    Apply filters
-                  </Button>
-                  <a href={routes.app.clients.index.href()} mix={[textLinkStyle, submitButtonStyle]}>
-                    Reset
-                  </a>
-                </div>
+                <label mix={searchLabelStyle}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                    mix={searchIconStyle}
+                  >
+                    <circle cx="10.8" cy="10.8" r="6.8"></circle>
+                    <path d="m16 16 4.5 4.5"></path>
+                  </svg>
+                  <input
+                    name="q"
+                    type="search"
+                    aria-label="Search clients"
+                    placeholder="Search by name, email, or phone"
+                    defaultValue={query}
+                    mix={searchInputStyle}
+                  />
+                </label>
               </form>
               <div
                 mix={filterRowStyle}

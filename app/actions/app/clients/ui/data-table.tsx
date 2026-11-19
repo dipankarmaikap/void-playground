@@ -23,7 +23,7 @@ export const headerCellStyle = css({
   color: neutrals.softMuted,
   fontSize: '0.75rem',
   fontWeight: 700,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.05em',
   textAlign: 'left',
   textTransform: 'uppercase',
   whiteSpace: 'nowrap',
@@ -33,11 +33,11 @@ export const headerCellStyle = css({
 export const rowStyle = css({
   borderBottom: `1px solid ${neutrals.line}`,
   '&:last-child': { borderBottom: 'none' },
-  '&:hover': { background: neutrals.canvas },
+  '&:hover': { background: neutrals.rowHover },
 });
 
 export const cellStyle = css({
-  padding: '11px 14px',
+  padding: '13px 14px',
   color: neutrals.muted,
   fontSize: '0.875rem',
   verticalAlign: 'middle',

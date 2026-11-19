@@ -14,6 +14,8 @@ export const neutrals = {
   line: '#ececf3',
   paper: '#ffffff',
   canvas: '#f7f7fb',
+  /** The subtler tint reference data-table rows use on hover. */
+  rowHover: '#fcfbff',
 } as const;
 
 /** Primary brand shades and soft fills (reference `--purple` … `--red`). */
@@ -71,6 +73,7 @@ export const shadows = {
   small: '0 5px 20px rgba(42, 39, 92, 0.06)',
   panel: '0 2px 8px rgba(39, 36, 87, 0.015)',
   primary: '0 7px 15px rgba(61, 95, 211, 0.2)',
+  primaryHover: '0 9px 20px rgba(61, 95, 211, 0.27)',
   brandMark: '0 5px 12px rgba(55, 86, 190, 0.2)',
 } as const;
 

@@ -240,7 +240,6 @@ describe('Clients directory from real data', () => {
 
     assert.match(html, /role="group" aria-label="Filter clients by follow-up"/);
     assert.doesNotMatch(html, /aria-label="Filter clients by status"/);
-    assert.match(html, /name="status"/);
 
     let followUpGroup =
       html.match(/<div[^>]*aria-label="Filter clients by follow-up"[^>]*>[\s\S]*?<\/div>/)?.[0] ??
@@ -248,8 +247,10 @@ describe('Clients directory from real data', () => {
     assert.ok(followUpGroup.includes('Needs follow-up'));
     assert.doesNotMatch(followUpGroup, /aria-current/);
 
+    // Status has exactly one control: the Active/Archived toggle in the panel header.
     let statusNav = html.match(/<nav aria-label="Client status"[\s\S]*?<\/nav>/)?.[0] ?? '';
     assert.match(statusNav, /Active/);
+    assert.match(statusNav, /status=archived/);
     assert.doesNotMatch(statusNav, /aria-current/);
 
     assert.match(html, /<span aria-current="page"[^>]*>\d+<\/span>/);
