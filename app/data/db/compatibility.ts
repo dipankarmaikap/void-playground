@@ -22,7 +22,32 @@ import {
 } from './tables.ts';
 
 /** The migration runner's journal table, created by the first migration run. */
-const migrationJournalTable = { name: 'data_table_migrations' };
+export const migrationJournalTableName = 'data_table_migrations';
+
+/**
+ * Every typed app table, in one list. The journal gate rejects a database that already holds
+ * any of them without the migration journal, and the migration suite asserts the fresh-install
+ * schema contains them all — so adding a table touches `tables.ts`, a migration, and this list.
+ */
+export const appTables = [
+  clients,
+  creditNoteLines,
+  creditNotePdfArtifacts,
+  creditNotes,
+  documentSequences,
+  invoiceLines,
+  invoicePayments,
+  invoicePdfArtifacts,
+  invoiceRefunds,
+  invoices,
+  organizationGstRatePresets,
+  organizationInvoicingProfiles,
+  organizationMemberships,
+  organizations,
+  sessions,
+  userPasswords,
+  users,
+];
 
 function missingClientOrganizationSchemaError(): Error {
   return new Error(
@@ -49,31 +74,17 @@ export async function assertClientSchemaCompatible(database: SqliteDatabase): Pr
   ) {
     throw missingClientOrganizationSchemaError();
   }
+}
 
-  // The migration runner owns schema application, so a database that already holds app tables
-  // but no journal was written by the old hand-rolled pipeline (or by hand). Reject it before
-  // the runner re-runs history against it and crashes on CREATE TABLE; adopting the runner
-  // means the operator-managed clean start, per docs/adr/0002-organization-access.md.
-  if (!(await database.hasTable(migrationJournalTable))) {
-    let appTables = [
-      clients,
-      creditNoteLines,
-      creditNotePdfArtifacts,
-      creditNotes,
-      documentSequences,
-      invoiceLines,
-      invoicePayments,
-      invoicePdfArtifacts,
-      invoiceRefunds,
-      invoices,
-      organizationGstRatePresets,
-      organizationInvoicingProfiles,
-      organizationMemberships,
-      organizations,
-      sessions,
-      userPasswords,
-      users,
-    ];
+/**
+ * Rejects a database that already holds app tables but no migration journal. The migration
+ * runner owns schema application, so such a database was written by the old hand-rolled
+ * pipeline (or by hand); reject it before the runner re-runs history against it and crashes
+ * on CREATE TABLE. Adopting the runner means the operator-managed clean start, per
+ * docs/adr/0002-organization-access.md.
+ */
+export async function assertJournaledSchema(database: SqliteDatabase): Promise<void> {
+  if (!(await database.hasTable({ name: migrationJournalTableName }))) {
     for (let table of appTables) {
       if (await database.hasTable(getTableReference(table))) {
         throw predatesMigrationJournalError();

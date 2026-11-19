@@ -1,5 +1,3 @@
-import { fileURLToPath } from 'node:url';
-
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 import { getTableReference } from 'remix/data-table';
@@ -12,27 +10,14 @@ import { CLIENT_TYPES } from '../client-names.ts';
 
 import {
   clients,
-  creditNoteLines,
-  creditNotePdfArtifacts,
   creditNotes,
-  documentSequences,
-  invoiceLines,
-  invoicePayments,
-  invoicePdfArtifacts,
-  invoiceRefunds,
   invoices,
-  organizationGstRatePresets,
-  organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
-  sessions,
-  userPasswords,
   users,
 } from './tables.ts';
-import { migrateDatabase } from './migrate.ts';
-
-/** Where the numbered SQL migrations live, resolved the same way the migration entry does. */
-const migrationsDirectory = fileURLToPath(new URL('./migrations/', import.meta.url));
+import { appTables, migrationJournalTableName } from './compatibility.ts';
+import { migrateDatabase, migrationsDirectory } from './migrate.ts';
 
 /** Observes the resulting schema: does the named index exist right now? */
 async function indexExists(database: SqliteDatabase, name: string): Promise<boolean> {
@@ -53,26 +38,7 @@ describe('migrateDatabase', () => {
     let freshDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
     await migrateDatabase(freshDb);
 
-    let finalTables = [
-      users,
-      organizations,
-      organizationInvoicingProfiles,
-      organizationGstRatePresets,
-      organizationMemberships,
-      userPasswords,
-      sessions,
-      clients,
-      invoices,
-      documentSequences,
-      invoiceLines,
-      invoicePdfArtifacts,
-      invoicePayments,
-      invoiceRefunds,
-      creditNotes,
-      creditNoteLines,
-      creditNotePdfArtifacts,
-    ];
-    for (let table of finalTables) {
+    for (let table of appTables) {
       assert.ok(
         await freshDb.hasTable(getTableReference(table)),
         `the final schema has the ${getTableReference(table).name} table`,
@@ -165,7 +131,7 @@ describe('migrateDatabase', () => {
     // edited up.sql after application surfaces as a mismatch; plant the mismatch on the
     // journal side, which the untouched files then disagree with.
     await freshDb.executeScript(
-      "UPDATE data_table_migrations SET checksum = 'rewritten-history' WHERE id = '0003'",
+      `UPDATE ${migrationJournalTableName} SET checksum = 'rewritten-history' WHERE id = '0003'`,
     );
 
     let rejected = false;

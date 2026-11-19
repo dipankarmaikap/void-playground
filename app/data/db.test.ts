@@ -1551,8 +1551,8 @@ describe('db', () => {
     );
     assert.match(message, /operator-managed clean start/);
     let tables = await legacyDb.exec(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN " +
-        "('invoices', 'data_table_migrations') ORDER BY name",
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ` +
+        `('invoices', '${compatibility.migrationJournalTableName}') ORDER BY name`,
     );
     let tableNames = (tables.rows ?? []).map((row) => String((row as { name?: unknown }).name));
     assert.equal(

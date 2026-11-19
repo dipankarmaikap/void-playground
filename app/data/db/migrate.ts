@@ -8,7 +8,7 @@ import { db } from '../db.ts';
 import * as compatibility from './compatibility.ts';
 
 /** Where the numbered SQL migrations live, resolved from this module like the app's other paths. */
-const migrationsDirectory = fileURLToPath(new URL('./migrations/', import.meta.url));
+export const migrationsDirectory = fileURLToPath(new URL('./migrations/', import.meta.url));
 
 /**
  * The single migration entry. Rejects incompatible legacy databases before any migration SQL
@@ -23,6 +23,7 @@ export async function migrateDatabase(
   options?: DatabaseMigrateOptions,
 ): Promise<MigrateResult> {
   await compatibility.assertClientSchemaCompatible(database);
+  await compatibility.assertJournaledSchema(database);
   let migrations = await loadMigrations(migrationsDirectory);
   let result = await database.migrate(migrations, options);
   await compatibility.assertOrganizationSchemaCompatible(database);
