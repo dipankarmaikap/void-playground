@@ -1,7 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -18,12 +17,14 @@ import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../../data/organization/invoicing.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
-import { invoicingFormValuesOf, readInvoicingFormValues } from './form-values.ts';
+import { invoicingFormValuesOf } from './form-values.ts';
+import { invoicingValuesOf, presetValuesOf } from './public/schema.ts';
 import { InvoicingPage } from './page.tsx';
 
 function identityOf(auth: GoodAuth<User>) {
@@ -32,16 +33,16 @@ function identityOf(auth: GoodAuth<User>) {
 
 export default createController(routes.app.settings.invoicing, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let [view, presets] = await Promise.all([
-        getInvoicingProfileView(organization),
-        findGstPresets(organization.id),
+        getInvoicingProfileView(context.db, organization),
+        findGstPresets(context.db, organization.id),
       ]);
       let message = context.session.get('message');
 
@@ -58,26 +59,21 @@ export default createController(routes.app.settings.invoicing, {
       );
     },
     async action(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let form = context.formData.get('_form');
-      let view = await getInvoicingProfileView(organization);
+      let view = await getInvoicingProfileView(context.db, organization);
 
       if (form === 'preset_add' || form === 'preset_update' || form === 'preset_remove') {
-        let presets = await ensureGstPresets(organization.id);
-        let text = (name: string) => {
-          let value = context.formData.get(name);
-          return typeof value === 'string' ? value : '';
-        };
-        let rate = text('rate');
-        let presetId = text('preset_id');
+        let presets = await ensureGstPresets(context.db, organization.id);
+        let { rate, presetId } = presetValuesOf(context.formData);
 
         let result =
           form === 'preset_add'
-            ? await addGstPreset(organization.id, rate)
+            ? await addGstPreset(context.db, organization.id, rate)
             : form === 'preset_update'
-              ? await updateGstPreset(organization.id, presetId, rate)
-              : await removeGstPreset(organization.id, presetId).then((removed) => ({
+              ? await updateGstPreset(context.db, organization.id, presetId, rate)
+              : await removeGstPreset(context.db, organization.id, presetId).then((removed) => ({
                   ok: removed.found,
                   notFound: !removed.found,
                   message: undefined,
@@ -86,7 +82,7 @@ export default createController(routes.app.settings.invoicing, {
         if (result.notFound) return new Response('GST rate preset not found', { status: 404 });
 
         if (result.ok) {
-          if (form === 'preset_remove') await ensureGstPresets(organization.id);
+          if (form === 'preset_remove') await ensureGstPresets(context.db, organization.id);
           context.session.flash(
             'message',
             form === 'preset_add'
@@ -115,8 +111,8 @@ export default createController(routes.app.settings.invoicing, {
         );
       }
 
-      let submitted = readInvoicingFormValues(context.formData);
-      let presets = await ensureGstPresets(organization.id);
+      let submitted = invoicingValuesOf(context.formData);
+      let presets = await ensureGstPresets(context.db, organization.id);
       let parsed = parseInvoicingProfile(submitted, view);
 
       if (!parsed.ok) {
@@ -136,7 +132,7 @@ export default createController(routes.app.settings.invoicing, {
       }
 
       // The Organization is resolved from the authenticated membership, never from form data.
-      await saveInvoicingProfile(organization.id, parsed.value);
+      await saveInvoicingProfile(context.db, organization.id, parsed.value);
       context.session.flash('message', 'Invoicing settings updated');
       return redirect(routes.app.settings.invoicing.index.href());
     },

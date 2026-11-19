@@ -1,16 +1,12 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
-
 import * as s from 'remix/data-schema';
-import * as f from 'remix/data-schema/form-data';
-import * as checks from 'remix/data-schema/checks';
 
 import { Auth } from 'remix/middleware/auth';
 import type { AuthState } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import {
-  db,
   organizationMemberships,
   organizationGstRatePresets,
   organizations,
@@ -24,13 +20,7 @@ import { parseOrganizationName } from '../../../data/organization/name.ts';
 import { hashPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { RegisterPage } from './page.tsx';
-
-const registerForm = f.object({
-  email: f.field(s.string().pipe(checks.email())),
-  organization_name: f.field(s.defaulted(s.string(), '')),
-  display_name: f.field(s.defaulted(s.string(), '')),
-  password: f.field(s.string().pipe(checks.minLength(8))),
-});
+import { RegisterForm } from './public/schema.ts';
 
 function isDuplicateEmailViolation(error: unknown): boolean {
   return error instanceof Error && error.message.includes('UNIQUE constraint failed: users.email');
@@ -73,7 +63,7 @@ export default createController(routes.auth.register, {
           { status: 400 },
         );
 
-      let parsed = s.parseSafe(registerForm, context.formData);
+      let parsed = s.parseSafe(RegisterForm, context.formData);
       if (!parsed.success) {
         return renderInvalidRegistration(parsed.issues[0]?.message ?? 'Invalid input');
       }
@@ -91,13 +81,13 @@ export default createController(routes.auth.register, {
       let email = parsed.value.email.trim().toLowerCase();
       let password = parsed.value.password;
 
-      let existing = await db.findOne(users, { where: { email } });
+      let existing = await context.db.findOne(users, { where: { email } });
       if (existing) {
         context.session.flash('error', 'Email already registered');
         return redirect(routes.auth.register.index.href());
       }
 
-      let passwordHash = hashPassword(password);
+      let passwordHash = await hashPassword(password);
       let token = crypto.randomUUID();
       let expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       let userId = crypto.randomUUID();
@@ -105,7 +95,7 @@ export default createController(routes.auth.register, {
       let now = Date.now();
 
       try {
-        await db.transaction(async (tx) => {
+        await context.db.transaction(async (tx) => {
           await tx.create(users, {
             id: userId,
             email,
@@ -153,6 +143,9 @@ export default createController(routes.auth.register, {
       console.log(verifyUrl.href);
 
       context.session.flash('message', 'Check your email to verify your account');
+      // Registration deliberately signs nobody in: no Session is minted here, so an unverified
+      // registration never holds an authenticated Session. The first authenticated Session is
+      // minted at login, where the framework rotates the Session id.
       return redirect(routes.auth.login.index.href());
     },
   },

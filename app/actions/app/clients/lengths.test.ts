@@ -1,11 +1,12 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
-import { router } from '../../../router.ts';
+import { clients } from '../../../data/db.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, postForm } from '../../../../test/http.ts';
+import { createUserAndLogin, postForm, submitForm } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 const clientTextLimits = [
   { field: 'legal_name', limit: 120 },
@@ -62,11 +63,11 @@ function uniqueName(prefix: string) {
 
 describe('Client free-text length limits', () => {
   it('accepts each free-text field at its documented maximum length', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let values = maxLengthValues();
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       values,
       sessionCookie,
     );
@@ -85,7 +86,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('rejects every over-limit field with feedback and preserves the submitted value', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
 
     for (let { field, limit } of clientTextLimits) {
       let value = 'X'.repeat(limit + 1);
@@ -97,7 +98,7 @@ describe('Client free-text length limits', () => {
 
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         fields,
         sessionCookie,
       );
@@ -135,7 +136,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('rejects over-limit name submissions before trimming whitespace', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let cases = [
       {
         field: 'legal_name',
@@ -163,7 +164,7 @@ describe('Client free-text length limits', () => {
 
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         fields,
         sessionCookie,
       );
@@ -177,7 +178,7 @@ describe('Client free-text length limits', () => {
   });
 
   it('reveals invalid Business-only fields on an Individual form', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let fields = {
       type: 'individual',
       legal_name: uniqueName('Individual with hidden values'),
@@ -189,7 +190,7 @@ describe('Client free-text length limits', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       fields,
       sessionCookie,
     );
@@ -205,11 +206,11 @@ describe('Client free-text length limits', () => {
   });
 
   it('preserves stored Client data when edit fields exceed their limits', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'client-length');
+    let sessionCookie = await createUserAndLogin(router, db, 'client-length');
     let values = maxLengthValues();
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       values,
       sessionCookie,
     );
@@ -227,10 +228,11 @@ describe('Client free-text length limits', () => {
       billing_country: ` ${'Z'.repeat(100)}`,
       billing_currency: 'usd ',
     };
-    let response = await postForm(
+    let response = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: client.id }),
-      submitted,
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
+      { ...submitted, _method: 'PUT' },
       sessionCookie,
     );
 

@@ -1,12 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
-import { db, sessions } from '../app/data/db.ts';
-import './db-setup.ts';
+import { sessions } from '../app/data/db.ts';
 
 import { cookieFromResponse, createUser, extractCsrf, login, origin } from './http.ts';
+
+const { router, db } = await createTestRouter();
 
 async function seedSession(userId: string, ip: string, createdAt = Date.now()): Promise<string> {
   let id = crypto.randomUUID();
@@ -33,7 +34,7 @@ async function getSessionsPage(sessionCookie: string) {
 describe('session flow', () => {
   it('login, view sessions, revoke another session', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let otherSessionId = await seedSession(userId, '1.2.3.4');
 
     let sessionCookie = await login(router, email, 'password123');
@@ -78,7 +79,7 @@ describe('session flow', () => {
 
   it('shows the current session first with a text marker', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
     // Newer than the current session, so plain date order would put it first.
     await seedSession(userId, '9.9.9.9', Date.now() + 60_000);
@@ -89,7 +90,7 @@ describe('session flow', () => {
 
   it('offers no row-level Revoke for the current session', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let sessionsHtml = await getSessionsPage(sessionCookie);
@@ -100,7 +101,7 @@ describe('session flow', () => {
 
   it('guards revoking all other sessions with a no-JS confirmation', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     await seedSession(userId, '1.1.1.1');
 
     let sessionCookie = await login(router, email, 'password123');
@@ -115,7 +116,7 @@ describe('session flow', () => {
 
   it('revokes all other sessions', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     await seedSession(userId, '1.1.1.1');
     await seedSession(userId, '2.2.2.2');
 
@@ -148,7 +149,7 @@ describe('session flow', () => {
 
   it('logout destroys the session', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let dashboard = await router.fetch(new URL(routes.app.dashboard.href(), origin), {
@@ -174,12 +175,14 @@ describe('session flow', () => {
       headers: { Cookie: cookieFromResponse(response) },
     });
     assert.equal(followUp.status, 302);
-    assert.equal(followUp.headers.get('Location'), routes.auth.login.index.href());
+    let loginLocation = new URL(followUp.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), routes.app.dashboard.href());
   });
 
   it('does not report successful Log out when Session deletion fails', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
     let currentRows = await db.findMany(sessions, { where: { user_id: userId } });
     assert.equal(currentRows.length, 1);
@@ -226,8 +229,8 @@ describe('session flow', () => {
   it('does not list or Revoke a Session owned by another User', async () => {
     let firstEmail = `u-${crypto.randomUUID()}@example.com`;
     let secondEmail = `u-${crypto.randomUUID()}@example.com`;
-    let firstUserId = await createUser(firstEmail, 'password123');
-    let secondUserId = await createUser(secondEmail, 'password123');
+    let firstUserId = await createUser(db, firstEmail, 'password123');
+    let secondUserId = await createUser(db, secondEmail, 'password123');
     let foreignSessionId = await seedSession(secondUserId, '8.8.8.8');
     let sessionCookie = await login(router, firstEmail, 'password123');
     let sessionsHtml = await getSessionsPage(sessionCookie);
@@ -261,7 +264,7 @@ describe('session flow', () => {
 
   it('revoking the current session logs out', async () => {
     let email = `u-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let currentRows = await db.findMany(sessions, { where: { user_id: userId } });

@@ -1,4 +1,6 @@
-import { clients, db } from './db.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
+import { clients } from './db.ts';
 import type { Client } from './db.ts';
 
 /**
@@ -19,6 +21,7 @@ export function parseClientStatusFilter(value: unknown): ClientStatus {
 
 /** Archives a Client in place only when it belongs to the given Organization. */
 export async function archiveClient(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
 ): Promise<Client | null> {
@@ -37,6 +40,7 @@ export async function archiveClient(
 
 /** Returns an archived Client to Active only within the given Organization. */
 export async function restoreClient(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
 ): Promise<Client | null> {

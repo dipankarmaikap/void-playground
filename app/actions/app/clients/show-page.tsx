@@ -99,7 +99,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
       {},
       { searchParams: { clientId: client.id } },
     );
-    let newInvoiceHref = routes.app.invoices.new.index.href(
+    let newInvoiceHref = routes.app.invoices.new.href(
       {},
       { searchParams: { clientId: client.id } },
     );
@@ -187,7 +187,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
         </section>
         <div mix={actionsStyle}>
           <a
-            href={routes.app.clients.edit.index.href({ clientId: client.id })}
+            href={routes.app.clients.edit.href({ clientId: client.id })}
             mix={linkButtonStyle}
           >
             Edit client

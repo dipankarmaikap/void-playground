@@ -1,5 +1,18 @@
 {
   "$schema": "./node_modules/remix/schema/remix.json",
+  "assets": {
+    "rootDir": ".",
+    "basePath": "/assets",
+    "allowFiles": [
+      "app/routes.ts",
+      "app/actions/app/routes.ts",
+      "app/actions/app/clients/routes.ts",
+      "app/actions/app/invoices/routes.ts",
+      "app/**/public/**"
+    ],
+    "allowPackages": ["remix"],
+    "denyFiles": ["app/**/*.test.*"]
+  },
   "db": {
     "adapter": {
       "type": "sqlite",
@@ -8,6 +21,15 @@
     },
     "migrations": {
       "directory": "./app/data/db/migrations"
+    },
+    "seed": "./app/data/db/seed.sql"
+  },
+  "test": {
+    "exclude": ["node_modules/**", "tmp/**"],
+    "type": ["server"],
+    "playwright": {
+      "configFile": "./playwright.config.ts",
+      "projects": ["chromium"]
     }
   }
 }

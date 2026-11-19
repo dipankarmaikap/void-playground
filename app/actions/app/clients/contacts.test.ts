@@ -1,9 +1,8 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
-import { router } from '../../../router.ts';
+import { clients } from '../../../data/db.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -12,6 +11,8 @@ import {
   postForm,
   submitForm,
 } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -23,14 +24,14 @@ function uniqueEmail(prefix: string) {
 
 describe('client contacts', () => {
   it('creates, views, and edits an Individual email and phone', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Individual');
     let email = uniqueEmail('person');
     let phone = '+91 98765 43210';
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone },
       sessionCookie,
     );
@@ -52,10 +53,11 @@ describe('client contacts', () => {
 
     let updatedEmail = uniqueEmail('person-updated');
     let updatedPhone = '(020) 7946-0000';
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: legalName, email: updatedEmail, phone: updatedPhone },
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: legalName, email: updatedEmail, phone: updatedPhone },
       sessionCookie,
     );
     assert.equal(edited.status, 302);
@@ -70,13 +72,13 @@ describe('client contacts', () => {
   });
 
   it('trims contact values and stores blank optional values as null', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Optional Contacts');
     let email = uniqueEmail('trimmed');
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: legalName,
@@ -102,12 +104,12 @@ describe('client contacts', () => {
   });
 
   it('accepts an Individual with no contact details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('No Contacts');
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       sessionCookie,
     );
@@ -125,14 +127,14 @@ describe('client contacts', () => {
   });
 
   it('rejects an invalid Individual email and keeps the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Email');
     let badEmail = 'not-an-email';
     let phone = '+91 98765 43210';
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email: badEmail, phone },
       sessionCookie,
     );
@@ -150,14 +152,14 @@ describe('client contacts', () => {
   });
 
   it('rejects an invalid Individual phone number and keeps the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Phone');
     let email = uniqueEmail('valid');
     let badPhone = 'call me maybe';
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone: badPhone },
       sessionCookie,
     );
@@ -174,7 +176,7 @@ describe('client contacts', () => {
   });
 
   it('creates, views, and edits Business shared and primary-contact details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Business');
     let sharedEmail = uniqueEmail('shared');
     let sharedPhone = '+44 20 7946 0958';
@@ -185,7 +187,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -225,10 +227,12 @@ describe('client contacts', () => {
     assert.ok(profile.includes(contactPhone));
 
     let updatedRole = 'Finance director';
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: legalName,
         email: sharedEmail,
@@ -251,14 +255,14 @@ describe('client contacts', () => {
   });
 
   it('requires a primary contact name when any other primary-contact field is present', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Named Contact Required');
     let role = 'Operations';
     let contactEmail = uniqueEmail('ops');
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -282,13 +286,13 @@ describe('client contacts', () => {
   });
 
   it('accepts a Business primary contact with only a name', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Name Only Contact');
     let contactName = uniqueName('Sam Rivera');
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -310,13 +314,13 @@ describe('client contacts', () => {
   });
 
   it('rejects invalid primary-contact email and phone values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Contact Details');
     let contactName = uniqueName('Jordan Lee');
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -341,7 +345,7 @@ describe('client contacts', () => {
   });
 
   it('allows the same email, phone, and primary contact across Clients', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let sharedEmail = uniqueEmail('duplicate');
     let sharedPhone = '+91 90000 00000';
     let contactName = uniqueName('Shared Contact');
@@ -353,7 +357,7 @@ describe('client contacts', () => {
     for (let legalName of [firstName, secondName]) {
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         {
           type: 'business',
           legal_name: legalName,
@@ -378,15 +382,15 @@ describe('client contacts', () => {
   });
 
   it('does not disclose or edit another Organization’s contact details', async () => {
-    let firstCookie = await createUserAndLogin(router, 'contacts');
-    let secondCookie = await createUserAndLogin(router, 'contacts');
+    let firstCookie = await createUserAndLogin(router, db, 'contacts');
+    let secondCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Shared Contacts');
     let email = uniqueEmail('owner');
     let phone = '+61 2 9374 4000';
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone },
       firstCookie,
     );
@@ -408,8 +412,8 @@ describe('client contacts', () => {
     let edited = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: legalName, email, phone: updatedPhone },
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: legalName, email, phone: updatedPhone },
       secondCookie,
     );
     assert.equal(edited.status, 404);
@@ -420,7 +424,7 @@ describe('client contacts', () => {
   });
 
   it('keeps Business primary-contact values through a type change', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Type Change');
     let contactName = uniqueName('Casey Morgan');
     let contactRole = 'Procurement';
@@ -428,7 +432,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -446,10 +450,12 @@ describe('client contacts', () => {
 
     // The form keeps the hidden Business group in the submission, so an Individual switch
     // must not erase the primary contact.
-    let toIndividual = await postForm(
+    let toIndividual = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'individual',
         legal_name: legalName,
         contact_name: contactName,
@@ -475,16 +481,18 @@ describe('client contacts', () => {
 
     let individualEdit = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(individualEdit, new RegExp(`name="contact_name"[^>]*value="${contactName}"`));
     assert.match(individualEdit, /name="contact_email"/);
 
-    let backToBusiness = await postForm(
+    let backToBusiness = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: legalName,
         contact_name: contactName,
@@ -501,13 +509,13 @@ describe('client contacts', () => {
   });
 
   it('rejects contact edits without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact CSRF');
     let originalEmail = uniqueEmail('original');
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email: originalEmail },
       sessionCookie,
     );
@@ -516,7 +524,7 @@ describe('client contacts', () => {
     assert.ok(row);
 
     let response = await router.fetch(
-      new URL(routes.app.clients.edit.action.href({ clientId: row.id }), origin),
+      new URL(routes.app.clients.update.href({ clientId: row.id }), origin),
       {
         method: 'POST',
         headers: {
@@ -524,6 +532,7 @@ describe('client contacts', () => {
           Cookie: sessionCookie,
         },
         body: new URLSearchParams({
+          _method: 'PUT',
           type: 'individual',
           legal_name: legalName,
           email: uniqueEmail('tampered'),

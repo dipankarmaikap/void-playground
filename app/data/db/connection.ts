@@ -4,24 +4,17 @@ import { dirname, join } from 'node:path';
 import { createSqliteDatabase } from 'remix/data-table/sqlite';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-/** True while `npm test` runs, which swaps the persistent developer database for an in-memory one. */
-export const isTest = process.env.NODE_ENV === 'test';
-
-const dbPath = isTest
-  ? ':memory:'
-  : join(import.meta.dirname, '..', '..', '..', 'data', 'app.db');
-
-if (!isTest) {
-  mkdirSync(dirname(dbPath), { recursive: true });
-}
-
 /**
- * Creates the application's single SQLite database connection.
+ * Creates the application's SQLite database connection for server startup and scripts. Tests
+ * never call this: the shared test bootstrap constructs its own in-memory database explicitly
+ * through the same adapter, so no environment branch lives in production code.
  *
  * `remix.json` mirrors these adapter settings for the `remix db` CLI — the same database
- * filename (`data/app.db` outside test mode) and `foreignKeys: true`. JSON can't hold
- * comments, so this pointer lives here: both must change together.
+ * filename and `foreignKeys: true`. JSON can't hold comments, so this pointer lives here:
+ * both must change together.
  */
 export function createAppDatabase(): SqliteDatabase {
+  let dbPath = join(import.meta.dirname, '..', '..', '..', 'data', 'app.db');
+  mkdirSync(dirname(dbPath), { recursive: true });
   return createSqliteDatabase({ filename: dbPath, foreignKeys: true });
 }

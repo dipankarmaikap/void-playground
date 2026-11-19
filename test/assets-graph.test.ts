@@ -2,9 +2,11 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
-import { router } from '../app/router.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
 import { createUserAndLogin, extractCsrf, origin } from './http.ts';
+
+const { router, db } = await createTestRouter();
 
 describe('browser asset graph', () => {
   it('allows only the shared route contract and its browser-safe route modules', async () => {
@@ -43,10 +45,42 @@ describe('browser asset graph', () => {
     }
   });
 
+  it('ships every shared form schema through the per-feature public convention', async () => {
+    // The `app/**/public/**` allow-list entry is the structural browser-bundle boundary: each
+    // form's schema module must stay under it so the browser can use the same description the
+    // server parses with.
+    for (let path of [
+      'app/ui/public/form-field.ts',
+      'app/actions/auth/login/public/schema.ts',
+      'app/actions/auth/register/public/schema.ts',
+      'app/actions/auth/verify/public/schema.ts',
+      'app/actions/app/clients/public/schema.ts',
+      'app/actions/app/invoices/public/schema.ts',
+      'app/actions/app/invoices/payments/public/schema.ts',
+      'app/actions/app/invoices/refunds/public/schema.ts',
+      'app/actions/app/invoices/credit-notes/public/schema.ts',
+      'app/actions/app/settings/profile/public/schema.ts',
+      'app/actions/app/settings/invoicing/public/schema.ts',
+    ]) {
+      let details = await assets.getAssetDetails(path);
+      assert.equal(details.status, 'reachable', `${path} should be browser-reachable`);
+    }
+
+    // The server-only pieces those schemas describe stay outside the graph.
+    for (let path of [
+      'app/actions/app/clients/parse-client-form.ts',
+      'app/actions/app/settings/invoicing/form-values.ts',
+      'app/data/organization/invoicing.ts',
+    ]) {
+      let details = await assets.getAssetDetails(path);
+      assert.notEqual(details.status, 'reachable', `${path} must remain outside the asset graph`);
+    }
+  });
+
   it('renders current import-map, preload, and entry metadata on each document response', async () => {
     let originalGetScriptEntry = assets.getScriptEntry;
     let version = 1;
-    let sessionCookie = await createUserAndLogin(router, 'asset-refresh');
+    let sessionCookie = await createUserAndLogin(router, db, 'asset-refresh');
 
     assets.getScriptEntry = async function (path) {
       let entry = await originalGetScriptEntry.call(assets, path);
@@ -80,14 +114,14 @@ describe('browser asset graph', () => {
       }
 
       let formPage = await router.fetch(
-        new URL(routes.app.clients.new.index.href(), origin),
+        new URL(routes.app.clients.new.href(), origin),
         { headers: { Cookie: sessionCookie } },
       );
       let csrf = extractCsrf(await formPage.text());
 
       version = 3;
       let validation = await router.fetch(
-        new URL(routes.app.clients.new.action.href(), origin),
+        new URL(routes.app.clients.create.href(), origin),
         {
           method: 'POST',
           headers: {

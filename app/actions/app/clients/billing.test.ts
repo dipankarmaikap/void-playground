@@ -1,9 +1,8 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
-import { router } from '../../../router.ts';
+import { clients } from '../../../data/db.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -12,6 +11,8 @@ import {
   postForm,
   submitForm,
 } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 const blankBilling = {
   billing_line1: '',
@@ -38,7 +39,7 @@ function clientFields(overrides: Record<string, string>) {
 async function createClient(sessionCookie: string, fields: Record<string, string>) {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     clientFields(fields),
     sessionCookie,
   );
@@ -54,7 +55,7 @@ function locationOf(response: Response) {
 
 describe('client billing details', () => {
   it('creates a client with no billing address or currency', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('No Billing Client');
 
     let created = await createClient(sessionCookie, { legal_name: legalName });
@@ -76,12 +77,12 @@ describe('client billing details', () => {
   });
 
   it('requires address line 1 and country when any address field is entered', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Partial Address');
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         billing_locality: 'Bengaluru',
@@ -106,7 +107,7 @@ describe('client billing details', () => {
     let missingCountryName = uniqueName('Address Without Country');
     let missingCountry = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({ legal_name: missingCountryName, billing_line1: '1 Main Street' }),
       sessionCookie,
     );
@@ -117,7 +118,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an address without locality, region, or postal code', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Minimal Address');
 
     let created = await createClient(sessionCookie, {
@@ -142,7 +143,7 @@ describe('client billing details', () => {
   });
 
   it('stores and edits the full billing address on an Individual profile', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Individual Billing');
 
     let created = await createClient(sessionCookie, {
@@ -173,7 +174,7 @@ describe('client billing details', () => {
     assert.match(profile, />United States</);
     assert.match(profile, /USD/);
 
-    let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
+    let editPath = routes.app.clients.edit.href({ clientId: row.id });
     let editPage = await getHtml(router, editPath, sessionCookie);
     assert.match(editPage, /name="billing_line1"[^>]*value="500 Congress Avenue"/);
     assert.match(editPage, /name="billing_locality"[^>]*value="Austin"/);
@@ -183,10 +184,12 @@ describe('client billing details', () => {
     assert.match(editPage, /name="billing_currency"[^>]*value="USD"/);
     assert.match(editPage, /<datalist id="billing-countries"/);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         billing_line1: '600 Congress Avenue',
         billing_locality: 'Austin',
@@ -208,7 +211,7 @@ describe('client billing details', () => {
   });
 
   it('stores billing details on a Business profile', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Business Billing Legal');
     let tradingName = uniqueName('Business Billing Trading');
 
@@ -239,7 +242,7 @@ describe('client billing details', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, /name="billing_country"[^>]*value="United Arab Emirates"/);
@@ -247,7 +250,7 @@ describe('client billing details', () => {
   });
 
   it('stores a blank currency as null while keeping the address and shows the suggestion before save', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Blank Currency');
 
     let created = await createClient(sessionCookie, {
@@ -272,7 +275,7 @@ describe('client billing details', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, /Suggested for India: INR — Indian Rupee/);
@@ -282,7 +285,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an unlisted country as entered and canonicalizes known country names', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Unlisted Country');
 
     let created = await createClient(sessionCookie, {
@@ -305,7 +308,7 @@ describe('client billing details', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, /name="billing_country"[^>]*value="Curaçao"/);
@@ -321,7 +324,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an unlisted 3-letter currency code', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Unlisted Currency');
 
     let created = await createClient(sessionCookie, {
@@ -342,7 +345,7 @@ describe('client billing details', () => {
   });
 
   it('keeps an explicit currency instead of the country suggestion', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Explicit Currency');
 
     await createClient(sessionCookie, {
@@ -359,7 +362,7 @@ describe('client billing details', () => {
   });
 
   it('accepts a manual currency with no billing address', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Manual Currency');
 
     let created = await createClient(sessionCookie, {
@@ -382,12 +385,12 @@ describe('client billing details', () => {
   });
 
   it('rejects an invalid currency and preserves the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Invalid Currency');
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         billing_line1: '7 Church Street',
@@ -411,7 +414,7 @@ describe('client billing details', () => {
   });
 
   it('keeps the stored billing details when an edit fails validation', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Stable Billing');
 
     let created = await createClient(sessionCookie, {
@@ -424,10 +427,12 @@ describe('client billing details', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let response = await postForm(
+    let response = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         billing_line1: '2 Invalid Street',
         billing_country: 'IN',
@@ -452,8 +457,8 @@ describe('client billing details', () => {
   });
 
   it('does not disclose or edit another Organization’s billing details', async () => {
-    let firstCookie = await createUserAndLogin(router, 'billing');
-    let secondCookie = await createUserAndLogin(router, 'billing');
+    let firstCookie = await createUserAndLogin(router, db, 'billing');
+    let secondCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Shared Billing');
 
     let created = await createClient(firstCookie, {
@@ -478,8 +483,9 @@ describe('client billing details', () => {
     let edited = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         billing_line1: '9 Shared Lane',
         billing_locality: 'Pune',
@@ -495,10 +501,10 @@ describe('client billing details', () => {
   });
 
   it('rejects billing mutations without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('No Token Billing');
 
-    let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

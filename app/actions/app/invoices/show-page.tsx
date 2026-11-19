@@ -36,6 +36,8 @@ import { Button, linkButtonStyle } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
 import { Input } from '../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../ui/public/form-field.ts';
+import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import {
   noticeSpacingStyle,
   noticeStatusStyle,
@@ -45,6 +47,9 @@ import {
 } from '../../../ui/page-styles.ts';
 import { Select } from '../../../ui/select.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+import { internalNoteFormFields } from './public/schema.ts';
+import { paymentFormFields, paymentVoidFormFields } from './payments/public/schema.ts';
+import { refundFormFields, refundVoidFormFields } from './refunds/public/schema.ts';
 
 export interface PaymentFormValues {
   amount: string;
@@ -561,8 +566,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>Void reason: {payment.void_reason}</p>
                         </>
                       ) : (
-                        <form
-                          method="post"
+                        <RestfulForm
+                          method="DELETE"
                           action={voidAction}
                           aria-labelledby={`invoice-payment-${payment.id}-heading`}
                         >
@@ -571,13 +576,11 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <textarea
                             id={voidReasonId}
                             name="reason"
-                            required
-                            maxLength={1000}
                             autoFocus={Boolean(voidError)}
                             defaultValue={voidError?.reason ?? ''}
-                            aria-invalid={voidError ? true : undefined}
                             aria-describedby={voidError ? voidErrorId : undefined}
                             mix={textAreaStyle}
+                            {...formFieldAttributes(paymentVoidFormFields.reason, voidError)}
                           />
                           {voidError ? (
                             <p id={voidErrorId} role="alert" mix={errorStyle}>
@@ -587,7 +590,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <Button type="submit" variant="danger">
                             Void payment
                           </Button>
-                        </form>
+                        </RestfulForm>
                       )}
                     </li>
                   );
@@ -616,15 +619,14 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-payment-amount"
                       name="amount"
-                      type="number"
                       min={paymentStep(invoice.currency)}
                       max={formatMinorInput(BigInt(balanceDueMinor), invoice.currency)}
                       step={paymentStep(invoice.currency)}
-                      required
                       autoFocus={Boolean(amountError || paymentActionError)}
                       defaultValue={paymentFormValues?.amount ?? ''}
                       aria-invalid={amountDescriptionId ? true : undefined}
                       aria-describedby={amountDescriptionId}
+                      {...formFieldAttributes(paymentFormFields.amount, amountError)}
                     />
                   </Field>
                   <Field
@@ -635,12 +637,10 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-payment-date"
                       name="payment_date"
-                      type="date"
-                      required
                       autoFocus={Boolean(!amountError && dateError)}
                       defaultValue={paymentFormValues?.payment_date ?? todayInKolkata()}
-                      aria-invalid={dateError ? true : undefined}
                       aria-describedby={dateError ? 'invoice-payment-date-error' : undefined}
+                      {...formFieldAttributes(paymentFormFields.payment_date, dateError)}
                     />
                   </Field>
                   <Field
@@ -651,12 +651,11 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Select
                       id="invoice-payment-method"
                       name="payment_method"
-                      required
                       autoFocus={Boolean(
                         !amountError && !dateError && methodError,
                       )}
-                      aria-invalid={methodError ? true : undefined}
                       aria-describedby={methodError ? 'invoice-payment-method-error' : undefined}
+                      {...formFieldAttributes(paymentFormFields.payment_method, methodError)}
                     >
                       <option value="" selected={!paymentFormValues?.payment_method}>
                         Choose a payment method
@@ -680,15 +679,14 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-payment-reference"
                       name="reference"
-                      maxLength={200}
                       autoFocus={Boolean(
                         !amountError && !dateError && !methodError && referenceError,
                       )}
                       defaultValue={paymentFormValues?.reference ?? ''}
-                      aria-invalid={referenceError ? true : undefined}
                       aria-describedby={
                         referenceError ? 'invoice-payment-reference-error' : undefined
                       }
+                      {...formFieldAttributes(paymentFormFields.reference, referenceError)}
                     />
                   </Field>
                   <div mix={paymentSubmitStyle}>
@@ -748,8 +746,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>Void reason: {refund.void_reason}</p>
                         </>
                       ) : (
-                        <form
-                          method="post"
+                        <RestfulForm
+                          method="DELETE"
                           action={routes.app.invoices.refunds.void.href({
                             invoiceId: invoice.id,
                             refundId: refund.id,
@@ -761,13 +759,11 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <textarea
                             id={voidReasonId}
                             name="reason"
-                            required
-                            maxLength={1000}
                             autoFocus={Boolean(voidError)}
                             defaultValue={voidError?.reason ?? ''}
-                            aria-invalid={voidError ? true : undefined}
                             aria-describedby={voidError ? voidErrorId : undefined}
                             mix={textAreaStyle}
+                            {...formFieldAttributes(refundVoidFormFields.reason, voidError)}
                           />
                           {voidError ? (
                             <p id={voidErrorId} role="alert" mix={errorStyle}>
@@ -777,7 +773,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <Button type="submit" variant="danger">
                             Void refund
                           </Button>
-                        </form>
+                        </RestfulForm>
                       )}
                     </li>
                   );
@@ -806,15 +802,14 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-refund-amount"
                       name="amount"
-                      type="number"
                       min={refundStep(invoice.currency)}
                       max={formatMinorInput(BigInt(refundDueMinor), invoice.currency)}
                       step={refundStep(invoice.currency)}
-                      required
                       autoFocus={Boolean(refundAmountError || refundActionError)}
                       defaultValue={refundFormValues?.amount ?? ''}
                       aria-invalid={refundAmountDescriptionId ? true : undefined}
                       aria-describedby={refundAmountDescriptionId}
+                      {...formFieldAttributes(refundFormFields.amount, refundAmountError)}
                     />
                   </Field>
                   <Field
@@ -825,12 +820,10 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-refund-date"
                       name="refund_date"
-                      type="date"
-                      required
                       autoFocus={Boolean(!refundAmountError && refundDateError)}
                       defaultValue={refundFormValues?.refund_date ?? todayInKolkata()}
-                      aria-invalid={refundDateError ? true : undefined}
                       aria-describedby={refundDateError ? 'invoice-refund-date-error' : undefined}
+                      {...formFieldAttributes(refundFormFields.refund_date, refundDateError)}
                     />
                   </Field>
                   <Field
@@ -841,10 +834,9 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Select
                       id="invoice-refund-method"
                       name="refund_method"
-                      required
                       autoFocus={Boolean(!refundAmountError && !refundDateError && refundMethodError)}
-                      aria-invalid={refundMethodError ? true : undefined}
                       aria-describedby={refundMethodError ? 'invoice-refund-method-error' : undefined}
+                      {...formFieldAttributes(refundFormFields.refund_method, refundMethodError)}
                     >
                       <option value="" selected={!refundFormValues?.refund_method}>
                         Choose a refund method
@@ -868,7 +860,6 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     <Input
                       id="invoice-refund-reference"
                       name="reference"
-                      maxLength={200}
                       autoFocus={Boolean(
                         !refundAmountError &&
                           !refundDateError &&
@@ -876,10 +867,10 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           refundReferenceError,
                       )}
                       defaultValue={refundFormValues?.reference ?? ''}
-                      aria-invalid={refundReferenceError ? true : undefined}
                       aria-describedby={
                         refundReferenceError ? 'invoice-refund-reference-error' : undefined
                       }
+                      {...formFieldAttributes(refundFormFields.reference, refundReferenceError)}
                     />
                   </Field>
                   <div mix={paymentSubmitStyle}>
@@ -920,7 +911,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                         {draft ? (
                           <>
                             <a
-                              href={routes.app.invoices.creditNotes.edit.index.href({
+                              href={routes.app.invoices.creditNotes.edit.href({
                                 invoiceId: invoice.id,
                                 creditNoteId: creditNote.id,
                               })}
@@ -974,7 +965,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             )}
             {revisedTotalMinor > 0 ? (
               <a
-                href={routes.app.invoices.creditNotes.new.index.href({
+                href={routes.app.invoices.creditNotes.new.href({
                   invoiceId: invoice.id,
                 })}
                 mix={linkButtonStyle}
@@ -1007,11 +998,10 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   <textarea
                     id="invoice-internal-note"
                     name="internal_note"
-                    maxLength={1000}
                     mix={textAreaStyle}
                     defaultValue={internalNoteValue ?? invoice.internal_note ?? ''}
-                    aria-invalid={internalNoteError ? true : undefined}
                     aria-describedby={internalNoteError ? 'internal-note-error' : undefined}
+                    {...formFieldAttributes(internalNoteFormFields.internal_note, internalNoteError)}
                   />
                   {internalNoteError ? (
                     <p id="internal-note-error" role="alert">
@@ -1029,7 +1019,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           <>
             <div mix={actionsStyle}>
               <a
-                href={routes.app.invoices.edit.index.href({ invoiceId: invoice.id })}
+                href={routes.app.invoices.edit.href({ invoiceId: invoice.id })}
                 mix={linkButtonStyle}
               >
                 Edit draft

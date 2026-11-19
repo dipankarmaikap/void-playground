@@ -2,10 +2,9 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -15,6 +14,8 @@ import {
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 
+const { router, db } = await createTestRouter();
+
 async function createIssuedInvoice(
   organizationId: string,
   clientId: string,
@@ -22,7 +23,7 @@ async function createIssuedInvoice(
   let invoiceId = crypto.randomUUID();
   let lineId = crypto.randomUUID();
   let now = Date.now();
-  await seedInvoice(organizationId, clientId, {
+  await seedInvoice(db, organizationId, clientId, {
     id: invoiceId,
     recipientName: `Refund Recipient ${invoiceId}`,
     invoiceDate: todayInKolkata(),
@@ -95,8 +96,8 @@ async function issueCreditNote(
 ): Promise<void> {
   let created = await submitForm(
     router,
-    routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-    routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+    routes.app.invoices.creditNotes.new.href({ invoiceId }),
+    routes.app.invoices.creditNotes.create.href({ invoiceId }),
     {
       credit_date: todayInKolkata(),
       reason: 'Service scope reduced',
@@ -111,7 +112,7 @@ async function issueCreditNote(
   let creditNoteId = new URL(location!, 'https://test.invalid').pathname.split('/').at(-2)!;
   let issued = await submitForm(
     router,
-    routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+    routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
     routes.app.invoices.creditNotes.lifecycle.issue.href({ invoiceId, creditNoteId }),
     {},
     sessionCookie,
@@ -166,9 +167,10 @@ describe('invoice refunds', () => {
   it('surfaces refund due after a post-payment full credit note and records a full refund', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-full',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -206,9 +208,10 @@ describe('invoice refunds', () => {
   it('tracks refund due after a partial post-payment credit note across multiple refunds', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-partial-cn',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Partial Credit Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -249,9 +252,10 @@ describe('invoice refunds', () => {
   it('rejects over-refunds, refunds without a refund due, invalid entries, and Draft invoices', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-rejections',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Rejected Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -282,7 +286,7 @@ describe('invoice refunds', () => {
     assert.match(await noRefundDue.text(), /There is no refund due on this invoice/);
 
     let draftId = crypto.randomUUID();
-    await seedInvoice(organizationId, client.id, {
+    await seedInvoice(db, organizationId, client.id, {
       id: draftId,
       recipientName: `Draft Refund Recipient ${draftId}`,
       invoiceDate: todayInKolkata(),
@@ -295,9 +299,10 @@ describe('invoice refunds', () => {
   it('rejects voiding the only payment after a full credit and refund', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-payment-void-invariant',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Payment Void Invariant Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -329,7 +334,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       paymentVoidAction,
-      { reason: 'Reverse the original receipt' },
+      { _method: 'DELETE', reason: 'Reverse the original receipt' },
       sessionCookie,
     );
     assert.equal(rejected.status, 400);
@@ -365,9 +370,10 @@ describe('invoice refunds', () => {
   it('derives status from net paid when gross payments and net paid diverge after a refund and a payment void', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-net-paid-status',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Net Paid Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -395,7 +401,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction,
-      { reason: 'Duplicate receipt' },
+      { _method: 'DELETE', reason: 'Duplicate receipt' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -418,9 +424,10 @@ describe('invoice refunds', () => {
   it('voids a refund with a reason, restoring refund due while retaining the audit history', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-void',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Void Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -438,7 +445,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: ' \t ' },
+      { _method: 'DELETE', reason: ' \t ' },
       sessionCookie,
     );
     assert.equal(missingReason.status, 400);
@@ -448,7 +455,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: 'Refund sent to the wrong account' },
+      { _method: 'DELETE', reason: 'Refund sent to the wrong account' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -469,7 +476,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: 'Second attempt' },
+      { _method: 'DELETE', reason: 'Second attempt' },
       sessionCookie,
     );
     assert.equal(alreadyVoided.status, 409);
@@ -478,9 +485,10 @@ describe('invoice refunds', () => {
   it('restores refund due and keeps balances consistent when a refund is voided', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-void-balances',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Void Balance Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -508,7 +516,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction,
-      { reason: 'Refund reversed by the bank' },
+      { _method: 'DELETE', reason: 'Refund reversed by the bank' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -522,14 +530,14 @@ describe('invoice refunds', () => {
   });
 
   it('scopes refund recording, voiding, and views to the authenticated Organization', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-other');
-    let ownerClient = await createClient(owner.organizationId, {
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-refund-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-refund-scope-other');
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Refund Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -567,7 +575,7 @@ describe('invoice refunds', () => {
       router,
       ownerShowPath,
       otherVoid.action,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       owner.sessionCookie,
     );
     assert.equal(foreignVoid.status, 404);
@@ -576,7 +584,7 @@ describe('invoice refunds', () => {
       router,
       otherShowPath,
       ownerVoid.action,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       other.sessionCookie,
     );
     assert.equal(foreignInvoiceVoid.status, 404);
@@ -596,9 +604,10 @@ describe('invoice refunds', () => {
   it('rejects refund mutations without a CSRF token', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-refund-csrf',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Csrf Refund Client ${crypto.randomUUID()}`,
       status: 'active',

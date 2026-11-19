@@ -1,12 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
-import { db, sessions } from '../app/data/db.ts';
-import './db-setup.ts';
+import { sessions } from '../app/data/db.ts';
 
 import { createUser, login, origin } from './http.ts';
+
+const { router, db } = await createTestRouter();
 
 describe('hybrid storage', () => {
   it('anonymous visits create no DB session rows', async () => {
@@ -19,7 +20,7 @@ describe('hybrid storage', () => {
 
   it('authenticated login creates exactly one DB row', async () => {
     let email = `h-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
 
     let sessionCookie = await login(router, email, 'password123');
 

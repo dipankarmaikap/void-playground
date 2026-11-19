@@ -17,6 +17,8 @@ import { Button, linkButtonStyle } from '../../../../ui/button.tsx';
 import { Field } from '../../../../ui/field.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import { Input } from '../../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
+import { RestfulForm } from '../../../../ui/public/restful-form.tsx';
 import {
   pageHeaderStyle,
   pageHeadingStyle,
@@ -24,6 +26,7 @@ import {
 } from '../../../../ui/page-styles.ts';
 import { colors, radius } from '../../../../ui/theme.ts';
 import { routes } from '../../../../routes.ts';
+import { creditNoteFormFields } from './public/schema.ts';
 
 /** Shared Draft form for the Credit Notes create and edit routes. */
 export interface CreditNoteDraftPageProps {
@@ -36,6 +39,7 @@ export interface CreditNoteDraftPageProps {
   creditableQuantities: ReadonlyMap<string, CreditNoteLineCapacity>;
   creditDate: string;
   action: string;
+  method?: 'POST' | 'PUT';
   heading: string;
   submitLabel: string;
   values: CreditNoteFormValues;
@@ -103,6 +107,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
       creditableQuantities,
       creditDate,
       action,
+      method = 'POST',
       heading,
       submitLabel,
       values,
@@ -202,8 +207,8 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
           </section>
         ) : null}
 
-        <form
-          method="post"
+        <RestfulForm
+          method={method}
           action={action}
           aria-labelledby="credit-note-details-heading"
         >
@@ -218,12 +223,10 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
               <Input
                 id="credit-note-date"
                 name="credit_date"
-                type="date"
                 min={invoice.invoice_date}
-                required
                 defaultValue={values.credit_date || creditDate}
-                aria-invalid={creditDateError ? true : undefined}
                 aria-describedby={creditDateError ? 'credit-note-date-error' : undefined}
+                {...formFieldAttributes(creditNoteFormFields.credit_date, creditDateError)}
               />
             </Field>
             <Field
@@ -234,12 +237,10 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
               <textarea
                 id="credit-note-reason"
                 name="reason"
-                required
-                maxLength={1000}
                 defaultValue={values.reason}
-                aria-invalid={reasonError ? true : undefined}
                 aria-describedby={reasonError ? 'credit-note-reason-error' : undefined}
                 mix={noteStyle}
+                {...formFieldAttributes(creditNoteFormFields.reason, reasonError)}
               />
             </Field>
           </section>
@@ -285,18 +286,10 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                   <Input
                     id={`credit-note-line-${line.id}-quantity`}
                     name="line_quantity"
-                    type="number"
                     min="0"
                     max={maxQuantity(line, creditableQuantities)}
                     step="0.0001"
                     defaultValue={valueByLineId.get(line.id) ?? ''}
-                    aria-invalid={
-                      issues.some(
-                        (issue) => issue.field === 'line_quantity' && issue.lineId === line.id,
-                      )
-                        ? true
-                        : undefined
-                    }
                     aria-describedby={
                       issues.some(
                         (issue) => issue.field === 'line_quantity' && issue.lineId === line.id,
@@ -304,13 +297,19 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                         ? `credit-note-line-${line.id}-error`
                         : undefined
                     }
+                    {...formFieldAttributes(
+                      creditNoteFormFields.line_quantity,
+                      issues.find(
+                        (issue) => issue.field === 'line_quantity' && issue.lineId === line.id,
+                      ),
+                    )}
                   />
                 </Field>
               </div>
             ))}
             <Button type="submit">{submitLabel}</Button>
           </section>
-        </form>
+        </RestfulForm>
         {creditNote ? (
           <div mix={actionsStyle}>
             <a

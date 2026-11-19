@@ -8,13 +8,17 @@ import { INDIA_STATES } from '../../../data/india-states.ts';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import { colors, radius } from '../../../ui/theme.ts';
-import { MIN_VISIBLE_LINES } from './form-intent.ts';
+import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import type { InvoiceFormValues } from './form-values.ts';
+import { InvoiceFormLines } from './invoice-form-lines.tsx';
+import { invoiceDraftFormFields } from './public/schema.ts';
 
 export interface InvoiceFormProps {
   csrfToken: string;
   action: string;
+  method?: 'POST' | 'PUT';
   submitLabel: string;
   values: InvoiceFormValues;
   issues?: readonly Issue[];
@@ -41,15 +45,6 @@ const gridStyle = css({
   display: 'grid',
   gap: '1rem',
   gridTemplateColumns: 'repeat(auto-fit, minmax(13rem, 1fr))',
-});
-
-const lineRowStyle = css({
-  display: 'grid',
-  gap: '0.75rem',
-  padding: '1rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.md,
-  gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
 });
 
 const textAreaStyle = css({
@@ -98,32 +93,22 @@ function firstIssue(issues: readonly Issue[], field: string): Issue | undefined 
   return issues.find((issue) => issue.path?.[0] === field);
 }
 
-function lineIssue(
-  issues: readonly Issue[],
-  index: number,
-  field: string,
-): Issue | undefined {
-  return issues.find(
-    (issue) => issue.path?.[0] === 'lines' && issue.path?.[1] === index && issue.path?.[2] === field,
-  );
-}
-
 export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
   return () => {
     let {
       csrfToken,
       action,
+      method = 'POST',
       submitLabel,
       values,
       issues = [],
       children,
       gstRatePresets,
     } = handle.props;
-    let lineCount = Math.max(MIN_VISIBLE_LINES, values.lines.length);
     let linesIssue = firstIssue(issues, 'lines');
 
     return (
-      <form method="post" action={action} mix={formStyle}>
+      <RestfulForm method={method} action={action} mix={formStyle}>
         <input type="hidden" name="_csrf" value={csrfToken} />
         <input type="hidden" name="client_id" value={values.client_id} />
         <input
@@ -164,10 +149,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               <Input
                 name="currency"
                 list="invoice-currencies"
-                maxLength={3}
                 defaultValue={values.currency}
                 variant={firstIssue(issues, 'currency') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'currency') ? true : undefined}
+                {...formFieldAttributes(invoiceDraftFormFields.currency, firstIssue(issues, 'currency'))}
               />
               <datalist id="invoice-currencies">
                 {CURRENCIES.map((currency) => (
@@ -180,23 +164,24 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
             <Field label="Invoice date" error={firstIssue(issues, 'invoice_date')?.message}>
               <Input
                 name="invoice_date"
-                type="date"
                 defaultValue={values.invoice_date}
                 variant={firstIssue(issues, 'invoice_date') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'invoice_date') ? true : undefined}
+                {...formFieldAttributes(invoiceDraftFormFields.invoice_date, firstIssue(issues, 'invoice_date'))}
               />
             </Field>
             <Field label="Due date" error={firstIssue(issues, 'due_date')?.message}>
               <Input
                 name="due_date"
-                type="date"
                 defaultValue={values.due_date}
                 variant={firstIssue(issues, 'due_date') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'due_date') ? true : undefined}
+                {...formFieldAttributes(invoiceDraftFormFields.due_date, firstIssue(issues, 'due_date'))}
               />
             </Field>
             <Field label="Payment term" error={firstIssue(issues, 'payment_term')?.message}>
-              <select name="payment_term">
+              <select
+                name="payment_term"
+                {...formFieldAttributes(invoiceDraftFormFields.payment_term, firstIssue(issues, 'payment_term'))}
+              >
                 {PAYMENT_TERMS.map((term) => (
                   <option key={term} value={term} selected={values.payment_term === term}>
                     {PAYMENT_TERM_LABELS[term]}
@@ -210,10 +195,9 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
             >
               <textarea
                 name="custom_payment_terms"
-                maxLength={200}
                 mix={textAreaStyle}
                 defaultValue={values.custom_payment_terms}
-                aria-invalid={firstIssue(issues, 'custom_payment_terms') ? true : undefined}
+                {...formFieldAttributes(invoiceDraftFormFields.custom_payment_terms, firstIssue(issues, 'custom_payment_terms'))}
               />
             </Field>
           </div>
@@ -236,14 +220,21 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 name="recipient_legal_name"
                 defaultValue={values.recipient_legal_name}
                 variant={firstIssue(issues, 'recipient_legal_name') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'recipient_legal_name') ? true : undefined}
+                {...formFieldAttributes(
+                  invoiceDraftFormFields.recipient_legal_name,
+                  firstIssue(issues, 'recipient_legal_name'),
+                )}
               />
             </Field>
             <Field
               label="Billing address line 1"
               error={firstIssue(issues, 'recipient_billing_line1')?.message}
             >
-              <Input name="recipient_billing_line1" defaultValue={values.recipient_billing_line1} />
+              <Input
+                name="recipient_billing_line1"
+                defaultValue={values.recipient_billing_line1}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_billing_line1)}
+              />
             </Field>
             <Field
               label="Locality or city"
@@ -252,13 +243,18 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               <Input
                 name="recipient_billing_locality"
                 defaultValue={values.recipient_billing_locality}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_billing_locality)}
               />
             </Field>
             <Field
               label="State or region"
               error={firstIssue(issues, 'recipient_billing_region')?.message}
             >
-              <Input name="recipient_billing_region" defaultValue={values.recipient_billing_region} />
+              <Input
+                name="recipient_billing_region"
+                defaultValue={values.recipient_billing_region}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_billing_region)}
+              />
             </Field>
             <Field
               label="Postal code"
@@ -267,31 +263,52 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               <Input
                 name="recipient_billing_postal_code"
                 defaultValue={values.recipient_billing_postal_code}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_billing_postal_code)}
               />
             </Field>
             <Field label="Country" error={firstIssue(issues, 'recipient_billing_country')?.message}>
-              <Input name="recipient_billing_country" defaultValue={values.recipient_billing_country} />
+              <Input
+                name="recipient_billing_country"
+                defaultValue={values.recipient_billing_country}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_billing_country)}
+              />
             </Field>
             <Field
               label="Tax identifier country"
               error={firstIssue(issues, 'recipient_tax_country')?.message}
             >
-              <Input name="recipient_tax_country" defaultValue={values.recipient_tax_country} />
+              <Input
+                name="recipient_tax_country"
+                defaultValue={values.recipient_tax_country}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_tax_country)}
+              />
             </Field>
             <Field label="Tax identifier type" error={firstIssue(issues, 'recipient_tax_type')?.message}>
-              <Input name="recipient_tax_type" defaultValue={values.recipient_tax_type} />
+              <Input
+                name="recipient_tax_type"
+                defaultValue={values.recipient_tax_type}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_tax_type)}
+              />
             </Field>
             <Field
               label="Tax identifier value"
               error={firstIssue(issues, 'recipient_tax_value')?.message}
             >
-              <Input name="recipient_tax_value" defaultValue={values.recipient_tax_value} />
+              <Input
+                name="recipient_tax_value"
+                defaultValue={values.recipient_tax_value}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_tax_value)}
+              />
             </Field>
             <Field
               label="Tax State/UT code"
               error={firstIssue(issues, 'recipient_tax_state_code')?.message}
             >
-              <Input name="recipient_tax_state_code" defaultValue={values.recipient_tax_state_code} />
+              <Input
+                name="recipient_tax_state_code"
+                defaultValue={values.recipient_tax_state_code}
+                {...formFieldAttributes(invoiceDraftFormFields.recipient_tax_state_code)}
+              />
             </Field>
           </div>
         </section>
@@ -302,7 +319,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </h2>
           <div mix={gridStyle}>
             <Field label="Invoice tax mode" error={firstIssue(issues, 'gst_mode')?.message}>
-              <select name="gst_mode" aria-invalid={firstIssue(issues, 'gst_mode') ? true : undefined}>
+              <select
+                name="gst_mode"
+                {...formFieldAttributes(invoiceDraftFormFields.gst_mode, firstIssue(issues, 'gst_mode'))}
+              >
                 <option value="none" selected={values.gst_mode === 'none'}>
                   No tax
                 </option>
@@ -325,7 +345,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               </p>
             <div mix={gridStyle}>
               <Field label="Supply classification" error={firstIssue(issues, 'supply_type')?.message}>
-                <select name="supply_type" aria-invalid={firstIssue(issues, 'supply_type') ? true : undefined}>
+                <select
+                  name="supply_type"
+                  {...formFieldAttributes(invoiceDraftFormFields.supply_type, firstIssue(issues, 'supply_type'))}
+                >
                   <option value="domestic" selected={values.supply_type === 'domestic'}>
                     Domestic
                   </option>
@@ -341,9 +364,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 <select
                   name="place_of_supply_state_code"
                   disabled={values.supply_type === 'export_lut' || values.supply_type === 'export_igst'}
-                  aria-invalid={
-                    firstIssue(issues, 'place_of_supply_state_code') ? true : undefined
-                  }
+                  {...formFieldAttributes(
+                    invoiceDraftFormFields.place_of_supply_state_code,
+                    firstIssue(issues, 'place_of_supply_state_code'),
+                  )}
                 >
                   <option value="" selected={values.place_of_supply_state_code === ''}>
                     Choose a State/UT
@@ -365,6 +389,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                   list="invoice-countries"
                   defaultValue={values.place_of_supply_country}
                   variant={firstIssue(issues, 'place_of_supply_country') ? 'error' : 'default'}
+                  {...formFieldAttributes(
+                    invoiceDraftFormFields.place_of_supply_country,
+                    firstIssue(issues, 'place_of_supply_country'),
+                  )}
                 />
                 <datalist id="invoice-countries">
                   {COUNTRIES.map((country) => (
@@ -375,9 +403,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
               <Field label="Export reference" error={firstIssue(issues, 'export_reference')?.message}>
                 <Input
                   name="export_reference"
-                  maxLength={200}
                   defaultValue={values.export_reference}
                   variant={firstIssue(issues, 'export_reference') ? 'error' : 'default'}
+                  {...formFieldAttributes(
+                    invoiceDraftFormFields.export_reference,
+                    firstIssue(issues, 'export_reference'),
+                  )}
                 />
               </Field>
               <Field label="Recipient GSTIN applicable" error={firstIssue(issues, 'recipient_gstin_applicable')?.message}>
@@ -386,10 +417,17 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                   name="recipient_gstin_applicable"
                   value="on"
                   checked={values.recipient_gstin_applicable === 'on'}
+                  {...formFieldAttributes(invoiceDraftFormFields.recipient_gstin_applicable)}
                 />
               </Field>
               <Field label="Reverse charge" error={firstIssue(issues, 'reverse_charge')?.message}>
-                <input type="checkbox" name="reverse_charge" value="on" checked={values.reverse_charge === 'on'} />
+                <input
+                  type="checkbox"
+                  name="reverse_charge"
+                  value="on"
+                  checked={values.reverse_charge === 'on'}
+                  {...formFieldAttributes(invoiceDraftFormFields.reverse_charge)}
+                />
               </Field>
             </div>
             </>
@@ -409,194 +447,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           {firstIssue(issues, 'total') ? (
             <p role="alert">{firstIssue(issues, 'total')?.message}</p>
           ) : null}
-          {Array.from({ length: lineCount }, (_, index) => {
-            let line = values.lines[index] ?? {
-              description: '',
-              sac: '',
-              quantity: '',
-              unit_price: '',
-              discount_mode: '',
-              discount_value: '',
-              tax_treatment: '',
-              gst_rate: '',
-              foreign_tax_label: '',
-              foreign_tax_mode: '',
-              foreign_tax_value: '',
-            };
-            let foreignTaxLabelIssue = lineIssue(issues, index, 'foreign_tax_label');
-            let foreignTaxModeIssue = lineIssue(issues, index, 'foreign_tax_mode');
-            let foreignTaxValueIssue = lineIssue(issues, index, 'foreign_tax_value');
-            let foreignTaxLabelErrorId = `line-${index}-foreign-tax-label-error`;
-            let foreignTaxModeErrorId = `line-${index}-foreign-tax-mode-error`;
-            let foreignTaxValueErrorId = `line-${index}-foreign-tax-value-error`;
-            return (
-              <div key={index} mix={lineRowStyle}>
-                <Field
-                  label={`Description ${index + 1}`}
-                  error={lineIssue(issues, index, 'description')?.message}
-                >
-                  <Input
-                    name="line_description"
-                    defaultValue={line.description}
-                    variant={lineIssue(issues, index, 'description') ? 'error' : 'default'}
-                    aria-invalid={lineIssue(issues, index, 'description') ? true : undefined}
-                  />
-                </Field>
-                <Field label={`SAC ${index + 1}`} error={lineIssue(issues, index, 'sac')?.message}>
-                  <Input name="line_sac" defaultValue={line.sac} />
-                </Field>
-                <Field
-                  label={`Quantity ${index + 1}`}
-                  error={lineIssue(issues, index, 'quantity')?.message}
-                >
-                  <Input
-                    name="line_quantity"
-                    defaultValue={line.quantity}
-                    variant={lineIssue(issues, index, 'quantity') ? 'error' : 'default'}
-                    aria-invalid={lineIssue(issues, index, 'quantity') ? true : undefined}
-                  />
-                </Field>
-                <Field
-                  label={`Unit price ${index + 1}`}
-                  error={lineIssue(issues, index, 'unit_price')?.message}
-                >
-                  <Input
-                    name="line_unit_price"
-                    defaultValue={line.unit_price}
-                    variant={lineIssue(issues, index, 'unit_price') ? 'error' : 'default'}
-                    aria-invalid={lineIssue(issues, index, 'unit_price') ? true : undefined}
-                  />
-                </Field>
-                <Field
-                  label={`Discount type ${index + 1}`}
-                  error={lineIssue(issues, index, 'discount_mode')?.message}
-                >
-                  <select
-                    name="line_discount_mode"
-                    aria-invalid={lineIssue(issues, index, 'discount_mode') ? true : undefined}
-                  >
-                    <option value="" selected={line.discount_mode === ''}>
-                      No discount
-                    </option>
-                    <option value="percent" selected={line.discount_mode === 'percent'}>
-                      Percentage
-                    </option>
-                    <option value="fixed" selected={line.discount_mode === 'fixed'}>
-                      Fixed amount
-                    </option>
-                  </select>
-                </Field>
-                <Field
-                  label={`Discount ${index + 1}`}
-                  error={lineIssue(issues, index, 'discount_value')?.message}
-                >
-                  <Input
-                    name="line_discount_value"
-                    defaultValue={line.discount_value}
-                    variant={lineIssue(issues, index, 'discount_value') ? 'error' : 'default'}
-                    aria-invalid={lineIssue(issues, index, 'discount_value') ? true : undefined}
-                  />
-                </Field>
-                {gstRatePresets.length > 0 ? (
-                  <>
-                    <Field
-                      label={`GST treatment ${index + 1}`}
-                      error={lineIssue(issues, index, 'tax_treatment')?.message}
-                    >
-                      <select
-                        name="line_tax_treatment"
-                        aria-invalid={
-                          lineIssue(issues, index, 'tax_treatment') ? true : undefined
-                        }
-                      >
-                        <option value="" selected={line.tax_treatment === ''}>
-                          Choose treatment
-                        </option>
-                        <option value="taxable" selected={line.tax_treatment === 'taxable'}>
-                          Taxable
-                        </option>
-                        <option value="nil_rated" selected={line.tax_treatment === 'nil_rated'}>
-                          Nil-rated
-                        </option>
-                        <option value="exempt" selected={line.tax_treatment === 'exempt'}>
-                          Exempt
-                        </option>
-                        <option value="non_gst" selected={line.tax_treatment === 'non_gst'}>
-                          Non-GST
-                        </option>
-                      </select>
-                    </Field>
-                    <Field
-                      label={`GST rate ${index + 1}`}
-                      error={lineIssue(issues, index, 'gst_rate')?.message}
-                    >
-                      <select
-                        name="line_gst_rate"
-                        aria-invalid={lineIssue(issues, index, 'gst_rate') ? true : undefined}
-                      >
-                        <option value="" selected={line.gst_rate === ''}>
-                          Choose rate
-                        </option>
-                        {gstRatePresets.map((rate) => (
-                          <option key={rate} value={rate} selected={line.gst_rate === rate}>
-                            {rate}%
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </>
-                ) : null}
-                <Field
-                  label={`Manual tax label ${index + 1}`}
-                  error={foreignTaxLabelIssue?.message}
-                  errorId={foreignTaxLabelIssue ? foreignTaxLabelErrorId : undefined}
-                >
-                  <Input
-                    id={`line-${index}-foreign-tax-label`}
-                    name="line_foreign_tax_label"
-                    maxLength={80}
-                    defaultValue={line.foreign_tax_label}
-                    variant={foreignTaxLabelIssue ? 'error' : 'default'}
-                    aria-invalid={foreignTaxLabelIssue ? true : undefined}
-                    aria-describedby={foreignTaxLabelIssue ? foreignTaxLabelErrorId : undefined}
-                  />
-                </Field>
-                <Field
-                  label={`Manual tax type ${index + 1}`}
-                  error={foreignTaxModeIssue?.message}
-                  errorId={foreignTaxModeIssue ? foreignTaxModeErrorId : undefined}
-                >
-                  <select
-                    id={`line-${index}-foreign-tax-mode`}
-                    name="line_foreign_tax_mode"
-                    aria-invalid={foreignTaxModeIssue ? true : undefined}
-                    aria-describedby={foreignTaxModeIssue ? foreignTaxModeErrorId : undefined}
-                  >
-                    <option value="" selected={line.foreign_tax_mode === ''}>No manual tax</option>
-                    <option value="percent" selected={line.foreign_tax_mode === 'percent'}>Percentage</option>
-                    <option value="fixed" selected={line.foreign_tax_mode === 'fixed'}>Fixed invoice-currency amount</option>
-                  </select>
-                </Field>
-                <Field
-                  label={`Manual tax rate or amount ${index + 1}`}
-                  error={foreignTaxValueIssue?.message}
-                  errorId={foreignTaxValueIssue ? foreignTaxValueErrorId : undefined}
-                >
-                  <Input
-                    id={`line-${index}-foreign-tax-value`}
-                    name="line_foreign_tax_value"
-                    defaultValue={line.foreign_tax_value}
-                    variant={foreignTaxValueIssue ? 'error' : 'default'}
-                    aria-invalid={foreignTaxValueIssue ? true : undefined}
-                    aria-describedby={foreignTaxValueIssue ? foreignTaxValueErrorId : undefined}
-                  />
-                </Field>
-                {lineIssue(issues, index, 'amount') ? (
-                  <p role="alert">{lineIssue(issues, index, 'amount')?.message}</p>
-                ) : null}
-              </div>
-            );
-          })}
+          <InvoiceFormLines values={values} issues={issues} gstRatePresets={gstRatePresets} />
         </section>
 
         <section aria-labelledby="invoice-discount-heading" mix={cardStyle}>
@@ -615,7 +466,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
             >
               <select
                 name="invoice_discount_mode"
-                aria-invalid={firstIssue(issues, 'invoice_discount_mode') ? true : undefined}
+                {...formFieldAttributes(
+                  invoiceDraftFormFields.invoice_discount_mode,
+                  firstIssue(issues, 'invoice_discount_mode'),
+                )}
               >
                 <option value="" selected={values.invoice_discount_mode === ''}>
                   No discount
@@ -636,7 +490,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 name="invoice_discount_value"
                 defaultValue={values.invoice_discount_value}
                 variant={firstIssue(issues, 'invoice_discount_value') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'invoice_discount_value') ? true : undefined}
+                {...formFieldAttributes(
+                  invoiceDraftFormFields.invoice_discount_value,
+                  firstIssue(issues, 'invoice_discount_value'),
+                )}
               />
             </Field>
             <Field label="Round-off" error={firstIssue(issues, 'round_off')?.message}>
@@ -644,7 +501,10 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
                 name="round_off"
                 defaultValue={values.round_off}
                 variant={firstIssue(issues, 'round_off') ? 'error' : 'default'}
-                aria-invalid={firstIssue(issues, 'round_off') ? true : undefined}
+                {...formFieldAttributes(
+                  invoiceDraftFormFields.round_off,
+                  firstIssue(issues, 'round_off'),
+                )}
               />
             </Field>
           </div>
@@ -661,10 +521,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           >
             <textarea
               name="payment_instructions"
-              maxLength={1000}
               mix={textAreaStyle}
               defaultValue={values.payment_instructions}
-              aria-invalid={firstIssue(issues, 'payment_instructions') ? true : undefined}
+              {...formFieldAttributes(
+                invoiceDraftFormFields.payment_instructions,
+                firstIssue(issues, 'payment_instructions'),
+              )}
             />
           </Field>
           <Field
@@ -674,10 +536,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           >
             <textarea
               name="customer_notes"
-              maxLength={1000}
               mix={textAreaStyle}
               defaultValue={values.customer_notes}
-              aria-invalid={firstIssue(issues, 'customer_notes') ? true : undefined}
+              {...formFieldAttributes(
+                invoiceDraftFormFields.customer_notes,
+                firstIssue(issues, 'customer_notes'),
+              )}
             />
           </Field>
           <Field
@@ -687,10 +551,12 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           >
             <textarea
               name="internal_note"
-              maxLength={1000}
               mix={textAreaStyle}
               defaultValue={values.internal_note}
-              aria-invalid={firstIssue(issues, 'internal_note') ? true : undefined}
+              {...formFieldAttributes(
+                invoiceDraftFormFields.internal_note,
+                firstIssue(issues, 'internal_note'),
+              )}
             />
           </Field>
         </section>
@@ -701,7 +567,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </Button>
           <Button type="submit">{submitLabel}</Button>
         </div>
-      </form>
+      </RestfulForm>
     );
   };
 }

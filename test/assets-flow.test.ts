@@ -2,10 +2,11 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
-import { db, sessions, users } from '../app/data/db.ts';
-import './db-setup.ts';
-import { router } from '../app/router.ts';
+import { sessions, users } from '../app/data/db.ts';
+import { createTestRouter } from './router.ts';
 import { createUserAndLogin, origin } from './http.ts';
+
+const { router, db } = await createTestRouter();
 
 describe('source asset requests', () => {
   it('serves assets anonymously and skips Session and User database lookups', async () => {
@@ -15,7 +16,7 @@ describe('source asset requests', () => {
     assert.equal(anonymous.status, 200);
     assert.doesNotMatch(anonymous.headers.get('Cache-Control') ?? '', /private|no-store/i);
 
-    let sessionCookie = await createUserAndLogin(router, 'asset');
+    let sessionCookie = await createUserAndLogin(router, db, 'asset');
     let lookups: unknown[] = [];
     let originalFind = db.find;
 

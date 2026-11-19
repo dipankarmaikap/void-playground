@@ -1,29 +1,26 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { requireAuth } from 'remix/middleware/auth';
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { and, ne } from 'remix/data-table';
-import { db, sessions } from '../../../../data/db.ts';
-import type { User } from '../../../../data/db.ts';
+import { sessions } from '../../../../data/db.ts';
 import { findOrganizationForUser } from '../../../../data/organization/access.ts';
 import { browserLabel } from '../../../../data/user-agent.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import { routes } from '../../../../routes.ts';
 import { SessionsPage } from './page.tsx';
 import type { SessionView } from './page.tsx';
 
 export default createController(routes.app.settings.sessions, {
-  middleware: [requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) })],
+  middleware: [requireAuth()],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
-      let organization = await findOrganizationForUser(auth.identity);
+      let auth = authedUser(context);
+      let organization = await findOrganizationForUser(context.db, auth.identity);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
-      let rows = await db.findMany(sessions, {
+      let rows = await context.db.findMany(sessions, {
         where: { user_id: auth.identity.id },
         orderBy: [['created_at', 'desc']],
       });
@@ -52,18 +49,18 @@ export default createController(routes.app.settings.sessions, {
       );
     },
     async action(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let action = String(context.formData.get('action') ?? '');
       let currentId = context.session.id;
 
       if (action === 'revoke') {
         let sessionId = String(context.formData.get('session_id') ?? '');
-        let row = await db.find(sessions, sessionId);
+        let row = await context.db.find(sessions, sessionId);
         if (!row || row.user_id !== auth.identity.id) {
           context.session.flash('error', 'Session not found');
           return redirect(routes.app.settings.sessions.index.href());
         }
-        await db.delete(sessions, sessionId);
+        await context.db.delete(sessions, sessionId);
         if (sessionId === currentId) {
           context.session.destroy();
           return redirect(routes.auth.login.index.href());
@@ -73,7 +70,7 @@ export default createController(routes.app.settings.sessions, {
       }
 
       if (action === 'revoke_others') {
-        await db.deleteMany(sessions, {
+        await context.db.deleteMany(sessions, {
           where: and({ user_id: auth.identity.id }, ne('id', currentId)),
         });
         context.session.flash('message', 'Revoked all other sessions');

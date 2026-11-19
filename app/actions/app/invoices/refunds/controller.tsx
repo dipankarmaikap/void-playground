@@ -1,14 +1,14 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
-import type { Invoice, Organization, User } from '../../../../data/db.ts';
+import type { Invoice, Organization } from '../../../../data/db.ts';
 import { currencyMinorDigits } from '../../../../data/invoices/calculation.ts';
 import { isValidIsoDate } from '../../../../data/invoices/dates.ts';
 import { invoiceActivityData } from '../../../../data/invoices/payments.ts';
@@ -20,16 +20,22 @@ import {
 } from '../../../../data/invoices/refunds.ts';
 import type { InvoiceRefundMethod } from '../../../../data/invoices/refunds.ts';
 import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
-import { formText } from '../form-text.ts';
+import {
+  REFUND_VOID_REASON_MAX_LENGTH,
+  RefundVoidForm,
+  refundValuesOf,
+} from '../refunds/public/schema.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps, RefundFormValues } from '../show-page.tsx';
 
 type RefundRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  db: SqliteDatabase;
   formData: FormData;
   render: RenderFunction;
 };
@@ -45,11 +51,11 @@ async function renderRefundError(
   invoice: Invoice,
   pageErrors: RefundPageErrors,
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
-    findClient(organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    findInvoiceLines(context.db, organization.id, invoice.id),
+    findClient(context.db, organization.id, invoice.client_id),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -68,23 +74,18 @@ async function renderRefundError(
 
 export default createController(routes.app.invoices.refunds, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {
     async record(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let refundFormValues: RefundFormValues = {
-        amount: formText(context, 'amount'),
-        refund_date: formText(context, 'refund_date'),
-        refund_method: formText(context, 'refund_method'),
-        reference: formText(context, 'reference'),
-      };
+      let refundFormValues: RefundFormValues = refundValuesOf(context.formData);
       if (invoice.status !== 'issued') {
         return renderRefundError(context, organization, invoice, {
           refundFormValues,
@@ -115,7 +116,7 @@ export default createController(routes.app.invoices.refunds, {
         });
       }
 
-      let result = await recordInvoiceRefund(organization.id, invoice.id, {
+      let result = await recordInvoiceRefund(context.db, organization.id, invoice.id, {
         refundDate: refundFormValues.refund_date,
         amountMinor: amountMinor!,
         method: refundFormValues.refund_method as InvoiceRefundMethod,
@@ -142,12 +143,13 @@ export default createController(routes.app.invoices.refunds, {
     },
     async void(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let reason = formText(context, 'reason');
+      let parsedReason = s.parseSafe(RefundVoidForm, context.formData);
+      let reason = parsedReason.success ? parsedReason.value.reason : '';
       let voidRefundError = (
         message: string,
       ): NonNullable<InvoiceShowPageProps['voidRefundError']> => ({
@@ -160,13 +162,14 @@ export default createController(routes.app.invoices.refunds, {
           voidRefundError: voidRefundError('Enter a reason for voiding this refund.'),
         });
       }
-      if (reason.trim().length > 1000) {
+      if (reason.trim().length > REFUND_VOID_REASON_MAX_LENGTH) {
         return renderRefundError(context, organization, invoice, {
           voidRefundError: voidRefundError('Reason must be 1,000 characters or fewer.'),
         });
       }
 
       let result = await voidInvoiceRefund(
+        context.db,
         organization.id,
         invoice.id,
         context.params.refundId,

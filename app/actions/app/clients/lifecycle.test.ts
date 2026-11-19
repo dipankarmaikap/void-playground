@@ -1,9 +1,9 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { clients, db } from '../../../data/db.ts';
+import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -13,6 +13,8 @@ import {
   postForm,
   submitForm,
 } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -40,7 +42,7 @@ function statusToggle(html: string) {
 async function createClient(sessionCookie: string, fields: Record<string, string>) {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     fields,
     sessionCookie,
   );
@@ -55,7 +57,7 @@ function archive(sessionCookie: string, clientId: string) {
     router,
     routes.app.clients.show.href({ clientId }),
     routes.app.clients.lifecycle.archive.href({ clientId }),
-    {},
+    { _method: 'PUT' },
     sessionCookie,
   );
 }
@@ -65,7 +67,7 @@ function restore(sessionCookie: string, clientId: string) {
     router,
     routes.app.clients.show.href({ clientId }),
     routes.app.clients.lifecycle.restore.href({ clientId }),
-    {},
+    { _method: 'PUT' },
     sessionCookie,
   );
 }
@@ -79,7 +81,7 @@ async function csrfFrom(path: string, sessionCookie: string) {
 
 describe('client lifecycle', () => {
   it('starts new Clients as Active and offers an Archive control', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let legalName = uniqueName('Active Start');
     let preferredName = uniqueName('Actively Known');
 
@@ -102,13 +104,14 @@ describe('client lifecycle', () => {
       profile,
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
     );
-    assert.match(archiveForm, /method="post"/);
+    assert.match(archiveForm, /method="POST"/);
+    assert.match(archiveForm, /<input type="hidden" name="_method" value="PUT" \/>/);
     assert.match(archiveForm, /name="_csrf" value="[^"]+"/);
     assert.doesNotMatch(archiveForm, /Restore client/);
   });
 
   it('archives a Client without deleting its profile and confirms through status feedback', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let legalName = uniqueName('Archive Preserve');
     let tradingName = uniqueName('Archive Trading');
     let industry = uniqueName('Archived industry');
@@ -147,12 +150,13 @@ describe('client lifecycle', () => {
       profile,
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
     );
-    assert.match(restoreForm, /method="post"/);
+    assert.match(restoreForm, /method="POST"/);
+    assert.match(restoreForm, /<input type="hidden" name="_method" value="PUT" \/>/);
     assert.match(restoreForm, /name="_csrf" value="[^"]+"/);
   });
 
   it('hides archived Clients from the default directory and lists them in the archived view', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let keptName = uniqueName('Still Active');
     let archivedName = uniqueName('Now Archived');
 
@@ -189,7 +193,7 @@ describe('client lifecycle', () => {
   });
 
   it('restores an archived Client to Active and keeps its details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let legalName = uniqueName('Restore Me');
     let preferredName = uniqueName('Restored');
 
@@ -220,8 +224,8 @@ describe('client lifecycle', () => {
   });
 
   it('does not archive or restore another Organization’s Client', async () => {
-    let firstCookie = await createUserAndLogin(router, 'lifecycle');
-    let secondCookie = await createUserAndLogin(router, 'lifecycle');
+    let firstCookie = await createUserAndLogin(router, db, 'lifecycle');
+    let secondCookie = await createUserAndLogin(router, db, 'lifecycle');
     let legalName = uniqueName('Shared Lifecycle');
 
     let { id } = await createClient(firstCookie, {
@@ -233,7 +237,7 @@ describe('client lifecycle', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       secondCookie,
     );
     assert.equal(foreignArchive.status, 404);
@@ -246,7 +250,7 @@ describe('client lifecycle', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       secondCookie,
     );
     assert.equal(foreignRestore.status, 404);
@@ -257,7 +261,7 @@ describe('client lifecycle', () => {
   });
 
   it('rejects lifecycle mutations without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let legalName = uniqueName('No Token Lifecycle');
     let { id } = await createClient(sessionCookie, {
       type: 'individual',
@@ -296,7 +300,7 @@ describe('client lifecycle', () => {
   });
 
   it('protects the archived directory and lifecycle pages from anonymous visitors', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let { id, profilePath } = await createClient(sessionCookie, {
       type: 'individual',
       legal_name: uniqueName('Private Lifecycle'),
@@ -309,12 +313,14 @@ describe('client lifecycle', () => {
     ]) {
       let response = await router.fetch(new URL(path, origin));
       assert.equal(response.status, 302, `${path} should redirect`);
-      assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+      let location = new URL(response.headers.get('Location') ?? '', origin);
+      assert.equal(location.pathname, routes.auth.login.index.href());
+      assert.equal(location.searchParams.get('returnTo'), path);
     }
   });
 
   it('returns 404 for lifecycle actions on unknown Clients', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
     let clientId = crypto.randomUUID();
     let csrf = await csrfFrom(routes.app.clients.index.href(), sessionCookie);
 
@@ -328,15 +334,15 @@ describe('client lifecycle', () => {
           'Content-Type': 'application/x-www-form-urlencoded',
           Cookie: sessionCookie,
         },
-        body: new URLSearchParams({ _csrf: csrf }).toString(),
+        body: new URLSearchParams({ _csrf: csrf, _method: 'PUT' }).toString(),
       });
       assert.equal(response.status, 404, `${path} should be 404`);
     }
   });
 
   it('shows a useful empty state in both directory views', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'lifecycle');
-    await clearTestTables(clients);
+    let sessionCookie = await createUserAndLogin(router, db, 'lifecycle');
+    await clearTestTables(db, invoices, clients);
 
     let archivedDirectory = await getHtml(
       router,

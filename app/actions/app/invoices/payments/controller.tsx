@@ -1,14 +1,14 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
-import type { Invoice, Organization, User } from '../../../../data/db.ts';
+import type { Invoice, Organization } from '../../../../data/db.ts';
 import { currencyMinorDigits } from '../../../../data/invoices/calculation.ts';
 import {
   invoiceActivityData,
@@ -19,17 +19,23 @@ import {
 } from '../../../../data/invoices/payments.ts';
 import type { InvoicePaymentMethod } from '../../../../data/invoices/payments.ts';
 import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { isValidIsoDate } from '../../../../data/invoices/dates.ts';
 import { routes } from '../../../../routes.ts';
-import { formText } from '../form-text.ts';
+import {
+  PAYMENT_VOID_REASON_MAX_LENGTH,
+  PaymentVoidForm,
+  paymentValuesOf,
+} from '../payments/public/schema.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps, PaymentFormValues } from '../show-page.tsx';
 
 type PaymentRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  db: SqliteDatabase;
   formData: FormData;
   render: RenderFunction;
 };
@@ -45,11 +51,11 @@ async function renderPaymentError(
   invoice: Invoice,
   pageErrors: PaymentPageErrors,
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
-    findClient(organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    findInvoiceLines(context.db, organization.id, invoice.id),
+    findClient(context.db, organization.id, invoice.client_id),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -68,23 +74,18 @@ async function renderPaymentError(
 
 export default createController(routes.app.invoices.payments, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {
     async record(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let paymentFormValues: PaymentFormValues = {
-        amount: formText(context, 'amount'),
-        payment_date: formText(context, 'payment_date'),
-        payment_method: formText(context, 'payment_method'),
-        reference: formText(context, 'reference'),
-      };
+      let paymentFormValues: PaymentFormValues = paymentValuesOf(context.formData);
       if (invoice.status !== 'issued') {
         return renderPaymentError(context, organization, invoice, {
           paymentFormValues,
@@ -115,7 +116,7 @@ export default createController(routes.app.invoices.payments, {
         });
       }
 
-      let result = await recordInvoicePayment(organization.id, invoice.id, {
+      let result = await recordInvoicePayment(context.db, organization.id, invoice.id, {
         paymentDate: paymentFormValues.payment_date,
         amountMinor: amountMinor!,
         method: paymentFormValues.payment_method as InvoicePaymentMethod,
@@ -142,12 +143,13 @@ export default createController(routes.app.invoices.payments, {
     },
     async void(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
 
-      let reason = formText(context, 'reason');
+      let parsedReason = s.parseSafe(PaymentVoidForm, context.formData);
+      let reason = parsedReason.success ? parsedReason.value.reason : '';
       let voidPaymentError = (
         message: string,
       ): NonNullable<InvoiceShowPageProps['voidPaymentError']> => ({
@@ -160,13 +162,14 @@ export default createController(routes.app.invoices.payments, {
           voidPaymentError: voidPaymentError('Enter a reason for voiding this payment.'),
         });
       }
-      if (reason.trim().length > 1000) {
+      if (reason.trim().length > PAYMENT_VOID_REASON_MAX_LENGTH) {
         return renderPaymentError(context, organization, invoice, {
           voidPaymentError: voidPaymentError('Reason must be 1,000 characters or fewer.'),
         });
       }
 
       let result = await voidInvoicePayment(
+        context.db,
         organization.id,
         invoice.id,
         context.params.paymentId,

@@ -1,9 +1,9 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { db, sessions, users } from '../db.ts';
+import { sessions, users } from '../db.ts';
 import { createHybridSessionStorage, SESSION_TTL_MS } from './storage.ts';
-import '../../../test/db-setup.ts';
+import { testDb as db } from '../../../test/db-setup.ts';
 
 async function createUser() {
   let id = crypto.randomUUID();
@@ -33,7 +33,7 @@ describe('hybrid session storage', () => {
       last_active_at: expiredAt,
     });
 
-    let storage = createHybridSessionStorage();
+    let storage = createHybridSessionStorage(db);
     let session = await storage.read(`db:${id}`);
 
     assert.equal(session.get('auth'), undefined);
@@ -53,7 +53,7 @@ describe('hybrid session storage', () => {
       last_active_at: Date.now(),
     });
 
-    let storage = createHybridSessionStorage();
+    let storage = createHybridSessionStorage(db);
     let session = await storage.read(`db:${id}`);
     let auth = session.get('auth') as { userId: string } | undefined;
 

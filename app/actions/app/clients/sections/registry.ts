@@ -1,5 +1,6 @@
 import type { RemixNode } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import type { Client } from '../../../../data/db.ts';
 import type { ClientFormValues } from '../form-values.ts';
@@ -21,6 +22,8 @@ export interface ClientFormSectionResult {
 }
 
 export interface ClientFormSectionContext {
+  /** The database the section's data functions read. */
+  db: SqliteDatabase;
   /** Server-verified Organization that will own the Client. */
   organizationId: string;
   /** The Client being edited; absent when creating a Client. */
@@ -30,15 +33,16 @@ export interface ClientFormSectionContext {
 /**
  * One editable slice of the Client form.
  *
- * Later Client tickets append an entry instead of rewriting the controllers:
- * each section parses its own form fields and returns only the changes it owns.
+ * Later Client tickets append an entry instead of rewriting the controllers: the shared form
+ * schema parses the submission into {@link ClientFormValues} once, and each section validates its
+ * own slice and returns only the changes it owns.
  */
 export interface ClientFormSection {
   /** Stable identity for rendering and diagnostics. */
   key: string;
   render: (props: ClientFormSectionProps) => RemixNode;
   parse: (
-    formData: FormData,
+    values: ClientFormValues,
     context: ClientFormSectionContext,
   ) => ClientFormSectionResult | Promise<ClientFormSectionResult>;
 }

@@ -2,16 +2,17 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import {
-  CLIENT_NAME_MAX_LENGTH,
   CLIENT_TYPES,
   clientTypeLabel,
   parseClientNames,
 } from '../../../../data/client-names.ts';
-import { validateClientTextFields, CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
+import { validateClientTextFields } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { Select } from '../../../../ui/select.tsx';
-import { issueFor, readText } from '../form-values.ts';
+import { issueFor } from '../form-values.ts';
+import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const nameGroupStyle = css({
@@ -38,9 +39,8 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
         <Field label="Client type" error={typeIssue?.message}>
           <Select
             name="type"
-            required
-            aria-invalid={typeIssue ? true : undefined}
             variant={typeIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.type, typeIssue)}
           >
             <option value="">Select a type</option>
             {CLIENT_TYPES.map((type) => (
@@ -57,11 +57,9 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="legal_name"
-            required
-            maxLength={CLIENT_NAME_MAX_LENGTH}
             defaultValue={values.legal_name}
-            aria-invalid={legalNameIssue ? true : undefined}
             variant={legalNameIssue ? 'error' : 'default'}
+            {...formFieldAttributes(clientFormFields.legal_name, legalNameIssue)}
           />
         </Field>
         {/* Both type-specific groups stay in the form; hidden values still submit. */}
@@ -73,10 +71,9 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="preferred_name"
-              maxLength={CLIENT_NAME_MAX_LENGTH}
               defaultValue={values.preferred_name}
-              aria-invalid={preferredNameIssue ? true : undefined}
               variant={preferredNameIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.preferred_name, preferredNameIssue)}
             />
           </Field>
         </div>
@@ -88,10 +85,9 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="trading_name"
-              maxLength={CLIENT_NAME_MAX_LENGTH}
               defaultValue={values.trading_name}
-              aria-invalid={tradingNameIssue ? true : undefined}
               variant={tradingNameIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.trading_name, tradingNameIssue)}
             />
           </Field>
           <Field
@@ -101,10 +97,9 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="industry"
-              maxLength={CLIENT_TEXT_LIMITS.industry}
               defaultValue={values.industry}
-              aria-invalid={industryIssue ? true : undefined}
               variant={industryIssue ? 'error' : 'default'}
+              {...formFieldAttributes(clientFormFields.industry, industryIssue)}
             />
           </Field>
         </div>
@@ -121,16 +116,13 @@ export const profileSection: ClientFormSection = {
       issues={props.issues}
     />
   ),
-  parse(formData) {
-    let type = readText(formData, 'type');
-    let legalName = readText(formData, 'legal_name');
-    let industry = readText(formData, 'industry');
-    let industryIssues = validateClientTextFields({ industry });
+  parse(values) {
+    let industryIssues = validateClientTextFields({ industry: values.industry });
     let parsed = parseClientNames({
-      type,
-      legal_name: legalName,
-      preferred_name: readText(formData, 'preferred_name'),
-      trading_name: readText(formData, 'trading_name'),
+      type: values.type,
+      legal_name: values.legal_name,
+      preferred_name: values.preferred_name,
+      trading_name: values.trading_name,
     });
 
     if (!parsed.ok || industryIssues.length > 0) {
@@ -152,7 +144,7 @@ export const profileSection: ClientFormSection = {
     }
 
     return {
-      changes: { ...parsed.value, industry: industry.trim() || null },
+      changes: { ...parsed.value, industry: values.industry.trim() || null },
       issues: [],
     };
   },

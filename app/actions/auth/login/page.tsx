@@ -6,6 +6,7 @@ import { AuthLayout } from '../../../ui/auth-layout.tsx';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import {
   authHeaderStyle,
   authHeadingStyle,
@@ -17,9 +18,11 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { Document } from '../../document.tsx';
+import { loginFormFields } from './public/schema.ts';
 
 export interface LoginPageProps {
   csrfToken: string;
+  action: string;
   error?: string;
   message?: string;
   email?: string;
@@ -27,7 +30,7 @@ export interface LoginPageProps {
 
 export function LoginPage(handle: Handle<LoginPageProps>) {
   return () => {
-    let { csrfToken, error, message, email } = handle.props;
+    let { csrfToken, action, error, message, email } = handle.props;
 
     return (
       <Document title="Log in" description={`Log in to ${APP_NAME} to open your dashboard.`}>
@@ -46,19 +49,17 @@ export function LoginPage(handle: Handle<LoginPageProps>) {
               {message}
             </p>
           ) : null}
-          <form method="post" action={routes.auth.login.action.href()} mix={formStackStyle}>
+          <form method="post" action={action} mix={formStackStyle}>
             <input type="hidden" name="_csrf" value={csrfToken} />
             <Field label="Email">
               <Input
                 name="email"
-                type="email"
-                autoComplete="email"
                 defaultValue={email ?? ''}
-                required
+                {...formFieldAttributes(loginFormFields.email)}
               />
             </Field>
             <Field label="Password">
-              <Input name="password" type="password" autoComplete="current-password" required />
+              <Input name="password" {...formFieldAttributes(loginFormFields.password)} />
             </Field>
             <Button type="submit">Log in</Button>
           </form>

@@ -1,12 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { db, organizationInvoicingProfiles } from '../../../../data/db.ts';
-import '../../../../../test/db-setup.ts';
+import { organizationInvoicingProfiles } from '../../../../data/db.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { router } from '../../../../router.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 const VALID_GSTIN = '27AAPCS2319F1Z5';
 const VALID_PAN = 'AAPCS2319F';
@@ -28,6 +29,7 @@ describe('organization tax registration settings', () => {
   it('saves a normalized PAN and a consistent enabled GST registration', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-save',
     );
 
@@ -45,7 +47,7 @@ describe('organization tax registration settings', () => {
 
     assert.equal(response.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.pan, VALID_PAN, 'PAN is trimmed and uppercased');
     assert.equal(row.gst_registered, true);
@@ -63,6 +65,7 @@ describe('organization tax registration settings', () => {
   it('requires a valid PAN and reports it accessibly while preserving the draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-pan-invalid',
     );
 
@@ -79,12 +82,13 @@ describe('organization tax registration settings', () => {
     assert.match(html, /Enter a valid 10-character PAN, for example AAPCS2319F\./);
     assert.match(html, /name="pan"[^>]*value="short"/);
     assert.match(html, /name="pan"[^>]*aria-invalid="true"/);
-    assert.equal((await findInvoicingProfile(organizationId))?.pan ?? null, null);
+    assert.equal((await findInvoicingProfile(db, organizationId))?.pan ?? null, null);
   });
 
   it('rejects an invalid GSTIN and preserves the submitted tax values', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-gstin-invalid',
     );
 
@@ -108,11 +112,11 @@ describe('organization tax registration settings', () => {
     );
     assert.match(html, new RegExp(`name="gstin"[^>]*value="27AAPCS2319F1Z"`));
     assert.match(html, new RegExp(`name="pan"[^>]*value="${VALID_PAN}"`));
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('rejects a GSTIN whose state code differs from the selected State/UT', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-state-mismatch');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-state-mismatch');
 
     let response = await postForm(
       router,
@@ -132,7 +136,7 @@ describe('organization tax registration settings', () => {
   });
 
   it('rejects a GSTIN whose PAN segment differs from the saved PAN', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-pan-mismatch');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-pan-mismatch');
 
     let response = await postForm(
       router,
@@ -153,7 +157,7 @@ describe('organization tax registration settings', () => {
   });
 
   it('requires a GSTIN and State/UT when GST registration is enabled', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-required');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-required');
 
     let response = await postForm(
       router,
@@ -171,6 +175,7 @@ describe('organization tax registration settings', () => {
   it('clears GSTIN and State/UT and drops the readiness requirement when GST is disabled', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-disable',
     );
     await postForm(
@@ -193,7 +198,7 @@ describe('organization tax registration settings', () => {
     );
 
     assert.equal(response.status, 302);
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.gst_registered, false);
     assert.equal(row.gstin, null);
@@ -209,6 +214,7 @@ describe('organization tax registration settings', () => {
   it('makes GSTIN and State/UT an issue-readiness requirement while GST is enabled', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-readiness',
     );
     await postForm(

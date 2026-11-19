@@ -1,5 +1,6 @@
 import { createAssetServer } from 'remix/assets';
 import type { ScriptEntry } from 'remix/assets';
+import { loadConfig } from 'remix/cli';
 import { componentHmr } from 'remix/component-hmr/assets';
 import { createContextKey, type Middleware } from 'remix/router';
 
@@ -8,19 +9,15 @@ const isDevelopment = nodeEnv === 'development';
 const isProduction = nodeEnv === 'production';
 const isHmr = Boolean(isDevelopment && process.env.REMIX_NODE_HMR);
 
-export const assets = createAssetServer({
-  basePath: '/assets',
-  rootDir: process.cwd(),
+// The JSON-compatible asset mapping (root directory, allow and deny lists) lives in remix.json;
+// only environment-dependent behavior stays in code.
+const config = await loadConfig(import.meta.dirname);
+if (config.assets === undefined) {
+  throw new Error('Missing assets configuration in remix.json');
+}
 
-  allowFiles: [
-    'app/routes.ts',
-    'app/actions/app/routes.ts',
-    'app/actions/app/clients/routes.ts',
-    'app/actions/app/invoices/routes.ts',
-    'app/**/public/**',
-  ],
-  allowPackages: ['remix'],
-  denyFiles: ['app/**/*.test.*'],
+export const assets = createAssetServer({
+  ...config.assets,
   sourceMaps: isDevelopment ? 'external' : undefined,
   minify: !isDevelopment,
   fingerprint: isProduction,

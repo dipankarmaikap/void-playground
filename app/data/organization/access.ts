@@ -1,7 +1,10 @@
-import { db, organizationMemberships, organizations } from '../db.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
+import { organizationMemberships, organizations } from '../db.ts';
 import type { Organization, OrganizationMembership, User } from '../db.ts';
 
 async function findSingleMembershipForUser(
+  db: SqliteDatabase,
   user: Pick<User, 'id'>,
 ): Promise<OrganizationMembership | null> {
   let memberships = await db.findMany(organizationMemberships, {
@@ -13,9 +16,10 @@ async function findSingleMembershipForUser(
 
 /** Finds the one Organization available to an authenticated User through membership. */
 export async function findOrganizationForUser(
+  db: SqliteDatabase,
   user: Pick<User, 'id'>,
 ): Promise<Organization | null> {
-  let membership = await findSingleMembershipForUser(user);
+  let membership = await findSingleMembershipForUser(db, user);
   if (!membership) return null;
 
   return db.find(organizations, membership.organization_id);
@@ -23,10 +27,11 @@ export async function findOrganizationForUser(
 
 /** Renames the one Organization an authenticated owner is associated with. */
 export async function renameOwnedOrganizationForUser(
+  db: SqliteDatabase,
   user: Pick<User, 'id'>,
   name: string,
 ): Promise<Organization | null> {
-  let membership = await findSingleMembershipForUser(user);
+  let membership = await findSingleMembershipForUser(db, user);
   if (!membership?.is_owner) return null;
 
   let organization = await db.find(organizations, membership.organization_id);

@@ -5,7 +5,9 @@
  * those bytes verbatim.
  */
 
-import { db, invoicePdfArtifacts } from '../db.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
+import { invoicePdfArtifacts } from '../db.ts';
 import type { Invoice } from '../db.ts';
 import type { IssuedInvoiceFinalizer } from './issuance.ts';
 import { documentPdfFilename } from './pdf-filenames.ts';
@@ -24,6 +26,7 @@ export function invoicePdfFilename(
 
 /** Reads the exact stored PDF bytes for an issued invoice, scoped to the Organization. */
 export function findIssuedInvoicePdfBytes(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
 ): Promise<Uint8Array | null> {

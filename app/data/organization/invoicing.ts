@@ -1,10 +1,11 @@
 import type { Issue } from 'remix/data-schema';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { canonicalCountry } from '../client-billing.ts';
 import { parseClientContacts } from '../client-contacts.ts';
 import { GSTIN_PATTERN } from '../client-tax.ts';
 import { CLIENT_TEXT_LIMITS } from '../client-text.ts';
-import { db, organizationInvoicingProfiles } from '../db.ts';
+import { organizationInvoicingProfiles } from '../db.ts';
 import type { Organization, OrganizationInvoicingProfile } from '../db.ts';
 import { ISO_4217_CURRENCY_MESSAGE, isIso4217Currency } from '../currency.ts';
 import { findIndiaStateByCode } from '../india-states.ts';
@@ -473,6 +474,7 @@ function parseStartingNumber(raw: string, label: string, issues: Issue[]): numbe
 
 /** Reads the one profile row owned by an Organization, or null when it has never saved one. */
 export function findInvoicingProfile(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<OrganizationInvoicingProfile | null> {
   return db.find(organizationInvoicingProfiles, organizationId);
@@ -480,11 +482,12 @@ export function findInvoicingProfile(
 
 /** Creates or updates the profile for one Organization. The Organization id always comes from the server. */
 export async function saveInvoicingProfile(
+  db: SqliteDatabase,
   organizationId: string,
   values: InvoicingProfileValues,
 ): Promise<OrganizationInvoicingProfile | null> {
   let now = Date.now();
-  let existing = await findInvoicingProfile(organizationId);
+  let existing = await findInvoicingProfile(db, organizationId);
   if (existing) {
     await db.update(organizationInvoicingProfiles, organizationId, {
       ...values,
@@ -498,14 +501,15 @@ export async function saveInvoicingProfile(
       updated_at: now,
     });
   }
-  return findInvoicingProfile(organizationId);
+  return findInvoicingProfile(db, organizationId);
 }
 
 /** Resolves stored values, the default legal seller name, and issue-time readiness. */
 export async function getInvoicingProfileView(
+  db: SqliteDatabase,
   organization: Organization,
 ): Promise<InvoicingProfileView> {
-  let profile = await findInvoicingProfile(organization.id);
+  let profile = await findInvoicingProfile(db, organization.id);
   let explicitLegalName = profile?.legal_name ?? null;
   let legalName = explicitLegalName?.trim() || organization.name;
   let addressLine1 = profile?.address_line1 ?? null;

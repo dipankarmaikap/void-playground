@@ -1,14 +1,14 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
-import type { Invoice, Organization, User } from '../../../../data/db.ts';
+import type { Invoice, Organization } from '../../../../data/db.ts';
 import { issueDraftInvoice } from '../../../../data/invoices/issuance.ts';
 import { invoiceActivityData } from '../../../../data/invoices/payments.ts';
 import { storeIssuedInvoicePdf } from '../../../../data/invoices/pdf-artifacts.ts';
@@ -18,11 +18,13 @@ import {
   findInvoiceLines,
   updateIssuedInvoiceInternalNote,
 } from '../../../../data/invoices/records.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
+import { INTERNAL_NOTE_MAX_LENGTH, InternalNoteForm } from '../public/schema.ts';
 import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps } from '../show-page.tsx';
 
@@ -33,6 +35,7 @@ import type { InvoiceShowPageProps } from '../show-page.tsx';
  */
 type InvoiceShowRequestContext = RequestContext<AnyParams, ContextEntries> & {
   render: RenderFunction;
+  db: SqliteDatabase;
 };
 
 /**
@@ -48,11 +51,11 @@ async function renderInvoiceShowPageError(
     'validationErrors' | 'internalNoteValue' | 'internalNoteError'
   >,
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let [lines, client, paymentData] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
-    findClient(organization.id, invoice.client_id),
-    invoiceActivityData(organization.id, invoice),
+    findInvoiceLines(context.db, organization.id, invoice.id),
+    findClient(context.db, organization.id, invoice.client_id),
+    invoiceActivityData(context.db, organization.id, invoice),
   ]);
   return context.render(
     <InvoiceShowPage
@@ -71,13 +74,14 @@ async function renderInvoiceShowPageError(
 
 export default createController(routes.app.invoices.lifecycle, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {
     async issue(context) {
       let organization = context.get(CurrentOrganization);
       let result = await issueDraftInvoice(
+        context.db,
         organization.id,
         context.params.invoiceId,
         storeIssuedInvoicePdf,
@@ -89,7 +93,7 @@ export default createController(routes.app.invoices.lifecycle, {
         return new Response('Only a Draft invoice can be issued', { status: 409 });
       }
       if (!result.ok) {
-        let invoice = await findInvoice(organization.id, context.params.invoiceId);
+        let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
         if (!invoice) return new Response('Invoice not found', { status: 404 });
         return renderInvoiceShowPageError(context, organization, invoice, {
           validationErrors: result.errors,
@@ -101,13 +105,13 @@ export default createController(routes.app.invoices.lifecycle, {
     },
     async discard(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be discarded', { status: 409 });
       }
 
-      let discarded = await discardDraftInvoice(organization.id, invoice.id);
+      let discarded = await discardDraftInvoice(context.db, organization.id, invoice.id);
       if (!discarded) {
         return new Response('Only a Draft invoice can be discarded', { status: 409 });
       }
@@ -117,25 +121,25 @@ export default createController(routes.app.invoices.lifecycle, {
     },
     async internalNote(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'issued') {
         return new Response('Internal notes can be updated only after issue', { status: 409 });
       }
 
-      let submittedNote = context.formData.get('internal_note');
-      let internalNote = typeof submittedNote === 'string' ? submittedNote : '';
-      if (typeof submittedNote !== 'string' || internalNote.length > 1000) {
+      let parsed = s.parseSafe(InternalNoteForm, context.formData);
+      let internalNote = parsed.success ? parsed.value.internal_note : '';
+      if (!parsed.success || internalNote.length > INTERNAL_NOTE_MAX_LENGTH) {
         return renderInvoiceShowPageError(context, organization, invoice, {
           internalNoteValue: internalNote,
-          internalNoteError:
-            typeof submittedNote === 'string'
-              ? 'Internal note must be 1,000 characters or fewer.'
-              : 'Enter the internal note as text.',
+          internalNoteError: parsed.success
+            ? 'Internal note must be 1,000 characters or fewer.'
+            : 'Enter the internal note as text.',
         });
       }
 
       let updated = await updateIssuedInvoiceInternalNote(
+        context.db,
         organization.id,
         invoice.id,
         internalNote.trim() || null,

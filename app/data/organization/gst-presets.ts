@@ -1,4 +1,6 @@
-import { db, organizationGstRatePresets } from '../db.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
+import { organizationGstRatePresets } from '../db.ts';
 import type { OrganizationGstRatePreset } from '../db.ts';
 
 /** Standard Indian service-tax slabs every Organization starts with, editable per Organization. */
@@ -44,9 +46,10 @@ export function parseGstRate(raw: string): PresetRateResult {
 
 /** Ensures an Organization has its default presets. Call only from a mutation or initialization. */
 export async function ensureGstPresets(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<OrganizationGstRatePreset[]> {
-  let existing = await findGstPresets(organizationId);
+  let existing = await findGstPresets(db, organizationId);
   if (existing.length > 0) return existing;
 
   await db.transaction(async (tx) => {
@@ -54,10 +57,13 @@ export async function ensureGstPresets(
       await tx.create(organizationGstRatePresets, preset);
     }
   });
-  return findGstPresets(organizationId);
+  return findGstPresets(db, organizationId);
 }
 
-export function findGstPresets(organizationId: string): Promise<OrganizationGstRatePreset[]> {
+export function findGstPresets(
+  db: SqliteDatabase,
+  organizationId: string,
+): Promise<OrganizationGstRatePreset[]> {
   return db.findMany(organizationGstRatePresets, {
     where: { organization_id: organizationId },
   });
@@ -74,6 +80,7 @@ function duplicateMessage(rate: string): string {
 }
 
 export async function addGstPreset(
+  db: SqliteDatabase,
   organizationId: string,
   rawRate: string,
 ): Promise<PresetMutation> {
@@ -81,7 +88,7 @@ export async function addGstPreset(
   if (!parsed.ok) return { ok: false, message: parsed.message };
   let rate = parsed.value!;
 
-  let existing = await findGstPresets(organizationId);
+  let existing = await findGstPresets(db, organizationId);
   if (existing.some((preset) => preset.rate === rate)) {
     return { ok: false, message: duplicateMessage(rate) };
   }
@@ -98,6 +105,7 @@ export async function addGstPreset(
 }
 
 export async function updateGstPreset(
+  db: SqliteDatabase,
   organizationId: string,
   presetId: string,
   rawRate: string,
@@ -111,7 +119,7 @@ export async function updateGstPreset(
   if (!parsed.ok) return { ok: false, message: parsed.message };
   let rate = parsed.value!;
 
-  let existing = await findGstPresets(organizationId);
+  let existing = await findGstPresets(db, organizationId);
   if (existing.some((preset) => preset.rate === rate && preset.id !== presetId)) {
     return { ok: false, message: duplicateMessage(rate) };
   }
@@ -121,6 +129,7 @@ export async function updateGstPreset(
 }
 
 export async function removeGstPreset(
+  db: SqliteDatabase,
   organizationId: string,
   presetId: string,
 ): Promise<{ found: boolean }> {

@@ -1,9 +1,10 @@
 import { and, eq, ilike, or } from 'remix/data-table';
 import type { Predicate } from 'remix/data-table';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import type { ClientType } from './client-names.ts';
 import type { ClientStatus } from './client-status.ts';
-import { clients, db } from './db.ts';
+import { clients } from './db.ts';
 import type { Client } from './db.ts';
 
 export type ClientTypeFilter = ClientType | 'all';
@@ -77,6 +78,7 @@ const DIRECTORY_COLUMNS = {
  * matched literally in bounded batches after status and type predicates run.
  */
 export async function listClients(
+  db: SqliteDatabase,
   organizationId: string,
   filter: ClientListFilter = {},
 ): Promise<ClientDirectoryPage> {
@@ -169,12 +171,17 @@ function matchesClientQuery(client: ClientDirectoryItem, q: string): boolean {
   return SEARCH_FIELDS.some((field) => client[field]?.toLowerCase().includes(needle));
 }
 
-export async function findClient(organizationId: string, id: string): Promise<Client | null> {
+export async function findClient(
+  db: SqliteDatabase,
+  organizationId: string,
+  id: string,
+): Promise<Client | null> {
   return db.findOne(clients, { where: { id, organization_id: organizationId } });
 }
 
 /** Inserts a Client into the given Organization. New Clients always start Active. */
 export async function createClient(
+  db: SqliteDatabase,
   organizationId: string,
   values: Omit<Partial<Client>, 'organization_id'>,
 ): Promise<Client> {
@@ -196,6 +203,7 @@ export async function createClient(
 
 /** Updates only a Client in the given Organization, always refreshing `updated_at`. */
 export async function updateClient(
+  db: SqliteDatabase,
   organizationId: string,
   id: string,
   changes: Omit<Partial<Client>, 'id' | 'organization_id' | 'created_at' | 'updated_at'>,
@@ -211,5 +219,5 @@ export async function updateClient(
     { ...safeChanges, updated_at: Date.now() },
     { where: { id, organization_id: organizationId }, limit: 1 },
   );
-  return findClient(organizationId, id);
+  return findClient(db, organizationId, id);
 }

@@ -1,15 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../../router.ts';
+import { createTestRouter } from '../../../test/router.ts';
 import { routes } from '../../routes.ts';
 import {
-  db,
   organizationMemberships,
   organizations,
   users,
 } from '../../data/db.ts';
-import '../../../test/db-setup.ts';
 import {
   cookieFromResponse,
   createUser,
@@ -18,6 +16,8 @@ import {
   origin,
   submitForm,
 } from '../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 const base = origin;
 
@@ -93,7 +93,7 @@ describe('auth controller', () => {
 
   it('GET /login redirects authenticated users to the dashboard', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let response = await router.fetch(new URL(routes.auth.login.index.href(), base), {
@@ -105,7 +105,7 @@ describe('auth controller', () => {
 
   it('GET /register redirects authenticated users to the dashboard', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123');
+    await createUser(db, email, 'password123');
     let sessionCookie = await login(router, email, 'password123');
 
     let response = await router.fetch(new URL(routes.auth.register.index.href(), base), {
@@ -117,7 +117,7 @@ describe('auth controller', () => {
 
   it('rejects login for an unverified user', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
-    await createUser(email, 'password123', false);
+    await createUser(db, email, 'password123', false);
 
     let page = await router.fetch(new URL(routes.auth.login.index.href(), base));
     let csrf = extractCsrf(await page.text());
@@ -153,7 +153,7 @@ describe('auth controller', () => {
   it('does not verify a user with an expired token', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() - 1000,
@@ -172,7 +172,7 @@ describe('auth controller', () => {
   it('renders a verification form for a valid link without changing the User', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() + 60_000,
@@ -196,7 +196,7 @@ describe('auth controller', () => {
   it('verifies a User only after a valid verification POST', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() + 60_000,
@@ -222,7 +222,7 @@ describe('auth controller', () => {
   it('rejects invalid and expired verification POSTs with accessible feedback', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() - 1000,
@@ -253,7 +253,7 @@ describe('auth controller', () => {
   it('rejects a reused verification token without changing the verified User', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() + 60_000,
@@ -290,7 +290,7 @@ describe('auth controller', () => {
   it('rejects Email Verification without a CSRF token', async () => {
     let email = `auth-${crypto.randomUUID()}@example.com`;
     let token = crypto.randomUUID();
-    let userId = await createUser(email, 'password123', false);
+    let userId = await createUser(db, email, 'password123', false);
     await db.update(users, userId, {
       verification_token: token,
       verification_expires_at: Date.now() + 60_000,

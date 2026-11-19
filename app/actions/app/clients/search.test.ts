@@ -1,10 +1,10 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
-import { clients, db } from '../../../data/db.ts';
+import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -13,12 +13,14 @@ import {
   postForm,
 } from '../../../../test/http.ts';
 
+const { router, db } = await createTestRouter();
+
 type ClientFixture = Partial<Client> & Pick<Client, 'type' | 'legal_name'>;
 
 let organizationId: string;
 
 async function createSearchUser() {
-  let tenant = await createUserAndLoginWithOrganization(router, 'search');
+  let tenant = await createUserAndLoginWithOrganization(router, db, 'search');
   organizationId = tenant.organizationId;
   return tenant.sessionCookie;
 }
@@ -55,7 +57,7 @@ function includes(html: string, value: string) {
 }
 
 beforeEach(async () => {
-  await clearTestTables(clients);
+  await clearTestTables(db, invoices, clients);
 });
 
 describe('client directory search and filters', () => {
@@ -273,7 +275,7 @@ describe('client directory search and filters', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       firstCookie,
     );
@@ -332,7 +334,9 @@ describe('client directory search and filters', () => {
 
     let anonymous = await router.fetch(new URL(path, origin));
     assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    let location = new URL(anonymous.headers.get('Location') ?? '', origin);
+    assert.equal(location.pathname, routes.auth.login.index.href());
+    assert.equal(location.searchParams.get('returnTo'), path);
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);

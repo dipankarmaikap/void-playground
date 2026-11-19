@@ -1,6 +1,4 @@
-import type { SqliteDatabase } from 'remix/data-table/sqlite';
-
-import { createAppDatabase } from './db/connection.ts';
+export { createAppDatabase } from './db/connection.ts';
 
 export {
   users,
@@ -22,6 +20,8 @@ export {
   creditNotePdfArtifacts,
 } from './db/tables.ts';
 
+export * from './db/relations.ts';
+
 export type {
   User,
   Organization,
@@ -42,13 +42,13 @@ export type {
 } from './db/row-types.ts';
 
 /**
- * The application's single database instance. Importing this module creates the connection only:
- * schema application lives in `./db/migrate.ts`, awaited by server startup before it listens and
- * by the shared test bootstrap, so no request or test ever sees a half-migrated schema. Startup
- * fails closed rather than upgrading a database that predates Organization ownership or the
- * migration journal.
+ * The stable entry for the application database: it owns the typed table and row-type contract
+ * and the factory server startup and scripts use to construct the application database. No
+ * instance lives here — request handling receives the database through the request context, and
+ * domain modules take it as an explicit parameter (see docs/agents/data-modules.md).
  *
- * The re-exported tables and row types above are the app-facing contract blessed by
- * docs/agents/data-modules.md: query code stays unaffected by how the schema is applied.
+ * Schema application lives in `./db/migrate.ts`, awaited by server startup before it listens
+ * and by the shared test bootstrap, so no request or test ever sees a half-migrated schema. The
+ * database is a disposable build-phase artifact (ADR-0003): the documented remedy for a stale
+ * or unrecognized dev database is deleting the file and restarting.
  */
-export const db: SqliteDatabase = createAppDatabase();

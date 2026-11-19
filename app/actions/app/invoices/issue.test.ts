@@ -5,13 +5,11 @@ import { createClient } from '../../../data/clients.ts';
 import { addDays, todayInKolkata } from '../../../data/invoices/dates.ts';
 import { issueDraftInvoice } from '../../../data/invoices/issuance.ts';
 import {
-  db,
   documentSequences,
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
 import { parseInvoiceDraft } from '../../../data/invoices/draft.ts';
 import {
   findInvoiceLines,
@@ -21,11 +19,11 @@ import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';
 import { invoicingFormFields } from '../settings/invoicing/test-fields.ts';
-import { readInvoiceFormValues } from './form-values.ts';
+import { parseInvoiceFormValues } from './public/schema.ts';
 import {
   createUserAndLoginWithOrganization,
   extractCsrf,
@@ -34,6 +32,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { markAsSent } from '../../../../test/invoice-fixtures.ts';
+
+const { router, db } = await createTestRouter();
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {
@@ -70,8 +70,8 @@ async function createDraft(
 ): Promise<string> {
   let response = await submitForm(
     router,
-    routes.app.invoices.new.index.href({}, { searchParams: { clientId } }),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.new.href({}, { searchParams: { clientId } }),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -141,16 +141,17 @@ async function setSellerProfile(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test seller profile should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 describe('invoice issue flow', () => {
   it('offers Mark as sent and leaves an invalid Draft unnumbered when seller details are incomplete', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-incomplete-seller',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Issue Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -188,10 +189,11 @@ describe('invoice issue flow', () => {
   it('validates recipient address, applicable GST identifiers, and saved service lines before numbering', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-recipient-gates',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Recipient Gate Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -202,7 +204,7 @@ describe('invoice issue flow', () => {
       recipient_billing_country: '',
       due_date: '2099-12-31',
     });
-    let missingAddress = await markAsSent(sessionCookie, missingAddressId);
+    let missingAddress = await markAsSent(router, sessionCookie, missingAddressId);
     assert.equal(missingAddress.status, 400);
     let missingAddressHtml = await missingAddress.text();
     assert.match(missingAddressHtml, /recipient billing address line 1/i);
@@ -223,7 +225,7 @@ describe('invoice issue flow', () => {
       due_date: '2099-12-31',
     });
     await db.update(invoices, applicableGstId, { recipient_tax_value: null });
-    let invalidRecipientGst = await markAsSent(sessionCookie, applicableGstId);
+    let invalidRecipientGst = await markAsSent(router, sessionCookie, applicableGstId);
     assert.equal(invalidRecipientGst.status, 400);
     assert.match(await invalidRecipientGst.text(), /valid recipient GSTIN or UIN/i);
     assert.equal((await db.find(invoices, applicableGstId))?.invoice_number, null);
@@ -232,7 +234,7 @@ describe('invoice issue flow', () => {
     await db.deleteMany(invoiceLines, {
       where: { organization_id: organizationId, invoice_id: missingLineId },
     });
-    let missingLine = await markAsSent(sessionCookie, missingLineId);
+    let missingLine = await markAsSent(router, sessionCookie, missingLineId);
     assert.equal(missingLine.status, 400);
     assert.match(await missingLine.text(), /at least one valid service line/i);
     assert.equal((await db.find(invoices, missingLineId))?.invoice_number, null);
@@ -252,10 +254,11 @@ describe('invoice issue flow', () => {
   it('rechecks seller GSTIN and State/UT readiness at issue time', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-seller-gst-gates',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Seller GST Gate Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -264,7 +267,7 @@ describe('invoice issue flow', () => {
     await db.update(organizationInvoicingProfiles, organizationId, {
       gstin: '000000000000000',
     });
-    let invalidGstin = await markAsSent(sessionCookie, invalidGstinId);
+    let invalidGstin = await markAsSent(router, sessionCookie, invalidGstinId);
     assert.equal(invalidGstin.status, 400);
     assert.match(await invalidGstin.text(), /valid seller GSTIN/i);
     assert.equal((await db.find(invoices, invalidGstinId))?.invoice_number, null);
@@ -274,7 +277,7 @@ describe('invoice issue flow', () => {
       gst_state_code: '99',
     });
     let invalidStateId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
-    let invalidState = await markAsSent(sessionCookie, invalidStateId);
+    let invalidState = await markAsSent(router, sessionCookie, invalidStateId);
     assert.equal(invalidState.status, 400);
     assert.match(await invalidState.text(), /valid GST State\/UT/i);
     assert.equal((await db.find(invoices, invalidStateId))?.invoice_number, null);
@@ -283,10 +286,11 @@ describe('invoice issue flow', () => {
   it('accepts a valid recipient UIN when it is marked applicable', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-valid-uin',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `UIN Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -304,7 +308,7 @@ describe('invoice issue flow', () => {
       due_date: '2099-12-31',
     });
 
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
     let issued = await db.find(invoices, invoiceId);
     assert.equal(issued?.status, 'issued');
     assert.equal(issued?.recipient_tax_type, 'uin');
@@ -314,10 +318,11 @@ describe('invoice issue flow', () => {
   it('issues a valid Draft with an FY number and seller snapshots', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-snapshot',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: 'Original Client Profile',
       billing_line1: 'Original Client Address',
@@ -327,7 +332,7 @@ describe('invoice issue flow', () => {
     let invoiceId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
     let showPath = routes.app.invoices.show.href({ invoiceId });
 
-    let response = await markAsSent(sessionCookie, invoiceId);
+    let response = await markAsSent(router, sessionCookie, invoiceId);
     assert.equal(response.status, 302);
 
     let issued = await db.find(invoices, invoiceId);
@@ -363,10 +368,11 @@ describe('invoice issue flow', () => {
   it('defaults the seller legal name to the Organization name until it is overridden', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-default-legal-name',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Default Legal Name Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -376,7 +382,7 @@ describe('invoice issue flow', () => {
     // the Organization name (spec #30).
     await db.update(organizationInvoicingProfiles, organizationId, { legal_name: null });
     let invoiceId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
 
     let issued = await db.find(invoices, invoiceId);
     assert.equal(issued?.seller_legal_name, `Test Organization ${organizationId}`);
@@ -385,10 +391,11 @@ describe('invoice issue flow', () => {
   it('derives Sent and Overdue at Kolkata date boundaries and filters/searches issued numbers', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-status',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Status Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -403,7 +410,7 @@ describe('invoice issue flow', () => {
         due_date: dueDate,
       });
       invoiceIds.push(invoiceId);
-      let issued = await markAsSent(sessionCookie, invoiceId);
+      let issued = await markAsSent(router, sessionCookie, invoiceId);
       assert.equal(issued.status, 302);
       let detail = await getHtml(
         router,
@@ -442,12 +449,12 @@ describe('invoice issue flow', () => {
   });
 
   it('allocates independent Indian FY sequences with custom prefixes and floors only on issue', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-issue-sequence-first');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-issue-sequence-first');
     await setSellerProfile(first.organizationId, {
       invoice_prefix: 'FY',
       invoice_starting_number: '50',
     });
-    let firstClient = await createClient(first.organizationId, {
+    let firstClient = await createClient(db, first.organizationId, {
       type: 'individual',
       legal_name: `Sequence Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -482,14 +489,14 @@ describe('invoice issue flow', () => {
       invoice_date: '2026-03-31',
       due_date: '2026-04-30',
     });
-    assert.equal((await markAsSent(first.sessionCookie, marchId)).status, 302);
+    assert.equal((await markAsSent(router, first.sessionCookie, marchId)).status, 302);
     assert.equal((await db.find(invoices, marchId))?.invoice_number, 'FY/25-26/0050');
 
     let aprilId = await createDraft(first.sessionCookie, firstClient.id, {
       invoice_date: '2026-04-01',
       due_date: '2026-04-30',
     });
-    assert.equal((await markAsSent(first.sessionCookie, aprilId)).status, 302);
+    assert.equal((await markAsSent(router, first.sessionCookie, aprilId)).status, 302);
     assert.equal((await db.find(invoices, aprilId))?.invoice_number, 'FY/26-27/0050');
 
     let discardIssued = await submitForm(
@@ -506,15 +513,15 @@ describe('invoice issue flow', () => {
       invoice_date: '2026-05-01',
       due_date: '2026-05-30',
     });
-    assert.equal((await markAsSent(first.sessionCookie, mayId)).status, 302);
+    assert.equal((await markAsSent(router, first.sessionCookie, mayId)).status, 302);
     assert.equal((await db.find(invoices, mayId))?.invoice_number, 'FY/26-27/0051');
 
-    let second = await createUserAndLoginWithOrganization(router, 'invoice-issue-sequence-second');
+    let second = await createUserAndLoginWithOrganization(router, db, 'invoice-issue-sequence-second');
     await setSellerProfile(second.organizationId, {
       invoice_prefix: 'ALT',
       invoice_starting_number: '7',
     });
-    let secondClient = await createClient(second.organizationId, {
+    let secondClient = await createClient(db, second.organizationId, {
       type: 'individual',
       legal_name: `Other Sequence Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -523,20 +530,21 @@ describe('invoice issue flow', () => {
       invoice_date: '2026-04-15',
       due_date: '2026-04-30',
     });
-    assert.equal((await markAsSent(second.sessionCookie, otherId)).status, 302);
+    assert.equal((await markAsSent(router, second.sessionCookie, otherId)).status, 302);
     assert.equal((await db.find(invoices, otherId))?.invoice_number, 'ALT/26-27/0007');
   });
 
   it('atomically assigns distinct invoice numbers to concurrent issue actions', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-concurrent',
     );
     await setSellerProfile(organizationId, {
       invoice_prefix: 'PAR',
       invoice_starting_number: '1',
     });
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Concurrent Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -545,8 +553,8 @@ describe('invoice issue flow', () => {
     let secondId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
 
     let responses = await Promise.all([
-      markAsSent(sessionCookie, firstId),
-      markAsSent(sessionCookie, secondId),
+      markAsSent(router, sessionCookie, firstId),
+      markAsSent(router, sessionCookie, secondId),
     ]);
     assert.deepEqual(
       responses.map((response) => response.status),
@@ -562,8 +570,8 @@ describe('invoice issue flow', () => {
       due_date: '2099-12-31',
     });
     let duplicateResponses = await Promise.all([
-      markAsSent(sessionCookie, duplicateIssueId),
-      markAsSent(sessionCookie, duplicateIssueId),
+      markAsSent(router, sessionCookie, duplicateIssueId),
+      markAsSent(router, sessionCookie, duplicateIssueId),
     ]);
     assert.deepEqual(
       duplicateResponses.map((response) => response.status).sort((a, b) => a - b),
@@ -586,10 +594,11 @@ describe('invoice issue flow', () => {
   it('rolls numbering back when the in-transaction issued-artifact finalizer fails', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-finalizer-rollback',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Finalizer Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -599,7 +608,7 @@ describe('invoice issue flow', () => {
     let failed = false;
 
     try {
-      await issueDraftInvoice(organizationId, invoiceId, async ({ invoice, lines }) => {
+      await issueDraftInvoice(db, organizationId, invoiceId, async ({ invoice, lines }) => {
         finalizerCalled = true;
         assert.equal(invoice.status, 'issued');
         assert.equal(invoice.invoice_number, 'NS/26-27/0050');
@@ -625,17 +634,18 @@ describe('invoice issue flow', () => {
       }),
       0,
     );
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
     assert.equal((await db.find(invoices, invoiceId))?.invoice_number, 'NS/26-27/0050');
   });
 
   it('keeps seller and recipient snapshots unchanged after Settings and Client profile edits', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-preserved-snapshot',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: 'Client Before Issue',
       billing_line1: 'Client Profile Address',
@@ -659,7 +669,7 @@ describe('invoice issue flow', () => {
       recipient_tax_value: '27AAPCS2319F1Z5',
       recipient_tax_state_code: '27',
     });
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
 
     let settingsUpdate = await submitForm(
       router,
@@ -688,9 +698,10 @@ describe('invoice issue flow', () => {
     assert.equal(settingsUpdate.status, 302);
     let clientUpdate = await submitForm(
       router,
-      routes.app.clients.edit.index.href({ clientId: client.id }),
-      routes.app.clients.edit.action.href({ clientId: client.id }),
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
       {
+        _method: 'PUT',
         ...clientFormValuesOf(client),
         legal_name: 'Client After Issue',
         billing_line1: 'Changed Client Address',
@@ -728,23 +739,24 @@ describe('invoice issue flow', () => {
   it('rejects issued edit and discard requests while allowing only the private note update', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-issue-immutable',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Immutable Client ${crypto.randomUUID()}`,
       status: 'active',
     });
     let invoiceId = await createDraft(sessionCookie, client.id, { due_date: '2099-12-31' });
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
     let showPath = routes.app.invoices.show.href({ invoiceId });
     let before = await db.find(invoices, invoiceId);
-    let beforeLines = await findInvoiceLines(organizationId, invoiceId);
+    let beforeLines = await findInvoiceLines(db, organizationId, invoiceId);
     assert.ok(before);
 
     let editPage = await router.fetch(new URL(
-      routes.app.invoices.edit.index.href({ invoiceId }),
+      routes.app.invoices.edit.href({ invoiceId }),
       origin,
     ), {
       headers: { Cookie: sessionCookie },
@@ -753,8 +765,9 @@ describe('invoice issue flow', () => {
     let attemptedEdit = await submitForm(
       router,
       showPath,
-      routes.app.invoices.edit.action.href({ invoiceId }),
+      routes.app.invoices.update.href({ invoiceId }),
       {
+        _method: 'PUT',
         ...draftFields(client.id),
         recipient_legal_name: 'Attempted overwrite',
         line_description: 'Attempted replacement line',
@@ -775,13 +788,14 @@ describe('invoice issue flow', () => {
     assert.equal(rejectedInvoice?.invoice_number, before.invoice_number);
     assert.equal(rejectedInvoice?.updated_at, before.updated_at);
 
-    let parsed = parseInvoiceDraft(readInvoiceFormValues(formDataOf(draftFields(client.id))));
+    let { values } = parseInvoiceFormValues(formDataOf(draftFields(client.id)));
+    let parsed = parseInvoiceDraft(values);
     assert.equal(parsed.ok, true);
     if (parsed.ok) {
-      let directEdit = await updateDraftInvoice(organizationId, invoiceId, parsed.value);
+      let directEdit = await updateDraftInvoice(db, organizationId, invoiceId, parsed.value);
       assert.equal(directEdit, null, 'the stale Draft update must not mutate an issued invoice');
     }
-    assert.deepEqual(await findInvoiceLines(organizationId, invoiceId), beforeLines);
+    assert.deepEqual(await findInvoiceLines(db, organizationId, invoiceId), beforeLines);
 
     let noCsrf = await router.fetch(
       new URL(routes.app.invoices.lifecycle.internalNote.href({ invoiceId }), origin),
@@ -814,7 +828,7 @@ describe('invoice issue flow', () => {
     assert.equal(after?.recipient_legal_name, before.recipient_legal_name);
     assert.equal(after?.invoice_date, before.invoice_date);
     assert.equal(after?.internal_note, 'Follow up after client call');
-    assert.deepEqual(await findInvoiceLines(organizationId, invoiceId), beforeLines);
+    assert.deepEqual(await findInvoiceLines(db, organizationId, invoiceId), beforeLines);
 
     let detail = await getHtml(router, showPath, sessionCookie);
     assert.match(detail, /Follow up after client call/);
@@ -822,16 +836,16 @@ describe('invoice issue flow', () => {
   });
 
   it('scopes issue and internal-note actions to the authenticated Organization', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-issue-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-issue-scope-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-issue-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-issue-scope-other');
     await setSellerProfile(owner.organizationId);
     await setSellerProfile(other.organizationId);
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Issue Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Issue Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -856,7 +870,7 @@ describe('invoice issue flow', () => {
     assert.equal((await db.find(invoices, otherInvoiceId))?.status, 'draft');
     assert.equal((await db.find(invoices, otherInvoiceId))?.invoice_number, null);
 
-    assert.equal((await markAsSent(other.sessionCookie, otherInvoiceId)).status, 302);
+    assert.equal((await markAsSent(router, other.sessionCookie, otherInvoiceId)).status, 302);
     let foreignNote = await postWithCsrf(
       owner.sessionCookie,
       routes.app.invoices.lifecycle.internalNote.href({ invoiceId: otherInvoiceId }),

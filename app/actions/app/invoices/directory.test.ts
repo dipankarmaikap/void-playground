@@ -2,8 +2,9 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
+
 import { addDays } from '../../../data/invoices/dates.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import type { InvoiceFixture as SeedInvoiceFixture } from '../../../../test/invoice-fixtures.ts';
@@ -12,6 +13,8 @@ import {
   getHtml,
   origin,
 } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 interface InvoiceFixture extends SeedInvoiceFixture {
   invoiceDate: string;
@@ -39,9 +42,10 @@ describe('invoice directory pagination', () => {
   it('renders bounded pages ordered by invoice date, creation time, then id', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-pages',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Directory Client ${crypto.randomUUID()}`,
     });
@@ -85,7 +89,7 @@ describe('invoice directory pagination', () => {
         createdAt: number,
       });
     }
-    for (let fixture of fixtures) await seedInvoice(organizationId, client.id, fixture);
+    for (let fixture of fixtures) await seedInvoice(db, organizationId, client.id, fixture);
 
     let first = await getHtml(router, indexHref(), sessionCookie);
     let second = await getHtml(router, indexHref({ page: '2' }), sessionCookie);
@@ -131,9 +135,10 @@ describe('invoice directory pagination', () => {
   it('normalizes invalid and unsafe page numbers to the first page', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-invalid-page',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Page Client ${crypto.randomUUID()}`,
     });
@@ -143,7 +148,7 @@ describe('invoice directory pagination', () => {
       invoiceDate: '2026-04-01',
       createdAt: 1,
     };
-    await seedInvoice(organizationId, client.id, fixture);
+    await seedInvoice(db, organizationId, client.id, fixture);
 
     for (let page of ['0', '-1', 'not-a-page', '9007199254740991']) {
       let html = await getHtml(router, indexHref({ page }), sessionCookie);
@@ -157,9 +162,10 @@ describe('invoice directory search', () => {
   it('matches Draft recipient legal names case-insensitively', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-search',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Search Client ${crypto.randomUUID()}`,
     });
@@ -176,8 +182,8 @@ describe('invoice directory search', () => {
       invoiceDate: '2026-05-02',
       createdAt: 2,
     };
-    await seedInvoice(organizationId, client.id, matching);
-    await seedInvoice(organizationId, client.id, unrelated);
+    await seedInvoice(db, organizationId, client.id, matching);
+    await seedInvoice(db, organizationId, client.id, unrelated);
 
     let html = await getHtml(router, indexHref({ q: token.toUpperCase() }), sessionCookie);
 
@@ -189,9 +195,10 @@ describe('invoice directory search', () => {
   it('matches percent and underscore literally across invoice search pages', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-literal-search',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Literal Search Client ${crypto.randomUUID()}`,
     });
@@ -228,7 +235,7 @@ describe('invoice directory search', () => {
       underscoreMatch,
       underscoreLookalike,
     ]) {
-      await seedInvoice(organizationId, client.id, fixture);
+      await seedInvoice(db, organizationId, client.id, fixture);
     }
 
     let firstPercentPage = await getHtml(router, indexHref({ q: '100%' }), sessionCookie);
@@ -267,9 +274,10 @@ describe('invoice directory filters', () => {
   it('filters Drafts by inclusive invoice-date range and safely handles invalid filters', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-filters',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Filter Client ${crypto.randomUUID()}`,
     });
@@ -305,7 +313,7 @@ describe('invoice directory filters', () => {
         createdAt: 5,
       },
     ];
-    for (let fixture of fixtures) await seedInvoice(organizationId, client.id, fixture);
+    for (let fixture of fixtures) await seedInvoice(db, organizationId, client.id, fixture);
 
     let range = await getHtml(
       router,
@@ -345,15 +353,16 @@ describe('invoice directory filters', () => {
   it('renders accessible GET filters and keeps them while paginating', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-directory-filter-form',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Filter Form Client ${crypto.randomUUID()}`,
     });
     let token = `FilterBatch${crypto.randomUUID().replaceAll('-', '')}`;
     for (let number = 1; number <= 25; number += 1) {
-      await seedInvoice(organizationId, client.id, {
+      await seedInvoice(db, organizationId, client.id, {
         id: `invoice-filter-form-${String(number).padStart(2, '0')}`,
         recipientName: `${token} invoice ${String(number).padStart(2, '0')}`,
         invoiceDate: addDays('2026-09-01', number),
@@ -400,13 +409,13 @@ describe('invoice directory filters', () => {
 
 describe('invoice directory Organization scope', () => {
   it('does not list or search another Organization’s invoices', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-directory-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-directory-scope-other');
-    let ownClient = await createClient(owner.organizationId, {
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-directory-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-directory-scope-other');
+    let ownClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Client ${crypto.randomUUID()}`,
     });
-    let foreignClient = await createClient(other.organizationId, {
+    let foreignClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Foreign Client ${crypto.randomUUID()}`,
     });
@@ -422,8 +431,8 @@ describe('invoice directory Organization scope', () => {
       invoiceDate: '2026-11-02',
       createdAt: 2,
     };
-    await seedInvoice(owner.organizationId, ownClient.id, ownInvoice);
-    await seedInvoice(other.organizationId, foreignClient.id, foreignInvoice);
+    await seedInvoice(db, owner.organizationId, ownClient.id, ownInvoice);
+    await seedInvoice(db, other.organizationId, foreignClient.id, foreignInvoice);
 
     let ownerDirectory = await getHtml(router, indexHref(), owner.sessionCookie);
     let foreignNameSearch = await getHtml(

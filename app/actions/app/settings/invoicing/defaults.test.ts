@@ -2,17 +2,19 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { router } from '../../../../router.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
 import { invoicingFormFields } from './test-fields.ts';
+
+const { router, db } = await createTestRouter();
 
 let index = routes.app.settings.invoicing.index.href();
 let action = routes.app.settings.invoicing.action.href();
 
 describe('organization invoicing defaults', () => {
   it('renders INR, Due on receipt, and blank client-visible defaults for a new Organization', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'inv-default-new');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'inv-default-new');
     let html = await getHtml(router, index, sessionCookie);
 
     assert.match(html, /name="default_currency"[^>]*value="INR"/);
@@ -28,6 +30,7 @@ describe('organization invoicing defaults', () => {
   it('saves and renders default currency, payment terms, instructions, and notes', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-save',
     );
 
@@ -45,7 +48,7 @@ describe('organization invoicing defaults', () => {
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('Location'), index);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.default_currency, 'USD', 'currency normalizes to uppercase');
     assert.equal(row.payment_term, 'net_30');
@@ -62,6 +65,7 @@ describe('organization invoicing defaults', () => {
   it('accepts and renders the valid ISO 4217 currency XAF', async () => {
     let { sessionCookie } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-xaf',
     );
 
@@ -80,6 +84,7 @@ describe('organization invoicing defaults', () => {
   it('updates and clears the client-visible defaults', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-update',
     );
     let saved = await postForm(
@@ -109,7 +114,7 @@ describe('organization invoicing defaults', () => {
     );
     assert.equal(updated.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.default_currency, 'GBP');
     assert.equal(row.payment_term, 'net_7');
@@ -126,6 +131,7 @@ describe('organization invoicing defaults', () => {
   it('rejects an invalid currency and an unknown payment term with 400s that preserve values', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-invalid',
     );
 
@@ -149,7 +155,7 @@ describe('organization invoicing defaults', () => {
     assert.match(html, /name="payment_instructions"[^>]*>Keep my instructions<\/textarea>/);
     assert.match(html, /name="default_currency"[^>]*aria-invalid="true"/);
     assert.match(html, /name="payment_term"[^>]*aria-invalid="true"/);
-    assert.equal(await findInvoicingProfile(organizationId), null, 'invalid defaults are not stored');
+    assert.equal(await findInvoicingProfile(db, organizationId), null, 'invalid defaults are not stored');
 
     let unknownCurrency = await postForm(
       router,
@@ -167,6 +173,7 @@ describe('organization invoicing defaults', () => {
   it('rejects overlong client-visible text without truncating the submitted draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-long',
     );
     let longInstructions = 'I'.repeat(1001);
@@ -188,6 +195,6 @@ describe('organization invoicing defaults', () => {
     assert.match(html, /Customer notes must be 1000 characters or fewer\./);
     assert.match(html, new RegExp(`name="payment_instructions"[^>]*>${longInstructions}</textarea>`));
     assert.match(html, new RegExp(`name="customer_notes"[^>]*>${longNotes}</textarea>`));
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 });

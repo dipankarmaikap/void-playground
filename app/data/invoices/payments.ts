@@ -1,4 +1,6 @@
-import { db, creditNotes, invoicePayments, invoiceRefunds, invoices } from '../db.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
+import { creditNotes, invoicePayments, invoiceRefunds, invoices } from '../db.ts';
 import type { CreditNote, Invoice, InvoicePayment, InvoiceRefund } from '../db.ts';
 import { findInvoiceCreditNotes } from './credit-notes.ts';
 import { isValidIsoDate } from './dates.ts';
@@ -98,6 +100,7 @@ export function summarizeInvoicePayments(
 
 /** Returns every payment entry, including voided entries, in the Organization-scoped history. */
 export function findInvoicePayments(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
 ): Promise<InvoicePayment[]> {
@@ -112,13 +115,14 @@ export function findInvoicePayments(
 }
 
 export async function invoiceActivityData(
+  db: SqliteDatabase,
   organizationId: string,
   invoice: Invoice,
 ): Promise<InvoiceActivityData> {
   let [payments, creditNotes, refunds] = await Promise.all([
-    findInvoicePayments(organizationId, invoice.id),
-    findInvoiceCreditNotes(organizationId, invoice.id),
-    findInvoiceRefunds(organizationId, invoice.id),
+    findInvoicePayments(db, organizationId, invoice.id),
+    findInvoiceCreditNotes(db, organizationId, invoice.id),
+    findInvoiceRefunds(db, organizationId, invoice.id),
   ]);
   let creditedTotalMinor = creditNotes.reduce(
     (total, note) => total + (note.status === 'issued' ? note.total_minor : 0),
@@ -134,6 +138,7 @@ export async function invoiceActivityData(
 
 /** Active totals support the invoice directory's read-time derived statuses. */
 export async function activeInvoicePaymentTotals(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<Map<string, number>> {
   let payments = await db.findMany(invoicePayments, {
@@ -151,6 +156,7 @@ export async function activeInvoicePaymentTotals(
 
 /** Records a confirmed payment only while the current issued invoice has enough balance due. */
 export async function recordInvoicePayment(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   input: InvoicePaymentInput,
@@ -224,6 +230,7 @@ export async function recordInvoicePayment(
 
 /** Voids a payment without deleting it so the invoice retains its audit history. */
 export async function voidInvoicePayment(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   paymentId: string,

@@ -1,6 +1,7 @@
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
 import {
   creditNotes,
-  db,
   invoicePayments,
   invoiceRefunds,
   invoices,
@@ -53,6 +54,7 @@ export const parseRefundAmount = parseMoneyMovementAmount;
 
 /** Returns every refund entry, including voided entries, in the Organization-scoped history. */
 export function findInvoiceRefunds(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
 ): Promise<InvoiceRefund[]> {
@@ -68,6 +70,7 @@ export function findInvoiceRefunds(
 
 /** Active refund totals support the invoice directory's read-time derived refund-due amount. */
 export async function activeInvoiceRefundTotals(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<Map<string, number>> {
   let refunds = await db.findMany(invoiceRefunds, {
@@ -101,6 +104,7 @@ export type VoidInvoiceRefundResult =
 
 /** Records a manual refund only while the issued invoice still has enough refund due. */
 export async function recordInvoiceRefund(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   input: InvoiceRefundInput,
@@ -177,6 +181,7 @@ export async function recordInvoiceRefund(
  * The only effect is the intended one: refund due grows back by the voided amount.
  */
 export async function voidInvoiceRefund(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   refundId: string,

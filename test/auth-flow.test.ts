@@ -1,15 +1,13 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createTestRouter } from './router.ts';
 import { routes } from '../app/routes.ts';
 import {
-  db,
   organizationMemberships,
   organizations,
   users,
 } from '../app/data/db.ts';
-import './db-setup.ts';
 import { findOrganizationForUser } from '../app/data/organization/access.ts';
 
 import {
@@ -21,10 +19,127 @@ import {
   postForm,
 } from './http.ts';
 
+const { router, db } = await createTestRouter();
+
 async function register(body: Record<string, string>) {
   let response = await postForm(router, routes.auth.register.action.href(), body);
   return { response, html: await response.text() };
 }
+
+describe('login return-to redirect', () => {
+  async function loginTo(
+    loginHref: string,
+    email: string,
+    password = 'password123',
+  ): Promise<Response> {
+    let page = await router.fetch(new URL(loginHref, origin));
+    let csrf = extractCsrf(await page.text());
+    return router.fetch(new URL(loginHref, origin), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: cookieFromResponse(page),
+      },
+      body: new URLSearchParams({ email, password, _csrf: csrf }).toString(),
+    });
+  }
+
+  it('sends an anonymous visitor to login with the current destination', async () => {
+    let destination = routes.app.clients.index.href(
+      {},
+      { searchParams: { status: 'archived' } },
+    );
+    let blocked = await router.fetch(new URL(destination, origin));
+
+    assert.equal(blocked.status, 302);
+    let loginLocation = new URL(blocked.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), destination);
+  });
+
+  it('returns the User to their destination after signing in', async () => {
+    let email = `return-to-${crypto.randomUUID()}@example.com`;
+    await createUser(db, email, 'password123');
+    let destination = routes.app.clients.index.href(
+      {},
+      { searchParams: { status: 'archived' } },
+    );
+
+    let blocked = await router.fetch(new URL(destination, origin));
+    let loginHref = blocked.headers.get('Location') ?? '';
+    assert.ok(loginHref, 'the protected page should redirect to login');
+
+    // The no-JS login form keeps the destination in its action URL.
+    let loginPage = await router.fetch(new URL(loginHref, origin), {
+      headers: { Cookie: cookieFromResponse(blocked) },
+    });
+    let loginHtml = await loginPage.text();
+    assert.match(
+      loginHtml,
+      new RegExp(`action="/login\\?returnTo=${encodeURIComponent(destination)}"`),
+    );
+
+    let signedIn = await loginTo(loginHref, email);
+    assert.equal(signedIn.status, 302);
+    assert.equal(signedIn.headers.get('Location'), destination);
+
+    let arrived = await router.fetch(new URL(destination, origin), {
+      headers: { Cookie: cookieFromResponse(signedIn) },
+    });
+    assert.equal(arrived.status, 200);
+  });
+
+  it('falls back to the dashboard for an off-site returnTo', async () => {
+    let email = `off-site-${crypto.randomUUID()}@example.com`;
+    await createUser(db, email, 'password123');
+
+    let loginHref = routes.auth.login.index.href(undefined, {
+      searchParams: { returnTo: 'https://evil.example/phish' },
+    });
+    let signedIn = await loginTo(loginHref, email);
+
+    assert.equal(signedIn.status, 302);
+    assert.equal(signedIn.headers.get('Location'), routes.app.dashboard.href());
+  });
+
+  it('falls back to the dashboard for a protocol-relative returnTo', async () => {
+    let email = `protocol-${crypto.randomUUID()}@example.com`;
+    await createUser(db, email, 'password123');
+
+    let loginHref = routes.auth.login.index.href(undefined, {
+      searchParams: { returnTo: '//evil.example/phish' },
+    });
+    let signedIn = await loginTo(loginHref, email);
+
+    assert.equal(signedIn.status, 302);
+    assert.equal(signedIn.headers.get('Location'), routes.app.dashboard.href());
+  });
+
+  it('falls back to the dashboard for a non-path returnTo', async () => {
+    let email = `scheme-${crypto.randomUUID()}@example.com`;
+    await createUser(db, email, 'password123');
+
+    let loginHref = routes.auth.login.index.href(undefined, {
+      searchParams: { returnTo: 'javascript:alert(1)' },
+    });
+    let signedIn = await loginTo(loginHref, email);
+
+    assert.equal(signedIn.status, 302);
+    assert.equal(signedIn.headers.get('Location'), routes.app.dashboard.href());
+  });
+
+  it('falls back to the current destination when the page URL carries an unsafe returnTo', async () => {
+    let destination = routes.app.clients.index.href(undefined, {
+      searchParams: { returnTo: 'https://evil.example/phish' },
+    });
+    let blocked = await router.fetch(new URL(destination, origin));
+
+    assert.equal(blocked.status, 302);
+    let loginLocation = new URL(blocked.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), destination);
+  });
+});
 
 describe('auth flow', () => {
   it('registers an Organization and makes the registering User its owner', async () => {
@@ -75,7 +190,7 @@ describe('auth flow', () => {
     assert.ok(user, 'registration should normalize the email');
     assert.ok(user.verification_token);
     assert.equal(user.email_verified, false);
-    assert.equal((await findOrganizationForUser(user))?.name, 'Lovelace Analytics');
+    assert.equal((await findOrganizationForUser(db, user))?.name, 'Lovelace Analytics');
 
     let afterRegister = await router.fetch(new URL(routes.auth.login.index.href(), origin), {
       headers: { Cookie: cookieFromResponse(registerResponse) },
@@ -150,7 +265,7 @@ describe('auth flow', () => {
     assert.equal(user?.display_name, 'Ada Lovelace');
     assert.ok(user?.verification_token);
     assert.equal(user?.email_verified, false);
-    assert.equal((await findOrganizationForUser(user))?.name, 'Ada Industries');
+    assert.equal((await findOrganizationForUser(db, user))?.name, 'Ada Industries');
   });
 
   it('registers without a display name', async () => {
@@ -294,8 +409,8 @@ describe('auth flow', () => {
   it('fails closed instead of trusting a browser-supplied Organization ID', async () => {
     let email = `unassociated-${crypto.randomUUID()}@example.com`;
     let foreignEmail = `foreign-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
-    let foreignUserId = await createUser(foreignEmail, 'password123');
+    let userId = await createUser(db, email, 'password123');
+    let foreignUserId = await createUser(db, foreignEmail, 'password123');
     let foreignMembership = await db.findOne(organizationMemberships, {
       where: { user_id: foreignUserId },
     });
@@ -324,7 +439,7 @@ describe('auth flow', () => {
 
   it('fails closed when an Organization selector would be needed', async () => {
     let email = `multiple-organizations-${crypto.randomUUID()}@example.com`;
-    let userId = await createUser(email, 'password123');
+    let userId = await createUser(db, email, 'password123');
     let organizationId = crypto.randomUUID();
     let now = Date.now();
     await db.create(organizations, {
@@ -343,7 +458,7 @@ describe('auth flow', () => {
 
     let user = await db.find(users, userId);
     assert.ok(user);
-    assert.equal(await findOrganizationForUser(user), null);
+    assert.equal(await findOrganizationForUser(db, user), null);
 
     let sessionCookie = await login(router, email, 'password123');
     let response = await router.fetch(new URL(routes.app.dashboard.href(), origin), {

@@ -1,18 +1,20 @@
 import { beforeEach, describe, it } from 'remix/test';
 import * as assert from 'remix/assert';
 
-import { clients, db } from '../../../data/db.ts';
+import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { ClientType } from '../../../data/client-names.ts';
 import { listClients } from '../../../data/clients.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
+
+const { router, db } = await createTestRouter();
 
 let organizationId: string;
 
 async function createPageUser() {
-  let tenant = await createUserAndLoginWithOrganization(router, 'client-page');
+  let tenant = await createUserAndLoginWithOrganization(router, db, 'client-page');
   organizationId = tenant.organizationId;
   return tenant.sessionCookie;
 }
@@ -57,7 +59,7 @@ function nextHref(html: string): string {
 }
 
 beforeEach(async () => {
-  await clearTestTables(clients);
+  await clearTestTables(db, invoices, clients);
 });
 
 describe('Client directory pagination', () => {
@@ -75,7 +77,7 @@ describe('Client directory pagination', () => {
     assert.ok(first.includes('Paged Client 020'));
     assert.ok(!first.includes('Paged Client 021'));
 
-    let directory = await listClients(organizationId);
+    let directory = await listClients(db, organizationId);
     assert.equal(directory.clients.length, 20);
     assert.ok(directory.clients[0]);
     for (let field of ['tax_value', 'billing_line1', 'created_at']) {

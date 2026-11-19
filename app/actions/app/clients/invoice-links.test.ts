@@ -2,39 +2,42 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { router } from '../../../router.ts';
+
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
 
+const { router, db } = await createTestRouter();
+
 describe('Client invoice links', () => {
   it('links Active and Archived Clients to only their Organization-scoped invoices', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'client-invoice-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'client-invoice-other');
-    let activeClient = await createClient(owner.organizationId, {
+    let owner = await createUserAndLoginWithOrganization(router, db, 'client-invoice-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'client-invoice-other');
+    let activeClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Active Invoice Client ${crypto.randomUUID()}`,
     });
-    let archivedClient = await createClient(owner.organizationId, {
+    let archivedClient = await createClient(db, owner.organizationId, {
       type: 'business',
       legal_name: `Archived Invoice Client ${crypto.randomUUID()}`,
       status: 'archived',
       archived_at: Date.now(),
     });
-    let anotherClient = await createClient(owner.organizationId, {
+    let anotherClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Another Invoice Client ${crypto.randomUUID()}`,
     });
-    let foreignClient = await createClient(other.organizationId, {
+    let foreignClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Foreign Invoice Client ${crypto.randomUUID()}`,
     });
 
-    await seedInvoice(owner.organizationId, activeClient.id, {
+    await seedInvoice(db, owner.organizationId, activeClient.id, {
       id: 'active-client-invoice',
       recipientName: 'Active invoice',
     });
-    await seedInvoice(
+    await seedInvoice(db,
       owner.organizationId,
       archivedClient.id,
       {
@@ -42,7 +45,7 @@ describe('Client invoice links', () => {
         recipientName: 'Archived invoice',
       },
     );
-    await seedInvoice(
+    await seedInvoice(db,
       owner.organizationId,
       anotherClient.id,
       {
@@ -50,7 +53,7 @@ describe('Client invoice links', () => {
         recipientName: 'Another Client invoice',
       },
     );
-    await seedInvoice(
+    await seedInvoice(db,
       other.organizationId,
       foreignClient.id,
       {
@@ -77,7 +80,7 @@ describe('Client invoice links', () => {
       {},
       { searchParams: { clientId: archivedClient.id } },
     );
-    let activeNewDraftHref = routes.app.invoices.new.index.href(
+    let activeNewDraftHref = routes.app.invoices.new.href(
       {},
       { searchParams: { clientId: activeClient.id } },
     );
@@ -88,7 +91,7 @@ describe('Client invoice links', () => {
     assert.ok(archivedProfile.includes(`href="${archivedDirectoryHref}"`));
     assert.ok(
       !archivedProfile.includes(
-        `href="${routes.app.invoices.new.index.href({}, { searchParams: { clientId: archivedClient.id } })}"`,
+        `href="${routes.app.invoices.new.href({}, { searchParams: { clientId: archivedClient.id } })}"`,
       ),
       'Archived Clients cannot start a new Draft from their profile',
     );

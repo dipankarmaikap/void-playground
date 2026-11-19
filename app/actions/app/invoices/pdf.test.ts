@@ -3,18 +3,16 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import {
-  db,
   documentSequences,
   invoicePdfArtifacts,
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';
 import { invoicingFormFields } from '../settings/invoicing/test-fields.ts';
@@ -25,6 +23,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { markAsSent } from '../../../../test/invoice-fixtures.ts';
+
+const { router, db } = await createTestRouter();
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {
@@ -62,8 +62,8 @@ async function createDraft(
 ): Promise<string> {
   let response = await submitForm(
     router,
-    routes.app.invoices.new.index.href({}, { searchParams: { clientId } }),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.new.href({}, { searchParams: { clientId } }),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -118,17 +118,18 @@ async function setSellerProfile(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test seller profile should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 describe('invoice PDF downloads', () => {
   it('previews a Draft PDF with a DRAFT watermark and no allocated number, without mutation', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-pdf-draft-preview',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Draft Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -178,10 +179,11 @@ describe('invoice PDF downloads', () => {
   it('omits the private internal note from Draft and issued PDFs', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-pdf-internal-note',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Internal Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -191,7 +193,7 @@ describe('invoice PDF downloads', () => {
     let draftPdf = await pdfBody(await fetchPdf(sessionCookie, invoiceId));
     assert.doesNotMatch(draftPdf, /Private note that must never reach a PDF/);
 
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
     let showPath = routes.app.invoices.show.href({ invoiceId });
     let noteUpdate = await submitForm(
       router,
@@ -209,10 +211,11 @@ describe('invoice PDF downloads', () => {
   it('stores the issued PDF at issue time and returns the exact bytes after Settings and Client edits', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-pdf-issued-immutability',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Immutability Client ${crypto.randomUUID()}`,
       billing_line1: 'Client Address Before Issue',
@@ -226,7 +229,7 @@ describe('invoice PDF downloads', () => {
     });
     assert.equal(beforeIssue, 0, 'a Draft must not have a stored PDF artifact');
 
-    let issueResponse = await markAsSent(sessionCookie, invoiceId);
+    let issueResponse = await markAsSent(router, sessionCookie, invoiceId);
     assert.equal(issueResponse.status, 302);
     let issuedNumber = (await db.find(invoices, invoiceId))?.invoice_number;
     assert.equal(issuedNumber, 'NS/26-27/0050');
@@ -275,9 +278,10 @@ describe('invoice PDF downloads', () => {
     assert.equal(settingsUpdate.status, 302);
     let clientUpdate = await submitForm(
       router,
-      routes.app.clients.edit.index.href({ clientId: client.id }),
-      routes.app.clients.edit.action.href({ clientId: client.id }),
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
       {
+        _method: 'PUT',
         ...clientFormValuesOf(client),
         legal_name: 'Client After Issue',
         billing_line1: 'Changed Client Address',
@@ -304,10 +308,11 @@ describe('invoice PDF downloads', () => {
   it('shows the accessible PDF download link on Draft and issued detail pages', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-pdf-detail-link',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Link Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -322,7 +327,7 @@ describe('invoice PDF downloads', () => {
     assert.match(draftDetail, new RegExp(`href="${routes.app.invoices.pdf.href({ invoiceId })}"`));
     assert.match(draftDetail, /Download PDF/);
 
-    assert.equal((await markAsSent(sessionCookie, invoiceId)).status, 302);
+    assert.equal((await markAsSent(router, sessionCookie, invoiceId)).status, 302);
     let issuedDetail = await getHtml(
       router,
       routes.app.invoices.show.href({ invoiceId }),
@@ -333,16 +338,16 @@ describe('invoice PDF downloads', () => {
   });
 
   it('keeps PDF downloads authenticated and Organization-scoped with 404 for foreign invoices', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'invoice-pdf-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-pdf-scope-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'invoice-pdf-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-pdf-scope-other');
     await setSellerProfile(owner.organizationId);
     await setSellerProfile(other.organizationId);
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -360,7 +365,7 @@ describe('invoice PDF downloads', () => {
     let foreignDraft = await fetchPdf(owner.sessionCookie, otherDraftId);
     assert.equal(foreignDraft.status, 404);
 
-    assert.equal((await markAsSent(other.sessionCookie, otherDraftId)).status, 302);
+    assert.equal((await markAsSent(router, other.sessionCookie, otherDraftId)).status, 302);
     let foreignIssued = await fetchPdf(owner.sessionCookie, otherDraftId);
     assert.equal(foreignIssued.status, 404);
     assert.equal(
@@ -391,10 +396,11 @@ describe('invoice PDF downloads', () => {
   it('renders international amount-in-words for non-INR drafts', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-pdf-usd-words',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Usd Client ${crypto.randomUUID()}`,
       status: 'active',

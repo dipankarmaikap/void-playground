@@ -2,14 +2,13 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, organizationGstRatePresets } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { organizationGstRatePresets } from '../../../data/db.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -20,6 +19,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
+const { router, db } = await createTestRouter();
+
 type DraftFields = Record<string, string | string[] | undefined>;
 
 async function submitDraft(
@@ -27,6 +28,7 @@ async function submitDraft(
   actionUrl: string,
   fields: DraftFields,
   cookie: string,
+  method: 'POST' | 'PUT' = 'POST',
 ): Promise<Response> {
   let page = await router.fetch(new URL(pageUrl, origin), {
     headers: { Cookie: cookie },
@@ -39,6 +41,7 @@ async function submitDraft(
     else body.append(name, value);
   }
   body.append('_csrf', csrf);
+  if (method !== 'POST') body.append('_method', method);
   return router.fetch(new URL(actionUrl, origin), {
     method: 'POST',
     headers: {
@@ -86,7 +89,7 @@ async function createDraft(
 ): Promise<Response> {
   return submitDraft(
     newDraftPath(clientId),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -117,11 +120,11 @@ async function setInvoicingDefaults(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test defaults should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 async function makeClient(organizationId: string, overrides: Record<string, unknown> = {}) {
-  return createClient(organizationId, {
+  return createClient(db, organizationId, {
     type: 'individual',
     legal_name: unique('Draft Client'),
     billing_line1: '12 Residency Road',
@@ -153,12 +156,12 @@ function expectedDueDate(invoiceDate: string, days: number): string {
 }
 
 function newDraftPath(clientId: string): string {
-  return routes.app.invoices.new.index.href({}, { searchParams: { clientId } });
+  return routes.app.invoices.new.href({}, { searchParams: { clientId } });
 }
 
 describe('draft invoices', () => {
   it('exposes the Invoices destination in the authenticated navigation', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'invoice-nav');
+    let sessionCookie = await createUserAndLogin(router, db, 'invoice-nav');
     let html = await getHtml(router, routes.app.dashboard.href(), sessionCookie);
 
     assert.match(html, /<nav aria-label="Main"[\s\S]*?Invoices[\s\S]*?<\/nav>/);
@@ -170,7 +173,7 @@ describe('draft invoices', () => {
   });
 
   it('renders an Organization-scoped invoice directory for a signed-in User', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'invoice-index');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'invoice-index');
     let html = await getHtml(router, routes.app.invoices.index.href(), sessionCookie);
 
     assert.match(html, /<h1[^>]*>Invoices<\/h1>/);
@@ -182,6 +185,7 @@ describe('draft invoices', () => {
   it('keeps invoice form GET requests read-only for GST presets', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-get-read-only',
     );
     await setInvoicingDefaults(organizationId, {
@@ -202,7 +206,7 @@ describe('draft invoices', () => {
 
     for (let path of [
       newDraftPath(client.id),
-      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(created) }),
+      routes.app.invoices.edit.href({ invoiceId: draftIdFrom(created) }),
     ]) {
       let response = await router.fetch(new URL(path, origin), {
         headers: { Cookie: sessionCookie },
@@ -220,14 +224,18 @@ describe('draft invoices', () => {
   });
 
   it('redirects anonymous visitors from the invoice directory to login', async () => {
-    let response = await router.fetch(new URL(routes.app.invoices.index.href(), origin));
+    let path = routes.app.invoices.index.href();
+    let response = await router.fetch(new URL(path, origin));
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+    let location = new URL(response.headers.get('Location') ?? '', origin);
+    assert.equal(location.pathname, routes.auth.login.index.href());
+    assert.equal(location.searchParams.get('returnTo'), path);
   });
 
   it('prefills recipient, currency, dates, and notes from the Client and Organization defaults', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-prefill',
     );
     await setInvoicingDefaults(organizationId, {
@@ -265,6 +273,7 @@ describe('draft invoices', () => {
   it('preserves the Client India tax State/UT name on the Draft without trusting a forged value', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-tax-state',
     );
     let client = await makeClient(organizationId, { tax_state_name: 'Maharashtra' });
@@ -295,6 +304,7 @@ describe('draft invoices', () => {
   it('falls back to Organization currency and term when the Client has no default currency', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-fallback',
     );
     await setInvoicingDefaults(organizationId, {
@@ -313,6 +323,7 @@ describe('draft invoices', () => {
   it('defaults Place of Supply from the Client and calculates intra-state GST after discounts', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-domestic-gst',
     );
     await setInvoicingDefaults(organizationId, {
@@ -361,7 +372,7 @@ describe('draft invoices', () => {
     assert.match(detail, /Total: 159\.30 INR/);
     let edit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(edit, /CGST @ 9%: 12\.15 INR/);
@@ -370,6 +381,7 @@ describe('draft invoices', () => {
   it('gates GST for unregistered Organizations and allows no-tax Drafts', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-gst-disabled',
     );
     let client = await makeClient(organizationId);
@@ -406,6 +418,7 @@ describe('draft invoices', () => {
   it('applies multiple GST slabs after invoice discounts and groups zero-tax treatments', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-gst-slabs',
     );
     await setInvoicingDefaults(organizationId, {
@@ -446,7 +459,7 @@ describe('draft invoices', () => {
 
     let edit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(edit, /Current GST summary/);
@@ -457,6 +470,7 @@ describe('draft invoices', () => {
   it('defaults Place of Supply from Indian billing region and permits an inter-state override', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-gst-place-override',
     );
     await setInvoicingDefaults(organizationId, {
@@ -537,13 +551,13 @@ describe('draft invoices', () => {
   });
 
   it('refuses new drafts for Archived and foreign-Organization Clients', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-archived');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-archived');
     let client = await makeClient(first.organizationId);
     let archived = await submitForm(
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: client.id }),
-      {},
+      { _method: 'PUT' },
       first.sessionCookie,
     );
     assert.equal(archived.status, 302);
@@ -560,7 +574,7 @@ describe('draft invoices', () => {
     assert.equal(archivedResponse.status, 404);
     assert.doesNotMatch(await archivedResponse.text(), /New invoice draft/);
 
-    let second = await createUserAndLoginWithOrganization(router, 'invoice-foreign');
+    let second = await createUserAndLoginWithOrganization(router, db, 'invoice-foreign');
     let foreignClient = await makeClient(second.organizationId);
     let foreignResponse = await router.fetch(new URL(newDraftPath(foreignClient.id), origin), {
       headers: { Cookie: first.sessionCookie },
@@ -572,6 +586,7 @@ describe('draft invoices', () => {
   it('creates a Draft with exact line totals and no final invoice number', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-create',
     );
     let client = await makeClient(organizationId);
@@ -611,6 +626,7 @@ describe('draft invoices', () => {
   it('applies a per-line percentage discount and reconciles the subtotal breakdown', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-line-percent',
     );
     let client = await makeClient(organizationId);
@@ -639,6 +655,7 @@ describe('draft invoices', () => {
   it('applies a fixed per-line discount and rejects discounts above the line gross', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-line-fixed',
     );
     let client = await makeClient(organizationId);
@@ -701,6 +718,7 @@ describe('draft invoices', () => {
   it('allocates an invoice-wide percentage discount across uneven lines by largest remainder', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-percent-allocate',
     );
     let client = await makeClient(organizationId);
@@ -727,6 +745,7 @@ describe('draft invoices', () => {
   it('applies a fixed invoice discount on post-line-discount values and rejects over-discounts', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-fixed-allocate',
     );
     let client = await makeClient(organizationId);
@@ -775,6 +794,7 @@ describe('draft invoices', () => {
   it('applies a positive round-off to the nearest whole currency unit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-round-off-positive',
     );
     let client = await makeClient(organizationId);
@@ -798,6 +818,7 @@ describe('draft invoices', () => {
   it('rounds exact halfway totals away from zero', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-round-off-halfway',
     );
     let client = await makeClient(organizationId);
@@ -823,6 +844,7 @@ describe('draft invoices', () => {
   it('applies a negative round-off to the nearest whole currency unit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-round-off-negative',
     );
     let client = await makeClient(organizationId);
@@ -844,6 +866,7 @@ describe('draft invoices', () => {
   it('rejects round-off amounts that do not produce the nearest whole currency unit', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-round-off-invalid',
     );
     let client = await makeClient(organizationId);
@@ -882,6 +905,7 @@ describe('draft invoices', () => {
   it('round-trips discounts and round-off through the edit form', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-round-trip',
     );
     let client = await makeClient(organizationId);
@@ -900,7 +924,7 @@ describe('draft invoices', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(
@@ -919,6 +943,7 @@ describe('draft invoices', () => {
   it('preserves unsaved discount and round-off values when adding a line', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-add-line',
     );
     let client = await makeClient(organizationId);
@@ -945,10 +970,11 @@ describe('draft invoices', () => {
       round_off: ['-0.25'],
     });
     let added = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       { ...fields, _intent: 'add_line' },
       sessionCookie,
+      'PUT',
     );
     assert.equal(added.status, 200);
     let addedHtml = await added.text();
@@ -959,7 +985,7 @@ describe('draft invoices', () => {
 
     let savedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(savedEditPage, /name="line_discount_value"[^>]*value="10"/);
@@ -970,6 +996,7 @@ describe('draft invoices', () => {
   it('preserves submitted discount and round-off values after validation errors', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-validation',
     );
     let client = await makeClient(organizationId);
@@ -996,10 +1023,11 @@ describe('draft invoices', () => {
       round_off: ['-0.25'],
     });
     let invalid = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       fields,
       sessionCookie,
+      'PUT',
     );
     assert.equal(invalid.status, 400);
     let invalidHtml = await invalid.text();
@@ -1011,6 +1039,7 @@ describe('draft invoices', () => {
   it('saves edited discounts and round-off on the Draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-save',
     );
     let client = await makeClient(organizationId);
@@ -1027,8 +1056,8 @@ describe('draft invoices', () => {
       }),
     );
     let updated = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         line_description: ['Consulting'],
         line_quantity: ['2'],
@@ -1040,6 +1069,7 @@ describe('draft invoices', () => {
         round_off: ['-0.25'],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(updated.status, 302);
     let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
@@ -1051,8 +1081,8 @@ describe('draft invoices', () => {
   });
 
   it('keeps discount fields scoped to the Organization and protected by CSRF', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-discount-scope-first');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-discount-scope-other');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-discount-scope-first');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-discount-scope-other');
     let ownClient = await makeClient(first.organizationId);
     let id = draftIdFrom(
       await createDraft(first.sessionCookie, ownClient.id, {
@@ -1070,7 +1100,7 @@ describe('draft invoices', () => {
 
     let foreignEdit = await submitDraft(
       routes.app.dashboard.href(),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(ownClient.id, {
         line_discount_mode: ['fixed'],
         line_discount_value: ['99'],
@@ -1079,6 +1109,7 @@ describe('draft invoices', () => {
         round_off: ['99'],
       }),
       other.sessionCookie,
+      'PUT',
     );
     assert.equal(foreignEdit.status, 404);
     let after = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), first.sessionCookie);
@@ -1102,7 +1133,7 @@ describe('draft invoices', () => {
       if (Array.isArray(value)) value.forEach((entry) => body.append(name, entry));
       else if (value != null) body.append(name, value);
     }
-    let noCsrf = await router.fetch(new URL(routes.app.invoices.new.action.href(), origin), {
+    let noCsrf = await router.fetch(new URL(routes.app.invoices.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1120,6 +1151,7 @@ describe('draft invoices', () => {
   it('applies ISO 4217 minor-unit precision for INR, USD, JPY, XAF, and KWD', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-precision',
     );
     let client = await makeClient(organizationId);
@@ -1147,6 +1179,7 @@ describe('draft invoices', () => {
   it('respects zero-, two-, and three-minor-unit currencies for discounts and round-off', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-precision',
     );
     let client = await makeClient(organizationId);
@@ -1228,6 +1261,7 @@ describe('draft invoices', () => {
   it('applies recipient overrides to the Draft only, never to the saved Client', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-override',
     );
     let client = await makeClient(organizationId, {
@@ -1264,6 +1298,7 @@ describe('draft invoices', () => {
   it('adds service lines through a no-JS server intent and saves four or more lines', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-add-line',
     );
     let client = await makeClient(organizationId);
@@ -1275,7 +1310,7 @@ describe('draft invoices', () => {
 
     let added = await submitDraft(
       newDraftPath(client.id),
-      routes.app.invoices.new.action.href(),
+      routes.app.invoices.create.href(),
       draftFields(client.id, { ...threeLines, _intent: 'add_line' }),
       sessionCookie,
     );
@@ -1305,14 +1340,15 @@ describe('draft invoices', () => {
   it('adds a line while editing without mutating the Draft until saved', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-edit-add-line',
     );
     let client = await makeClient(organizationId);
     let id = draftIdFrom(await createDraft(sessionCookie, client.id));
 
     let added = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         _intent: 'add_line',
         line_description: ['Consulting services', '', ''],
@@ -1320,6 +1356,7 @@ describe('draft invoices', () => {
         line_unit_price: ['100.0000', '', ''],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(added.status, 200);
     let html = await added.text();
@@ -1327,7 +1364,7 @@ describe('draft invoices', () => {
     assert.match(html, /name="line_description"[^>]*value="Consulting services"/);
     let savedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.equal((savedEditPage.match(/name="line_description"/g) ?? []).length, 3);
@@ -1343,6 +1380,7 @@ describe('draft invoices', () => {
   it('rejects invalid lines with 400 responses that preserve what was submitted', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-invalid-lines',
     );
     let client = await makeClient(organizationId);
@@ -1399,6 +1437,7 @@ describe('draft invoices', () => {
   it('rejects a discount-only blank line instead of silently dropping its discount', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-discount-only-row',
     );
     let client = await makeClient(organizationId);
@@ -1428,6 +1467,7 @@ describe('draft invoices', () => {
   it('rejects amounts outside the exact persisted numeric range without saving anything', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-money-range',
     );
     let client = await makeClient(organizationId);
@@ -1449,10 +1489,11 @@ describe('draft invoices', () => {
     let before = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
     assert.match(before, /Total: 150\.00 INR/);
     let edited = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, oversized),
       sessionCookie,
+      'PUT',
     );
     assert.equal(edited.status, 400);
     assert.match(await edited.text(), /too large to store exactly/i);
@@ -1465,6 +1506,7 @@ describe('draft invoices', () => {
   it('validates invoice dates, due dates, and currency codes', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-dates',
     );
     let client = await makeClient(organizationId);
@@ -1513,6 +1555,7 @@ describe('draft invoices', () => {
   it('rejects draft mutations without a CSRF token', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-csrf',
     );
     let client = await makeClient(organizationId);
@@ -1522,7 +1565,7 @@ describe('draft invoices', () => {
       if (Array.isArray(value)) value.forEach((entry) => body.append(name, entry));
       else body.append(name, value);
     }
-    let response = await router.fetch(new URL(routes.app.invoices.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.invoices.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1537,8 +1580,8 @@ describe('draft invoices', () => {
   });
 
   it('ignores forged Organization ids and refuses Clients from another Organization', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-scope-first');
-    let second = await createUserAndLoginWithOrganization(router, 'invoice-scope-second');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-scope-first');
+    let second = await createUserAndLoginWithOrganization(router, db, 'invoice-scope-second');
     let ownClient = await makeClient(first.organizationId);
     let foreignClient = await makeClient(second.organizationId);
 
@@ -1556,7 +1599,7 @@ describe('draft invoices', () => {
 
     let foreign = await submitDraft(
       newDraftPath(ownClient.id),
-      routes.app.invoices.new.action.href(),
+      routes.app.invoices.create.href(),
       draftFields(foreignClient.id),
       first.sessionCookie,
     );
@@ -1571,6 +1614,7 @@ describe('draft invoices', () => {
   it('views a Draft with its lines, totals, notes, and no final invoice number', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-show',
     );
     let client = await makeClient(organizationId);
@@ -1594,7 +1638,7 @@ describe('draft invoices', () => {
       'the destructive POST should be behind an accessible no-JS confirmation',
     );
 
-    let foreign = await createUserAndLoginWithOrganization(router, 'invoice-show-foreign');
+    let foreign = await createUserAndLoginWithOrganization(router, db, 'invoice-show-foreign');
     let response = await router.fetch(new URL(routes.app.invoices.show.href({ invoiceId: id }), origin), {
       headers: { Cookie: foreign.sessionCookie },
     });
@@ -1605,22 +1649,24 @@ describe('draft invoices', () => {
   it('edits a Draft, replaces its lines, and keeps stored data intact on validation errors', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-edit',
     );
     let client = await makeClient(organizationId);
     let created = await createDraft(sessionCookie, client.id);
     let id = draftIdFrom(created);
 
-    let editPage = await getHtml(router, routes.app.invoices.edit.index.href({ invoiceId: id }), sessionCookie);
+    let editPage = await getHtml(router, routes.app.invoices.edit.href({ invoiceId: id }), sessionCookie);
     assert.match(editPage, /name="recipient_legal_name"[^>]*value="Draft Recipient"/);
     assert.match(editPage, /name="line_description"[^>]*value="Consulting services"/);
     assert.match(editPage, /name="line_quantity"[^>]*value="1.5"/);
 
     let invalid = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { line_quantity: ['0'] }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(invalid.status, 400);
     assert.match(await invalid.text(), /positive quantity/);
@@ -1633,8 +1679,8 @@ describe('draft invoices', () => {
     assert.match(afterInvalid, /Consulting services/);
 
     let updated = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, {
         currency: 'USD',
         recipient_legal_name: 'Edited Recipient',
@@ -1645,6 +1691,7 @@ describe('draft invoices', () => {
         line_unit_price: ['10.0000', '4.0000'],
       }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(updated.status, 302);
 
@@ -1659,7 +1706,7 @@ describe('draft invoices', () => {
 
     let updatedEditPage = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
       sessionCookie,
     );
     assert.match(updatedEditPage, new RegExp(`name="client_id"[^>]*value="${client.id}"`));
@@ -1668,8 +1715,8 @@ describe('draft invoices', () => {
   });
 
   it('does not let another Organization view or edit a Draft', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-edit-scope-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'invoice-edit-scope-other');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-edit-scope-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'invoice-edit-scope-other');
     let client = await makeClient(first.organizationId);
     let created = await createDraft(first.sessionCookie, client.id);
     let id = draftIdFrom(created);
@@ -1679,7 +1726,7 @@ describe('draft invoices', () => {
       first.sessionCookie,
     );
 
-    let show = await router.fetch(new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin), {
+    let show = await router.fetch(new URL(routes.app.invoices.edit.href({ invoiceId: id }), origin), {
       headers: { Cookie: other.sessionCookie },
     });
     assert.equal(show.status, 404);
@@ -1689,9 +1736,10 @@ describe('draft invoices', () => {
 
     let edit = await submitDraft(
       routes.app.dashboard.href(),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { recipient_legal_name: 'Hacked Recipient' }),
       other.sessionCookie,
+      'PUT',
     );
     assert.equal(edit.status, 404);
     assert.ok(!(await edit.text()).includes('Hacked Recipient'));
@@ -1711,6 +1759,7 @@ describe('draft invoices', () => {
   it('keeps an existing Draft accessible and editable after its Client is archived', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-archived-draft',
     );
     let client = await makeClient(organizationId);
@@ -1720,7 +1769,7 @@ describe('draft invoices', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: client.id }),
-      {},
+      { _method: 'PUT' },
       sessionCookie,
     );
     assert.equal(archived.status, 302);
@@ -1738,16 +1787,17 @@ describe('draft invoices', () => {
     assert.match(await show.text(), /Archived/);
 
     let editPage = await router.fetch(
-      new URL(routes.app.invoices.edit.index.href({ invoiceId: id }), origin),
+      new URL(routes.app.invoices.edit.href({ invoiceId: id }), origin),
       { headers: { Cookie: sessionCookie } },
     );
     assert.equal(editPage.status, 200);
 
     let edited = await submitDraft(
-      routes.app.invoices.edit.index.href({ invoiceId: id }),
-      routes.app.invoices.edit.action.href({ invoiceId: id }),
+      routes.app.invoices.edit.href({ invoiceId: id }),
+      routes.app.invoices.update.href({ invoiceId: id }),
       draftFields(client.id, { internal_note: 'Still editable' }),
       sessionCookie,
+      'PUT',
     );
     assert.equal(edited.status, 302);
     let detail = await getHtml(router, routes.app.invoices.show.href({ invoiceId: id }), sessionCookie);
@@ -1755,7 +1805,7 @@ describe('draft invoices', () => {
   });
 
   it('discards only the current Organization’s Drafts with CSRF protection', async () => {
-    let first = await createUserAndLoginWithOrganization(router, 'invoice-discard-first');
+    let first = await createUserAndLoginWithOrganization(router, db, 'invoice-discard-first');
     let ownClient = await makeClient(first.organizationId);
     let firstDraft = draftIdFrom(
       await createDraft(first.sessionCookie, ownClient.id, {
@@ -1767,7 +1817,7 @@ describe('draft invoices', () => {
         recipient_legal_name: 'Kept recipient',
       }),
     );
-    let second = await createUserAndLoginWithOrganization(router, 'invoice-discard-second');
+    let second = await createUserAndLoginWithOrganization(router, db, 'invoice-discard-second');
     let foreignClient = await makeClient(second.organizationId);
     let foreignDraft = draftIdFrom(
       await createDraft(second.sessionCookie, foreignClient.id, {
@@ -1845,6 +1895,7 @@ describe('draft invoices', () => {
   it('renders export endorsements and discloses reverse-charge GST without collecting it', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-export-reverse-charge',
     );
     await setInvoicingDefaults(organizationId, {
@@ -1907,7 +1958,7 @@ describe('draft invoices', () => {
     assert.match(exportIgstDetail, /Total: 177\.00 INR/);
     let exportEdit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: exportIgstId }),
+      routes.app.invoices.edit.href({ invoiceId: exportIgstId }),
       sessionCookie,
     );
     assert.match(exportEdit, /name="supply_type"[\s\S]*?<option value="export_igst" selected/);
@@ -1936,7 +1987,7 @@ describe('draft invoices', () => {
     assert.match(reverseDetail, /Total: 150\.00 INR/);
     let reverseEdit = await getHtml(
       router,
-      routes.app.invoices.edit.index.href({ invoiceId: draftIdFrom(reverseCharge) }),
+      routes.app.invoices.edit.href({ invoiceId: draftIdFrom(reverseCharge) }),
       sessionCookie,
     );
     assert.match(reverseEdit, /name="reverse_charge"[^>]*checked/);
@@ -1945,6 +1996,7 @@ describe('draft invoices', () => {
   it('calculates percentage and fixed foreign tax at USD, EUR, JPY, and KWD precision', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-manual-foreign-tax',
     );
     let client = await makeClient(organizationId);
@@ -1980,7 +2032,7 @@ describe('draft invoices', () => {
       assert.doesNotMatch(detail, /CGST|SGST|IGST/);
       let edit = await getHtml(
         router,
-        routes.app.invoices.edit.index.href({ invoiceId }),
+        routes.app.invoices.edit.href({ invoiceId }),
         sessionCookie,
       );
       assert.match(edit, /value="foreign_manual" selected/);
@@ -1997,6 +2049,7 @@ describe('draft invoices', () => {
   it('rejects combining Indian GST and manual foreign tax on one Draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-mixed-tax-regimes',
     );
     await setInvoicingDefaults(organizationId, {
@@ -2067,6 +2120,7 @@ describe('draft invoices', () => {
   it('calculates manual percentage tax on the post-discount line value', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'invoice-manual-tax-discounts',
     );
     let client = await makeClient(organizationId);

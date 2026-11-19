@@ -198,7 +198,7 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
           </p>
         ) : null}
         <div mix={toolbarStyle}>
-          <a href={routes.app.invoices.new.index.href()} mix={linkButtonStyle}>
+          <a href={routes.app.invoices.new.href()} mix={linkButtonStyle}>
             New invoice draft
           </a>
         </div>
