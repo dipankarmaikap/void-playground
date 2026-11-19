@@ -83,7 +83,7 @@ const currentBadgeStyle = css({
   padding: '0.125rem 0.5rem',
   borderRadius: '999px',
   background: colors.accent,
-  color: '#ffffff',
+  color: colors.onPrimary,
   fontSize: '0.75rem',
   fontWeight: 700,
   letterSpacing: '0.02em',
