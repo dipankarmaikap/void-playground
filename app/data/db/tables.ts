@@ -275,6 +275,44 @@ export const clients = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    let next = trimText(value, [
+      'legal_name',
+      'preferred_name',
+      'trading_name',
+      'industry',
+      'email',
+      'phone',
+      'contact_name',
+      'contact_role',
+      'contact_email',
+      'contact_phone',
+      'billing_line1',
+      'billing_locality',
+      'billing_region',
+      'billing_postal_code',
+      'billing_country',
+      'billing_currency',
+      'tax_country',
+      'tax_type',
+      'tax_value',
+      'tax_state_name',
+      'tax_state_code',
+    ]);
+    if (typeof next.tax_value === 'string') {
+      next.tax_value = next.tax_value.toUpperCase();
+    }
+    return { value: next };
+  },
+  validate({ operation, value }) {
+    if (operation === 'create' && typeof value.legal_name !== 'string') {
+      return fail('Legal name is required.', ['legal_name']);
+    }
+    if (typeof value.legal_name === 'string' && value.legal_name.trim() === '') {
+      return fail('Legal name is required.', ['legal_name']);
+    }
+    return { value };
+  },
 });
 
 /**

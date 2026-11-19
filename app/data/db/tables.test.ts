@@ -2,7 +2,7 @@ import * as assert from 'remix/assert';
 import { DataTableValidationError } from 'remix/data-table';
 import { describe, it } from 'remix/test';
 
-import { db, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
+import { db, clients, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
 import '../../../test/db-setup.ts';
 
 async function createOrganization(name: string): Promise<string> {
@@ -191,8 +191,7 @@ describe('organization invoicing profile table hooks', () => {
   });
 });
 
-describe('organization gst rate preset table hooks', () => {
-  it('canonicalizes a padded decimal rate before writing', async () => {
+describe('organization gst rate preset table hooks', () => {  it('canonicalizes a padded decimal rate before writing', async () => {
     let organizationId = await createOrganization('Preset Trim Studio');
     let id = crypto.randomUUID();
     let now = Date.now();
@@ -243,5 +242,75 @@ describe('organization gst rate preset table hooks', () => {
       DataTableValidationError,
     );
     assert.equal(await db.find(organizationGstRatePresets, id), null);
+  });
+});
+
+describe('clients table hooks', () => {
+  async function baseClient(organizationId: string) {
+    let now = Date.now();
+    return {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      type: 'business' as const,
+      legal_name: 'Whitmore Consultancy',
+      status: 'active' as const,
+      archived_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  it('trims text fields and uppercases the tax identifier before writing', async () => {
+    let organizationId = await createOrganization('Client Trim Studio');
+    let client = {
+      ...(await baseClient(organizationId)),
+      preferred_name: '  Dana ',
+      email: '  dana@whitmore.example ',
+      tax_country: '  India ',
+      tax_type: '  gstin ',
+      tax_value: ' 27aapcs2319f1z5 ',
+    };
+    await db.create(clients, client);
+
+    let saved = await db.find(clients, client.id);
+    assert.ok(saved);
+    assert.equal(saved.preferred_name, 'Dana');
+    assert.equal(saved.email, 'dana@whitmore.example');
+    assert.equal(saved.tax_country, 'India');
+    assert.equal(saved.tax_type, 'gstin');
+    assert.equal(saved.tax_value, '27AAPCS2319F1Z5');
+  });
+
+  it('rejects a create with a blank legal name', async () => {
+    let organizationId = await createOrganization('Client Blank Studio');
+    let client = { ...(await baseClient(organizationId)), legal_name: '   ' };
+    await assert.rejects(() => db.create(clients, client), DataTableValidationError);
+    assert.equal(await db.find(clients, client.id), null);
+  });
+
+  it('rejects an update that blanks the legal name', async () => {
+    let organizationId = await createOrganization('Client Rename Studio');
+    let client = await baseClient(organizationId);
+    await db.create(clients, client);
+
+    await assert.rejects(
+      () => db.update(clients, client.id, { legal_name: ' \t ', updated_at: Date.now() }),
+      DataTableValidationError,
+    );
+    let saved = await db.find(clients, client.id);
+    assert.ok(saved);
+    assert.equal(saved.legal_name, 'Whitmore Consultancy');
+  });
+
+  it('leaves the legal name untouched when an update changes another field', async () => {
+    let organizationId = await createOrganization('Client Partial Studio');
+    let client = await baseClient(organizationId);
+    await db.create(clients, client);
+
+    await db.update(clients, client.id, { phone: ' +91 98200 00000 ', updated_at: Date.now() });
+    let saved = await db.find(clients, client.id);
+    assert.ok(saved);
+    assert.equal(saved.legal_name, 'Whitmore Consultancy');
+    assert.equal(saved.phone, '+91 98200 00000');
   });
 });
