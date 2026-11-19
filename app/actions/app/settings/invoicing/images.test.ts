@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { db } from '../../../../data/db.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
 import { router } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';
@@ -48,7 +49,7 @@ describe('organization logo and authorized signature settings', () => {
     );
     assert.equal(saved.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.logo_data_url, logo);
     assert.equal(row.signature_data_url, signature);
@@ -76,7 +77,7 @@ describe('organization logo and authorized signature settings', () => {
     );
     assert.equal(replaced.status, 302);
 
-    let replacedRow = await findInvoicingProfile(organizationId);
+    let replacedRow = await findInvoicingProfile(db, organizationId);
     assert.ok(replacedRow);
     assert.equal(replacedRow.logo_data_url, newLogo, 'a new data URL replaces the previous logo');
     assert.equal(replacedRow.signature_data_url, signature, 'a blank image field keeps the saved image');
@@ -115,7 +116,7 @@ describe('organization logo and authorized signature settings', () => {
     );
     assert.equal(removed.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.logo_data_url, null);
     assert.equal(row.signature_data_url, null);
@@ -152,7 +153,7 @@ describe('organization logo and authorized signature settings', () => {
     assert.ok(html.includes(`value="${badLogo}"`), 'the rejected logo data URL is preserved');
     assert.match(html, /name="signature_image"[^>]*value="not a data url"/);
     assert.match(html, /name="logo"[^>]*aria-invalid="true"/);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('rejects logo and signature images above the byte limit', async () => {
@@ -173,7 +174,7 @@ describe('organization logo and authorized signature settings', () => {
     let html = await response.text();
     assert.match(html, /Logo image must be 128 KB or smaller\./);
     assert.match(html, /Signature image must be 128 KB or smaller\./);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('rejects overlong signatory text without storing it', async () => {
@@ -199,7 +200,7 @@ describe('organization logo and authorized signature settings', () => {
     assert.match(html, /Signatory name must be 120 characters or fewer\./);
     assert.match(html, /Signatory designation must be 100 characters or fewer\./);
     assert.match(html, new RegExp(`name="signatory_name"[^>]*value="${longName}"`));
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('keeps image settings private and ignores a forged Organization id', async () => {
@@ -230,8 +231,8 @@ describe('organization logo and authorized signature settings', () => {
     );
     assert.equal(forged.status, 302);
 
-    let ownerRow = await findInvoicingProfile(owner.organizationId);
-    let otherRow = await findInvoicingProfile(other.organizationId);
+    let ownerRow = await findInvoicingProfile(db, owner.organizationId);
+    let otherRow = await findInvoicingProfile(db, other.organizationId);
     assert.ok(ownerRow);
     assert.ok(otherRow);
     assert.equal(ownerRow.logo_data_url, logo);

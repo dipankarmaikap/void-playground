@@ -141,7 +141,7 @@ async function setSellerProfile(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test seller profile should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 describe('invoice issue flow', () => {

@@ -10,7 +10,6 @@ import type { AuthState } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import {
-  db,
   organizationMemberships,
   organizationGstRatePresets,
   organizations,
@@ -91,7 +90,7 @@ export default createController(routes.auth.register, {
       let email = parsed.value.email.trim().toLowerCase();
       let password = parsed.value.password;
 
-      let existing = await db.findOne(users, { where: { email } });
+      let existing = await context.db.findOne(users, { where: { email } });
       if (existing) {
         context.session.flash('error', 'Email already registered');
         return redirect(routes.auth.register.index.href());
@@ -105,7 +104,7 @@ export default createController(routes.auth.register, {
       let now = Date.now();
 
       try {
-        await db.transaction(async (tx) => {
+        await context.db.transaction(async (tx) => {
           await tx.create(users, {
             id: userId,
             email,

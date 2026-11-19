@@ -39,10 +39,10 @@ export default createController(routes.app.invoices.new, {
         return new Response('Client not found', { status: 404 });
       }
 
-      let profile = selectedClient ? await getInvoicingProfileView(organization) : null;
+      let profile = selectedClient ? await getInvoicingProfileView(context.db, organization) : null;
       let gstRatePresets =
         profile?.gst_registered
-          ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
+          ? (await findGstPresets(context.db, organization.id)).map((preset) => preset.rate)
           : [];
       let values = selectedClient && profile
         ? draftFormValuesFor(selectedClient, profile, todayInKolkata())
@@ -64,9 +64,9 @@ export default createController(routes.app.invoices.new, {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
       let values = readInvoiceFormValues(context.formData);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await ensureGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       let taxConfig = {
         gstRegistered: profile.gst_registered,

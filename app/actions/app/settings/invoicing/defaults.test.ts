@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { db } from '../../../../data/db.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
 import { router } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';
@@ -45,7 +46,7 @@ describe('organization invoicing defaults', () => {
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('Location'), index);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.default_currency, 'USD', 'currency normalizes to uppercase');
     assert.equal(row.payment_term, 'net_30');
@@ -109,7 +110,7 @@ describe('organization invoicing defaults', () => {
     );
     assert.equal(updated.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.default_currency, 'GBP');
     assert.equal(row.payment_term, 'net_7');
@@ -149,7 +150,7 @@ describe('organization invoicing defaults', () => {
     assert.match(html, /name="payment_instructions"[^>]*>Keep my instructions<\/textarea>/);
     assert.match(html, /name="default_currency"[^>]*aria-invalid="true"/);
     assert.match(html, /name="payment_term"[^>]*aria-invalid="true"/);
-    assert.equal(await findInvoicingProfile(organizationId), null, 'invalid defaults are not stored');
+    assert.equal(await findInvoicingProfile(db, organizationId), null, 'invalid defaults are not stored');
 
     let unknownCurrency = await postForm(
       router,
@@ -188,6 +189,6 @@ describe('organization invoicing defaults', () => {
     assert.match(html, /Customer notes must be 1000 characters or fewer\./);
     assert.match(html, new RegExp(`name="payment_instructions"[^>]*>${longInstructions}</textarea>`));
     assert.match(html, new RegExp(`name="customer_notes"[^>]*>${longNotes}</textarea>`));
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 });

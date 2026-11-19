@@ -39,9 +39,9 @@ export default createController(routes.app.invoices.edit, {
         findInvoiceLines(organization.id, invoice.id),
         findClient(organization.id, invoice.client_id),
       ]);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await findGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       return context.render(
         <EditInvoicePage
@@ -68,9 +68,9 @@ export default createController(routes.app.invoices.edit, {
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
       let values = readInvoiceFormValues(context.formData);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await ensureGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       let taxConfig = {
         gstRegistered: profile.gst_registered,

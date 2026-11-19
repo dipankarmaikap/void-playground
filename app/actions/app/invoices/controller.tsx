@@ -128,7 +128,7 @@ export default createController(routes.app.invoices, {
       let { internal_note: _internalNote, ...draftDocument } = invoice;
       let [lines, profileView] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
-        getInvoicingProfileView(organization),
+        getInvoicingProfileView(context.db, organization),
       ]);
       let pdf = renderInvoicePdf({
         invoice: draftDocument,

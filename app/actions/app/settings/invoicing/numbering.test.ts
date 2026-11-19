@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { db } from '../../../../data/db.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
 import { router } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';
@@ -41,7 +42,7 @@ describe('organization document numbering settings', () => {
     );
     assert.equal(saved.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.invoice_prefix, 'BILL');
     assert.equal(row.invoice_starting_number, 42);
@@ -90,7 +91,7 @@ describe('organization document numbering settings', () => {
       assert.match(html, new RegExp(`name="${field}"[^>]*aria-invalid="true"`));
       assert.match(html, new RegExp(`name="${field}"[^>]*value="${inputs[i]!.replace(/[#]/g, '\\#')}"`));
     }
-    assert.equal(await findInvoicingProfile(organizationId), null, 'invalid prefixes are not stored');
+    assert.equal(await findInvoicingProfile(db, organizationId), null, 'invalid prefixes are not stored');
   });
 
   it('rejects identical invoice and credit-note prefixes', async () => {
@@ -111,7 +112,7 @@ describe('organization document numbering settings', () => {
     assert.match(html, /Invoice and credit-note prefixes must be different\./);
     assert.match(html, /name="invoice_prefix"[^>]*value="SAME"/);
     assert.match(html, /name="credit_note_prefix"[^>]*value="same"/);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('rejects starting sequence numbers below 1 or that are not whole numbers', async () => {
@@ -137,7 +138,7 @@ describe('organization document numbering settings', () => {
     assert.match(html, /name="invoice_starting_number"[^>]*value="0"/);
     assert.match(html, /name="credit_note_starting_number"[^>]*value="1\.5"/);
     assert.match(html, /name="invoice_starting_number"[^>]*aria-invalid="true"/);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('keeps numbering settings private and ignores a forged Organization id', async () => {
@@ -172,8 +173,8 @@ describe('organization document numbering settings', () => {
     );
     assert.equal(forged.status, 302);
 
-    let ownerRow = await findInvoicingProfile(owner.organizationId);
-    let otherRow = await findInvoicingProfile(other.organizationId);
+    let ownerRow = await findInvoicingProfile(db, owner.organizationId);
+    let otherRow = await findInvoicingProfile(db, other.organizationId);
     assert.ok(ownerRow);
     assert.ok(otherRow);
     assert.equal(ownerRow.invoice_prefix, 'SECRET');

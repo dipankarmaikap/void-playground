@@ -75,7 +75,7 @@ describe('auth flow', () => {
     assert.ok(user, 'registration should normalize the email');
     assert.ok(user.verification_token);
     assert.equal(user.email_verified, false);
-    assert.equal((await findOrganizationForUser(user))?.name, 'Lovelace Analytics');
+    assert.equal((await findOrganizationForUser(db, user))?.name, 'Lovelace Analytics');
 
     let afterRegister = await router.fetch(new URL(routes.auth.login.index.href(), origin), {
       headers: { Cookie: cookieFromResponse(registerResponse) },
@@ -150,7 +150,7 @@ describe('auth flow', () => {
     assert.equal(user?.display_name, 'Ada Lovelace');
     assert.ok(user?.verification_token);
     assert.equal(user?.email_verified, false);
-    assert.equal((await findOrganizationForUser(user))?.name, 'Ada Industries');
+    assert.equal((await findOrganizationForUser(db, user))?.name, 'Ada Industries');
   });
 
   it('registers without a display name', async () => {
@@ -343,7 +343,7 @@ describe('auth flow', () => {
 
     let user = await db.find(users, userId);
     assert.ok(user);
-    assert.equal(await findOrganizationForUser(user), null);
+    assert.equal(await findOrganizationForUser(db, user), null);
 
     let sessionCookie = await login(router, email, 'password123');
     let response = await router.fetch(new URL(routes.app.dashboard.href(), origin), {

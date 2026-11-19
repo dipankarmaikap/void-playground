@@ -117,7 +117,7 @@ async function setInvoicingDefaults(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test defaults should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 async function makeClient(organizationId: string, overrides: Record<string, unknown> = {}) {

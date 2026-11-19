@@ -7,8 +7,9 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from 'remix/auth';
 
-import { db, users, userPasswords } from '../../../data/db.ts';
+import { userPasswords, users } from '../../../data/db.ts';
 import type { User } from '../../../data/db.ts';
+import { databaseContext } from '../../../middleware/database.ts';
 import { setAuthPayload } from '../../../data/session/auth-payload.ts';
 import { verifyPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
@@ -27,7 +28,11 @@ const credentialsProvider = createCredentialsAuthProvider<
       password: String(formData.get('password') ?? ''),
     };
   },
-  async verify({ email, password }) {
+  async verify({ email, password }, context) {
+    let db = context.get(databaseContext);
+    if (db == null) {
+      throw new Error('Expected loadDatabase() middleware before auth()');
+    }
     let user = await db.findOne(users, { where: { email } });
     if (!user || !user.email_verified) return null;
     let creds = await db.findOne(userPasswords, { where: { user_id: user.id } });
