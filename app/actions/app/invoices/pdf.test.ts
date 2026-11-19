@@ -9,6 +9,7 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,

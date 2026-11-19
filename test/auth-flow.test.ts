@@ -9,6 +9,7 @@ import {
   organizations,
   users,
 } from '../app/data/db.ts';
+import './db-setup.ts';
 import { findOrganizationForUser } from '../app/data/organization/access.ts';
 
 import {

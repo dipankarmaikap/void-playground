@@ -1,0 +1,1 @@
+-- No columns were added, so rolling this step back does nothing.

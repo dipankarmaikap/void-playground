@@ -11,6 +11,7 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import { parseInvoiceDraft } from '../../../data/invoices/draft.ts';
 import {
   findInvoiceLines,

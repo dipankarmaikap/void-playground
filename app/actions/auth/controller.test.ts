@@ -9,6 +9,7 @@ import {
   organizations,
   users,
 } from '../../data/db.ts';
+import '../../../test/db-setup.ts';
 import {
   cookieFromResponse,
   createUser,

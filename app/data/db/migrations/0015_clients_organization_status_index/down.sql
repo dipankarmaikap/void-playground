@@ -1,0 +1,1 @@
+DROP INDEX idx_clients_organization_status;

@@ -8,6 +8,7 @@ import {
   users,
   userPasswords,
 } from '../app/data/db.ts';
+import './db-setup.ts';
 import { hashPassword } from '../app/data/password.ts';
 import { defaultGstPresetRows } from '../app/data/organization/gst-presets.ts';
 import { routes } from '../app/routes.ts';

@@ -1,11 +1,40 @@
 import { getTableReference } from 'remix/data-table';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import { clients, organizationMemberships, users } from './tables.ts';
+import {
+  clients,
+  creditNoteLines,
+  creditNotePdfArtifacts,
+  creditNotes,
+  documentSequences,
+  invoiceLines,
+  invoicePayments,
+  invoicePdfArtifacts,
+  invoiceRefunds,
+  invoices,
+  organizationGstRatePresets,
+  organizationInvoicingProfiles,
+  organizationMemberships,
+  organizations,
+  sessions,
+  userPasswords,
+  users,
+} from './tables.ts';
+
+/** The migration runner's journal table, created by the first migration run. */
+const migrationJournalTable = { name: 'data_table_migrations' };
 
 function missingClientOrganizationSchemaError(): Error {
   return new Error(
     'This database schema is missing required Client Organization ownership. ' +
+      'Stop the app and perform the operator-managed clean start before continuing. ' +
+      'No stored data was deleted.',
+  );
+}
+
+function predatesMigrationJournalError(): Error {
+  return new Error(
+    'This database schema predates the file-based migration journal. ' +
       'Stop the app and perform the operator-managed clean start before continuing. ' +
       'No stored data was deleted.',
   );
@@ -19,6 +48,37 @@ export async function assertClientSchemaCompatible(database: SqliteDatabase): Pr
     !(await database.hasColumn(clientTable, 'organization_id'))
   ) {
     throw missingClientOrganizationSchemaError();
+  }
+
+  // The migration runner owns schema application, so a database that already holds app tables
+  // but no journal was written by the old hand-rolled pipeline (or by hand). Reject it before
+  // the runner re-runs history against it and crashes on CREATE TABLE; adopting the runner
+  // means the operator-managed clean start, per docs/adr/0002-organization-access.md.
+  if (!(await database.hasTable(migrationJournalTable))) {
+    let appTables = [
+      clients,
+      creditNoteLines,
+      creditNotePdfArtifacts,
+      creditNotes,
+      documentSequences,
+      invoiceLines,
+      invoicePayments,
+      invoicePdfArtifacts,
+      invoiceRefunds,
+      invoices,
+      organizationGstRatePresets,
+      organizationInvoicingProfiles,
+      organizationMemberships,
+      organizations,
+      sessions,
+      userPasswords,
+      users,
+    ];
+    for (let table of appTables) {
+      if (await database.hasTable(getTableReference(table))) {
+        throw predatesMigrationJournalError();
+      }
+    }
   }
 }
 

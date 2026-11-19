@@ -3,6 +3,7 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import { db, organizationGstRatePresets } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import {
   parseInvoicingProfile,

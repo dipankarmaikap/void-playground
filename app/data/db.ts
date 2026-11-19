@@ -1,9 +1,6 @@
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import * as compatibility from './db/compatibility.ts';
-import { createAppDatabase, isTest } from './db/connection.ts';
-import * as migrations from './db/migrations.ts';
-import * as schema from './db/schema.ts';
+import { createAppDatabase } from './db/connection.ts';
 
 export {
   users,
@@ -45,77 +42,13 @@ export type {
 } from './db/row-types.ts';
 
 /**
- * The application's single database instance. Importing this module creates it and runs the
- * schema, migrations, and compatibility checks below in one explicit order; startup fails closed
- * rather than upgrading a database that predates Organization ownership.
+ * The application's single database instance. Importing this module creates the connection only:
+ * schema application lives in `./db/migrate.ts`, awaited by server startup before it listens and
+ * by the shared test bootstrap, so no request or test ever sees a half-migrated schema. Startup
+ * fails closed rather than upgrading a database that predates Organization ownership or the
+ * migration journal.
  *
- * The default-`db` wrappers and re-exported row types below are the stable entry blessed by
- * docs/agents/data-modules.md: the test/back-compat seam imported by db.test.ts and consumers.
+ * The re-exported tables and row types above are the app-facing contract blessed by
+ * docs/agents/data-modules.md: query code stays unaffected by how the schema is applied.
  */
 export const db: SqliteDatabase = createAppDatabase();
-
-if (!isTest) {
-  await compatibility.assertClientSchemaCompatible(db);
-}
-
-await schema.applyFreshInstallSchema(db);
-await migrations.migrateInvoiceDiscountColumns(db);
-await migrations.migrateInvoiceTaxColumns(db);
-await migrations.migrateInvoiceExtendedTaxColumns(db);
-await migrations.migrateInvoiceTaxRateConstraints(db);
-await migrations.migrateInvoiceIssueColumns(db);
-await schema.applyInvoicePaymentSchema(db);
-await schema.applyInvoiceRefundSchema(db);
-await schema.applyCreditNoteSchema(db);
-await migrations.migrateCreditNoteDiscountModeColumn(db);
-await migrations.migrateUserDisplayNameColumn(db);
-await migrations.migrateClientColumns(db);
-await migrations.migrateInvoicingProfileColumns(db);
-
-if (!isTest) {
-  await compatibility.assertOrganizationSchemaCompatible(db);
-}
-
-await schema.createClientsOrganizationStatusIndex(db);
-
-/** Rejects a persisted pre-Organization Client schema before startup creates any new tables. */
-export async function assertClientSchemaCompatible(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await compatibility.assertClientSchemaCompatible(database);
-}
-
-/** Rejects a database whose identity data is not Organization-owned. */
-export async function assertOrganizationSchemaCompatible(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await compatibility.assertOrganizationSchemaCompatible(database);
-}
-
-export async function migrateInvoiceDiscountColumns(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await migrations.migrateInvoiceDiscountColumns(database);
-}
-
-export async function migrateInvoiceTaxColumns(database: SqliteDatabase = db): Promise<void> {
-  await migrations.migrateInvoiceTaxColumns(database);
-}
-
-export async function migrateInvoiceExtendedTaxColumns(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await migrations.migrateInvoiceExtendedTaxColumns(database);
-}
-
-export async function migrateInvoiceTaxRateConstraints(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await migrations.migrateInvoiceTaxRateConstraints(database);
-}
-
-export async function migrateInvoiceIssueColumns(
-  database: SqliteDatabase = db,
-): Promise<void> {
-  await migrations.migrateInvoiceIssueColumns(database);
-}

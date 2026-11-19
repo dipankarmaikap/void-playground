@@ -4,6 +4,7 @@ import { createRequestListener } from 'remix/node-fetch-server';
 import { assets } from './app/assets.ts';
 import { router } from './app/router.ts';
 import { db } from './app/data/db.ts';
+import { migrateDatabase } from './app/data/db/migrate.ts';
 import {
   getNodeRequestListenerOptions,
   getShutdownGracePeriodMs,
@@ -15,6 +16,11 @@ const hmrProxyPort = process.env.HMR_PROXY_PORT
   ? Number.parseInt(process.env.HMR_PROXY_PORT, 10)
   : null;
 const isHmr = process.env.REMIX_NODE_HMR === '1';
+
+// Migrations are applied before the HTTP server starts listening, so no request ever sees a
+// half-migrated schema. A legacy database fails closed here with the operator clean-start
+// message instead of reaching the runner.
+await migrateDatabase(db);
 
 const server = createServer(createRequestListener(router.fetch, getNodeRequestListenerOptions()));
 

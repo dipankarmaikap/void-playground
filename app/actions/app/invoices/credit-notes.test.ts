@@ -10,6 +10,7 @@ import {
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import { issueCreditNoteDraft } from '../../../data/invoices/credit-notes.ts';
 import { router } from '../../../router.ts';

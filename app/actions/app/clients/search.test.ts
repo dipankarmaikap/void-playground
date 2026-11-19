@@ -2,6 +2,7 @@ import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
 import { clients, db } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';

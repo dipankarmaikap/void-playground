@@ -2,6 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { db, organizationInvoicingProfiles } from '../../../../data/db.ts';
+import '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
 import { router } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';

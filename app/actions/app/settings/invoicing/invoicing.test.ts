@@ -7,6 +7,7 @@ import {
   organizationMemberships,
   organizations,
 } from '../../../../data/db.ts';
+import '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
 import { router } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';

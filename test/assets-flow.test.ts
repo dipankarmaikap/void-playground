@@ -3,6 +3,7 @@ import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
 import { db, sessions, users } from '../app/data/db.ts';
+import './db-setup.ts';
 import { router } from '../app/router.ts';
 import { createUserAndLogin, origin } from './http.ts';
 

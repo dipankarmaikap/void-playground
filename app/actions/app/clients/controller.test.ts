@@ -4,6 +4,7 @@ import { describe, it } from 'remix/test';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { db, clients } from '../../../data/db.ts';
+import '../../../../test/db-setup.ts';
 import {
   createUserAndLogin,
   createUserAndLoginWithOrganization,

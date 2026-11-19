@@ -20,14 +20,10 @@ import {
   organizations,
   users,
   userPasswords,
-  assertClientSchemaCompatible,
-  assertOrganizationSchemaCompatible,
-  migrateInvoiceDiscountColumns,
-  migrateInvoiceExtendedTaxColumns,
-  migrateInvoiceIssueColumns,
-  migrateInvoiceTaxColumns,
-  migrateInvoiceTaxRateConstraints,
 } from './db.ts';
+import * as compatibility from './db/compatibility.ts';
+import { migrateDatabase } from './db/migrate.ts';
+import '../../test/db-setup.ts';
 
 async function createUser(): Promise<string> {
   let id = crypto.randomUUID();
@@ -1408,40 +1404,14 @@ describe('db', () => {
     let clientId = crypto.randomUUID();
     let invoiceId = crypto.randomUUID();
     let lineId = crypto.randomUUID();
+
+    // Replay the pre-#43 history through the migration entry, then seed that era's data shape.
+    await migrateDatabase(legacyDb, { to: '0002_invoice_ownership' });
     await legacyDb.executeScript(`
-      CREATE TABLE organizations (
-        id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL,
-        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-      );
-      CREATE TABLE clients (
-        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL,
-        legal_name TEXT NOT NULL, status TEXT NOT NULL,
-        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-      );
-      CREATE TABLE invoices (
-        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, client_id TEXT NOT NULL,
-        document_type TEXT NOT NULL, status TEXT NOT NULL, invoice_number TEXT,
-        currency TEXT NOT NULL, invoice_date TEXT NOT NULL, due_date TEXT NOT NULL,
-        payment_term TEXT NOT NULL, custom_payment_terms TEXT, recipient_legal_name TEXT NOT NULL,
-        recipient_billing_line1 TEXT, recipient_billing_locality TEXT, recipient_billing_region TEXT,
-        recipient_billing_postal_code TEXT, recipient_billing_country TEXT,
-        recipient_tax_country TEXT, recipient_tax_type TEXT, recipient_tax_value TEXT,
-        recipient_tax_state_name TEXT, recipient_tax_state_code TEXT,
-        payment_instructions TEXT, customer_notes TEXT, internal_note TEXT,
-        subtotal_minor INTEGER NOT NULL, total_minor INTEGER NOT NULL,
-        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-      );
-      CREATE TABLE invoice_lines (
-        id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, invoice_id TEXT NOT NULL,
-        position INTEGER NOT NULL, description TEXT NOT NULL, sac TEXT,
-        quantity TEXT NOT NULL, unit_price TEXT NOT NULL, amount_minor INTEGER NOT NULL,
-        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-      );
-      CREATE UNIQUE INDEX legacy_clients_organization_id ON clients(organization_id, id);
       INSERT INTO organizations (id, name, created_at, updated_at)
         VALUES ('${organizationId}', 'Legacy Org', ${now}, ${now});
-      INSERT INTO clients (id, organization_id, legal_name, status, created_at, updated_at)
-        VALUES ('${clientId}', '${organizationId}', 'Legacy Client', 'active', ${now}, ${now});
+      INSERT INTO clients (id, organization_id, type, legal_name, status, created_at, updated_at)
+        VALUES ('${clientId}', '${organizationId}', 'business', 'Legacy Client', 'active', ${now}, ${now});
       INSERT INTO invoices (
         id, organization_id, client_id, document_type, status, invoice_number, currency,
         invoice_date, due_date, payment_term, recipient_legal_name, subtotal_minor, total_minor,
@@ -1459,47 +1429,7 @@ describe('db', () => {
         '100.0000', 15000, ${now}, ${now}
       );
     `);
-
-    await migrateInvoiceDiscountColumns(legacyDb);
-    await migrateInvoiceTaxColumns(legacyDb);
-    await migrateInvoiceExtendedTaxColumns(legacyDb);
-    await migrateInvoiceIssueColumns(legacyDb);
-
-    let invoice = await legacyDb.find(invoices, invoiceId);
-    assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
-    assert.equal(invoice?.total_minor, 17469, 'the stored total is untouched');
-    assert.equal(invoice?.gst_mode, 'none', 'existing invoices upgrade into no-tax mode');
-    assert.equal(invoice?.supply_type, null, 'legacy no-tax invoices have no export classification');
-    assert.equal(invoice?.tax_total_minor, 0);
-    let line = await legacyDb.find(invoiceLines, lineId);
-    assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
-    assert.equal(line?.amount_minor, 15000);
-    assert.equal(line?.foreign_tax_amount_minor, 0, 'new manual tax amounts default to zero');
-    assert.equal(
-      (await legacyDb.find(invoices, invoiceId))?.issued_at,
-      null,
-      'legacy Drafts upgrade without an issue timestamp',
-    );
-
-    let rejectedNegativeManualTax = false;
-    try {
-      await legacyDb.executeScript(
-        `UPDATE invoice_lines SET foreign_tax_amount_minor = -1 WHERE id = '${lineId}';`,
-      );
-    } catch {
-      rejectedNegativeManualTax = true;
-    }
-    assert.equal(rejectedNegativeManualTax, true, 'the migrated schema rejects negative tax amounts');
-
-    let rejectedInvalidManualRate = false;
-    try {
-      await legacyDb.executeScript(
-        `UPDATE invoice_lines SET foreign_tax_rate = '10x' WHERE id = '${lineId}';`,
-      );
-    } catch {
-      rejectedInvalidManualRate = true;
-    }
-    assert.equal(rejectedInvalidManualRate, true, 'the migrated schema rejects malformed tax rates');
+    await migrateDatabase(legacyDb, { to: '0005_invoice_extended_tax_columns' });
 
     let lineSchemaResult = await legacyDb.exec(
       "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'invoice_lines'",
@@ -1526,13 +1456,46 @@ describe('db', () => {
           foreign_tax_rate = '.'
       WHERE id = '${lineId}';
     `);
-    await migrateInvoiceTaxRateConstraints(legacyDb);
+    await migrateDatabase(legacyDb, { to: '0007_invoice_issue_columns' });
+
+    let invoice = await legacyDb.find(invoices, invoiceId);
+    assert.equal(invoice?.net_subtotal_minor, 17469, 'invoice net is backfilled from subtotal');
+    assert.equal(invoice?.total_minor, 17469, 'the stored total is untouched');
+    assert.equal(invoice?.gst_mode, 'none', 'existing invoices upgrade into no-tax mode');
+    assert.equal(invoice?.supply_type, null, 'legacy no-tax invoices have no export classification');
+    assert.equal(invoice?.tax_total_minor, 0);
+    assert.equal(invoice?.issued_at, null, 'legacy Drafts upgrade without an issue timestamp');
+    let line = await legacyDb.find(invoiceLines, lineId);
+    assert.equal(line?.net_minor, 15000, 'line net is backfilled from the gross amount');
+    assert.equal(line?.amount_minor, 15000);
+    assert.equal(line?.foreign_tax_amount_minor, 0, 'new manual tax amounts default to zero');
+
+    let rejectedNegativeManualTax = false;
+    try {
+      await legacyDb.executeScript(
+        `UPDATE invoice_lines SET foreign_tax_amount_minor = -1 WHERE id = '${lineId}';`,
+      );
+    } catch {
+      rejectedNegativeManualTax = true;
+    }
+    assert.equal(rejectedNegativeManualTax, true, 'the migrated schema rejects negative tax amounts');
+
+    let rejectedInvalidManualRate = false;
+    try {
+      await legacyDb.executeScript(
+        `UPDATE invoice_lines SET foreign_tax_rate = '10x' WHERE id = '${lineId}';`,
+      );
+    } catch {
+      rejectedInvalidManualRate = true;
+    }
+    assert.equal(rejectedInvalidManualRate, true, 'the migrated schema rejects malformed tax rates');
+
     let migratedLine = await legacyDb.find(invoiceLines, lineId);
     assert.equal(migratedLine?.gst_rate, '18');
     assert.equal(migratedLine?.cgst_rate, '9');
     assert.equal(migratedLine?.sgst_rate, '9');
     assert.equal(migratedLine?.igst_rate, '0');
-    assert.equal(migratedLine?.foreign_tax_rate, '0');
+    assert.equal(migratedLine?.foreign_tax_rate, '0', 'a lone decimal point is canonicalized to zero');
     assert.equal(migratedLine?.amount_minor, 15000, 'migration preserves existing amounts');
     assert.equal(migratedLine?.net_minor, 15000, 'migration preserves existing net values');
 
@@ -1548,18 +1511,19 @@ describe('db', () => {
       assert.equal(rejectedDotRate, true, `the upgraded schema rejects a lone ${column} point`);
     }
 
-    // A later startup must not overwrite a legitimate net value produced by #43 discounts.
+    // A later startup must not overwrite a legitimate net value produced by #43 discounts: the
+    // journal owns run-once, so re-running the entry replays nothing.
     await legacyDb.executeScript(
       `UPDATE invoices SET subtotal_minor = 999, net_subtotal_minor = 999, total_minor = 999 WHERE id = '${invoiceId}';` +
         `UPDATE invoice_lines SET net_minor = 888 WHERE id = '${lineId}';`,
     );
-    await migrateInvoiceDiscountColumns(legacyDb);
+    await migrateDatabase(legacyDb);
     assert.equal((await legacyDb.find(invoices, invoiceId))?.net_subtotal_minor, 999);
     assert.equal((await legacyDb.find(invoiceLines, lineId))?.net_minor, 888);
     await legacyDb.close();
   });
 
-  it('names the invoices table when the legacy schema cannot be rebuilt for issue state', async () => {
+  it('rejects a journal-less legacy schema without migrating or erasing it', async () => {
     let legacyDb = createSqliteDatabase({ filename: ':memory:', foreignKeys: true });
     await legacyDb.executeScript(`
       CREATE TABLE organizations (
@@ -1575,13 +1539,27 @@ describe('db', () => {
     let rejected = false;
     let message = '';
     try {
-      await migrateInvoiceIssueColumns(legacyDb);
+      await migrateDatabase(legacyDb);
     } catch (error) {
       rejected = true;
       message = error instanceof Error ? error.message : '';
     }
-    assert.equal(rejected, true, 'an unexpected legacy DDL must fail closed');
-    assert.match(message, /invoices table/);
+    assert.equal(
+      rejected,
+      true,
+      'a database from the pre-journal pipeline must fail closed before any migration SQL runs',
+    );
+    assert.match(message, /operator-managed clean start/);
+    let tables = await legacyDb.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN " +
+        "('invoices', 'data_table_migrations') ORDER BY name",
+    );
+    let tableNames = (tables.rows ?? []).map((row) => String((row as { name?: unknown }).name));
+    assert.equal(
+      tableNames.join(','),
+      'invoices',
+      'the legacy table survives and no journal table was created',
+    );
     await legacyDb.close();
   });
 
@@ -1596,7 +1574,7 @@ describe('db', () => {
 
     let rejectedEmptySchema = false;
     try {
-      await assertClientSchemaCompatible(legacyDb);
+      await compatibility.assertClientSchemaCompatible(legacyDb);
     } catch (error) {
       rejectedEmptySchema =
         error instanceof Error && /operator-managed clean start/.test(error.message);
@@ -1608,7 +1586,7 @@ describe('db', () => {
     `);
     let rejectedExistingData = false;
     try {
-      await assertClientSchemaCompatible(legacyDb);
+      await compatibility.assertClientSchemaCompatible(legacyDb);
     } catch (error) {
       rejectedExistingData =
         error instanceof Error && /operator-managed clean start/.test(error.message);
@@ -1616,7 +1594,7 @@ describe('db', () => {
     assert.equal(rejectedExistingData, true);
     let rejectedIncompatibleSchema = false;
     try {
-      await assertOrganizationSchemaCompatible(legacyDb);
+      await compatibility.assertOrganizationSchemaCompatible(legacyDb);
     } catch (error) {
       rejectedIncompatibleSchema =
         error instanceof Error && /operator-managed clean start/.test(error.message);
@@ -1634,7 +1612,7 @@ describe('db', () => {
     let message = '';
 
     try {
-      await assertOrganizationSchemaCompatible();
+      await compatibility.assertOrganizationSchemaCompatible(db);
     } catch (error) {
       rejected = true;
       message = error instanceof Error ? error.message : '';
@@ -1659,6 +1637,6 @@ describe('db', () => {
         created_at: Date.now(),
       });
     }
-    await assertOrganizationSchemaCompatible();
+    await compatibility.assertOrganizationSchemaCompatible(db);
   });
 });

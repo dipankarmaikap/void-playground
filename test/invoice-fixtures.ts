@@ -1,4 +1,5 @@
 import { db, invoices } from '../app/data/db.ts';
+import './db-setup.ts';
 import { router } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
 import { submitForm } from './http.ts';

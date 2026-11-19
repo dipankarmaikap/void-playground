@@ -4,6 +4,7 @@ import { describe, it } from 'remix/test';
 import { router } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
 import { db, sessions } from '../app/data/db.ts';
+import './db-setup.ts';
 
 import { cookieFromResponse, createUser, extractCsrf, login, origin } from './http.ts';
 

@@ -1,0 +1,3 @@
+-- Reserved for nullable Client columns from later Client tickets; none are needed yet. The
+-- step is journaled so a future column lands here with the next prefix and every database
+-- records the same history.
