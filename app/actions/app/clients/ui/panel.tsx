@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { neutrals, radii, shadows } from './theme.ts';
+import { neutrals, radii, shadows } from '../../../../ui/theme.ts';
 
 export const panelStyle = css({
   overflow: 'hidden',

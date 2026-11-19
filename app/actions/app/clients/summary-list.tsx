@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Panel, PanelBody, PanelHeader } from '../../../ui/panel.tsx';
+import { Panel, PanelBody, PanelHeader } from './ui/panel.tsx';
 import { neutrals } from '../../../ui/theme.ts';
 
 /**

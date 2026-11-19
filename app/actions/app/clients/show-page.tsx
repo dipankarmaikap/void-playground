@@ -9,16 +9,16 @@ import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
-import { DataTable, amountCellStyle } from '../../../ui/data-table.tsx';
+import { DataTable, amountCellStyle } from './ui/data-table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
-import { Panel, PanelBody, PanelFooter, PanelHeader } from '../../../ui/panel.tsx';
+import { Panel, PanelBody, PanelFooter, PanelHeader } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
   noticeSpacingStyle,
   noticeStatusStyle,
 } from '../../../ui/page-styles.ts';
-import { StatCard, statGridStyle } from '../../../ui/stat-card.tsx';
-import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/status-pill.tsx';
+import { StatCard, statGridStyle } from './ui/stat-card.tsx';
+import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
 import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';

@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { fontStack, neutrals, primary } from './theme.ts';
+import { fontStack, neutrals, primary } from '../../../../ui/theme.ts';
 
 /** Shared reference-style eyebrow + heading + introduction used by authenticated pages. */
 export interface PageHeaderProps {

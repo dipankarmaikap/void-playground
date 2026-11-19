@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { fontStack, neutrals } from './theme.ts';
+import { fontStack, neutrals } from '../../../../ui/theme.ts';
 
 export const tableWrapStyle = css({
   width: '100%',

@@ -14,12 +14,12 @@ import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Avatar } from '../../../ui/avatar.tsx';
 import { Button, linkButtonStyle } from '../../../ui/button.tsx';
-import { DataTable, amountCellStyle } from '../../../ui/data-table.tsx';
+import { DataTable, amountCellStyle } from './ui/data-table.tsx';
 import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
 import { Input } from '../../../ui/input.tsx';
-import { PageHeader } from '../../../ui/page-header.tsx';
-import { Panel, PanelBody, PanelFooter, PanelHeader } from '../../../ui/panel.tsx';
+import { PageHeader } from './ui/page-header.tsx';
+import { Panel, PanelBody, PanelFooter, PanelHeader } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
   noticeSpacingStyle,
@@ -27,8 +27,8 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { Select } from '../../../ui/select.tsx';
-import { StatCard, statGridStyle, trendUpStyle } from '../../../ui/stat-card.tsx';
-import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/status-pill.tsx';
+import { StatCard, statGridStyle, trendUpStyle } from './ui/stat-card.tsx';
+import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
 import { fontStack, neutrals, primary, radii, softFills } from '../../../ui/theme.ts';
 
 export type ClientFollowUpFilter = 'all' | 'current' | 'overdue';

@@ -8,7 +8,7 @@ import {
   panelStyle,
   panelSubtitleStyle,
   panelTitleStyle,
-} from '../../../ui/panel.tsx';
+} from './ui/panel.tsx';
 import { noticeErrorStyle, noticeSpacingStyle } from '../../../ui/page-styles.ts';
 import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import { neutrals } from '../../../ui/theme.ts';

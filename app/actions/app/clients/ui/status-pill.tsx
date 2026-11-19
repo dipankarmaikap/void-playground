@@ -1,8 +1,8 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import type { InvoiceDisplayStatus } from '../data/invoices/issuance.ts';
-import { fontStack, radii, statusColors } from './theme.ts';
+import type { InvoiceDisplayStatus } from '../../../../data/invoices/issuance.ts';
+import { fontStack, radii, statusColors } from '../../../../ui/theme.ts';
 
 /** Semantic tone of a status pill, named after the reference stylesheet's status classes. */
 export type StatusTone = keyof typeof statusColors;

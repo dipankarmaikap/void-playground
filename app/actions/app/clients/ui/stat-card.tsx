@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { fontStack, neutrals, primary, radii, shadows, softFills } from './theme.ts';
+import { fontStack, neutrals, primary, radii, shadows, softFills } from '../../../../ui/theme.ts';
 
 export type StatCardTone = 'primary' | 'coral' | 'green' | 'amber';
 
