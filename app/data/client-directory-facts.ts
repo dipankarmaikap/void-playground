@@ -44,6 +44,13 @@ export interface ClientDirectoryFacts {
 /** A follow-up view derived from real Invoice display statuses. */
 export type ClientFollowUpView = 'current' | 'overdue';
 
+/**
+ * The directory's follow-up filter: one of the derived views, or the unfiltered
+ * whole. Owned here so the controller and the page share one union with the
+ * facts that define it.
+ */
+export type ClientFollowUpFilter = 'all' | ClientFollowUpView;
+
 const MS_PER_DAY = 86_400_000;
 
 /**

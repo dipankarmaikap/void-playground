@@ -8,7 +8,7 @@ import {
   type ClientDirectoryItem,
   type ClientTypeFilter,
 } from '../../../data/clients.ts';
-import type { ClientDirectoryFacts } from '../../../data/client-directory-facts.ts';
+import type { ClientDirectoryFacts, ClientFollowUpFilter } from '../../../data/client-directory-facts.ts';
 import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -30,8 +30,6 @@ import { Select } from '../../../ui/select.tsx';
 import { StatCard, statGridStyle, trendUpStyle } from './ui/stat-card.tsx';
 import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
 import { fontStack, neutrals, primary, radii, softFills } from '../../../ui/theme.ts';
-
-export type ClientFollowUpFilter = 'all' | 'current' | 'overdue';
 
 export interface ClientsIndexPageProps {
   csrfToken: string;

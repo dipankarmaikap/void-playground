@@ -9,6 +9,7 @@ import {
   getClientDirectoryFacts,
   getClientProfileFacts,
 } from '../../../data/client-directory-facts.ts';
+import type { ClientFollowUpFilter } from '../../../data/client-directory-facts.ts';
 import {
   createClient,
   findClient,
@@ -28,7 +29,6 @@ import { EditClientPage } from './edit/page.tsx';
 import { clientFormValuesOf } from './form-values.ts';
 import { parseClientForm } from './parse-client-form.ts';
 import { ClientsIndexPage } from './index-page.tsx';
-import type { ClientFollowUpFilter } from './index-page.tsx';
 import { NewClientPage } from './new/page.tsx';
 import { ClientProfilePage } from './show-page.tsx';
 
