@@ -4,13 +4,13 @@ import { css } from 'remix/component';
 import { APP_NAME } from '../config.ts';
 import { routes } from '../routes.ts';
 import { Document } from '../actions/document.tsx';
+import { Avatar } from './avatar.tsx';
 import { Button } from './button.tsx';
 import { Icon } from './icon.tsx';
 import type { IconName } from './icon.tsx';
 import { identityOf } from './identity.ts';
 import type { UserIdentity } from './identity.ts';
 import {
-  avatarColors,
   focus,
   fontStack,
   gradients,
@@ -348,21 +348,6 @@ const profileStyle = css({
   minWidth: 0,
 });
 
-const avatarStyle = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-  boxSizing: 'border-box',
-  width: '2rem',
-  height: '2rem',
-  borderRadius: '999px',
-  background: avatarColors.default.background,
-  color: avatarColors.default.color,
-  fontSize: '0.625rem',
-  fontWeight: 800,
-});
-
 const profileNameStyle = css({
   display: 'flex',
   flexDirection: 'column',
@@ -414,13 +399,6 @@ const mainStyle = css({
     padding: '1.5rem 1rem 2.5rem',
   },
 });
-
-function initialsOf(value: string) {
-  let parts = value.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
 
 function NavLink(handle: Handle<NavItem>) {
   return () => {
@@ -505,9 +483,7 @@ function AppSidebar(handle: Handle<SidebarProps>) {
             </p>
           </div>
           <div mix={profileStyle}>
-            <span aria-hidden="true" mix={avatarStyle}>
-              {initialsOf(identity.name)}
-            </span>
+            <Avatar name={identity.name} tone="default" size="md" />
             <span mix={profileNameStyle}>
               <strong mix={identityNameStyle}>{identity.name}</strong>
               {identity.email ? <span mix={identityEmailStyle}>{identity.email}</span> : null}

@@ -19,6 +19,7 @@ const baseStyle = css({
 
 const sizeStyles = {
   sm: css({ width: '29px', height: '29px', fontSize: '0.5625rem' }),
+  md: css({ width: '2rem', height: '2rem', fontSize: '0.625rem' }),
   lg: css({ width: '48px', height: '48px', fontSize: '0.875rem' }),
 };
 
