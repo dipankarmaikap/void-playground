@@ -41,6 +41,9 @@ export interface CreditNoteDraftIssue {
   message: string;
 }
 
+/** Longest credit-note reason the domain accepts; the form's browser textarea shares it. */
+export const CREDIT_NOTE_REASON_MAX_LENGTH = 1000;
+
 /** One reversal line: copied stable values plus its source-line identity and copied tax strings. */
 export interface CreditNoteLineChanges extends LineValueFields {
   invoice_line_id: string;
@@ -328,7 +331,7 @@ export function calculateCreditNoteDraft(
 
   let reason = input.reason.trim();
   if (!reason) push('reason', 'Enter a reason for this credit note.');
-  if (input.reason.length > 1000) {
+  if (input.reason.length > CREDIT_NOTE_REASON_MAX_LENGTH) {
     push('reason', 'Reason must be 1,000 characters or fewer.');
   }
 
