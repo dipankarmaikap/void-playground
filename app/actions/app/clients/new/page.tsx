@@ -3,7 +3,6 @@ import type { Issue } from 'remix/data-schema';
 
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
-import { linkButtonStyle } from '../../../../ui/button.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import { ClientForm } from '../client-form.tsx';
 import { FormPageHeader } from '../form-page-header.tsx';
@@ -41,15 +40,6 @@ export function NewClientPage(handle: Handle<NewClientPageProps>) {
           eyebrow="Grow your circle"
           title="Add a client"
           intro="Save their details once and they will be ready for your next invoice."
-          action={
-            <a
-              href={routes.app.clients.index.href()}
-              data-variant="secondary"
-              mix={linkButtonStyle}
-            >
-              Cancel
-            </a>
-          }
         />
         <ClientForm
           csrfToken={csrfToken}

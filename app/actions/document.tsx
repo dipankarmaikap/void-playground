@@ -6,7 +6,7 @@ import { getCspNonce } from 'remix/middleware/csp';
 
 import { documentScriptEntry } from '../assets.ts';
 import { APP_NAME } from '../config.ts';
-import { fontAssetHref, fontFamily, fontStack, neutrals, typography } from '../ui/theme.ts';
+import { fontAssetHref, fontStack, neutrals, typography } from '../ui/theme.ts';
 
 export interface DocumentProps {
   children?: RemixNode;
@@ -24,10 +24,11 @@ export function Document(handle: Handle<DocumentProps>) {
     let nonce = getCspNonce(getContext());
     let pageTitle = title ? `${title} | ${APP_NAME}` : APP_NAME;
 
-    // Authored styles need the request nonce under the app's nonce-only
-    // style-src policy. css() rules get theirs from the render middleware, but
-    // a global @font-face cannot live inside a generated, scoped class.
-    let typographyStyle = `
+    // Authored styles need the request nonce under the app's nonce-only style-src policy.
+    // A global @font-face cannot live inside a generated, scoped class, so the authored <style>
+    // carries only the font face and control inheritance. Body typography is declared once,
+    // on <body> below via css(), whose rules the render middleware nonces automatically.
+    let fontFaceStyle = `
       @font-face {
         font-family: "Inter";
         font-style: normal;
@@ -35,15 +36,8 @@ export function Document(handle: Handle<DocumentProps>) {
         font-display: swap;
         src: url("${fontAssetHref}") format("woff2");
       }
-      body {
-        font-family: ${fontStack};
-        font-size: ${typography.bodyFontSize};
-        line-height: ${typography.bodyLineHeight};
-        color: ${neutrals.ink};
-        background: ${neutrals.canvas};
-      }
       button, input, select, textarea {
-        font-family: ${fontStack};
+        font-family: inherit;
       }
     `;
 
@@ -62,7 +56,7 @@ export function Document(handle: Handle<DocumentProps>) {
             crossorigin="anonymous"
             nonce={nonce}
           />
-          <style nonce={nonce}>{typographyStyle}</style>
+          <style nonce={nonce}>{fontFaceStyle}</style>
           <title>{pageTitle}</title>
           {description ? <meta name="description" content={description} /> : null}
           {noindex ? <meta name="robots" content="noindex" /> : null}
@@ -87,7 +81,7 @@ export function Document(handle: Handle<DocumentProps>) {
         <body
           mix={css({
             margin: 0,
-            fontFamily,
+            fontFamily: fontStack,
             fontSize: typography.bodyFontSize,
             lineHeight: typography.bodyLineHeight,
             color: neutrals.ink,

@@ -3,7 +3,11 @@ import { css } from 'remix/component';
 
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
 import type { ClientStatus } from '../../../data/client-status.ts';
-import type { ClientDirectoryItem, ClientTypeFilter } from '../../../data/clients.ts';
+import {
+  CLIENT_DIRECTORY_PAGE_SIZE,
+  type ClientDirectoryItem,
+  type ClientTypeFilter,
+} from '../../../data/clients.ts';
 import type { ClientDirectoryFacts } from '../../../data/client-directory-facts.ts';
 import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
@@ -14,6 +18,7 @@ import { DataTable, amountCellStyle } from '../../../ui/data-table.tsx';
 import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
 import { Input } from '../../../ui/input.tsx';
+import { PageHeader } from '../../../ui/page-header.tsx';
 import { Panel, PanelBody, PanelFooter, PanelHeader } from '../../../ui/panel.tsx';
 import {
   noticeErrorStyle,
@@ -22,7 +27,7 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { Select } from '../../../ui/select.tsx';
-import { StatCard, trendUpStyle } from '../../../ui/stat-card.tsx';
+import { StatCard, statGridStyle, trendUpStyle } from '../../../ui/stat-card.tsx';
 import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/status-pill.tsx';
 import { fontStack, neutrals, primary, radii, softFills } from '../../../ui/theme.ts';
 
@@ -38,6 +43,8 @@ export interface ClientsIndexPageProps {
   status: ClientStatus;
   followUp: ClientFollowUpFilter;
   page: number;
+  /** Clients matching the applied filters, before pagination. */
+  total: number;
   hasPrevious: boolean;
   hasNext: boolean;
   facts: ClientDirectoryFacts;
@@ -67,54 +74,11 @@ function directoryHref({ q, type, status, followUp = 'all', page }: DirectoryFil
     : routes.app.clients.index.href({}, { searchParams });
 }
 
-const pageHeaderStyle = css({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'flex-end',
-  justifyContent: 'space-between',
-  gap: '1rem',
-  marginBottom: '1.5rem',
-});
-
-const eyebrowStyle = css({
-  display: 'block',
-  marginBottom: '4px',
-  color: primary.base,
-  fontSize: '0.6875rem',
-  fontWeight: 800,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-});
-
-const headingStyle = css({
-  margin: 0,
-  color: neutrals.ink,
-  fontFamily: fontStack,
-  fontSize: '1.625rem',
-  fontWeight: 800,
-  letterSpacing: '-0.02em',
-  lineHeight: 1.2,
-});
-
-const introStyle = css({
-  margin: '6px 0 0',
-  color: neutrals.muted,
-  fontSize: '0.875rem',
-  lineHeight: 1.55,
-});
-
 const addClientStyle = css({
   minHeight: '38px',
   padding: '0 15px',
   fontSize: '0.8125rem',
   whiteSpace: 'nowrap',
-});
-
-const statGridStyle = css({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-  gap: '14px',
-  marginBottom: '18px',
 });
 
 const toolbarStyle = css({
@@ -173,7 +137,7 @@ const pillStyle = css({
     background: softFills.filterPill.background,
     color: primary.base,
   },
-  '&[aria-current="page"]': {
+  '&[data-active="true"]': {
     borderColor: softFills.filterPill.border,
     background: softFills.filterPill.background,
     color: primary.base,
@@ -197,7 +161,7 @@ const statusLinkStyle = css({
   color: primary.base,
   textDecoration: 'none',
   '&:hover': { textDecoration: 'underline' },
-  '&[aria-current="page"]': { color: neutrals.ink, fontWeight: 700 },
+  '&[data-active="true"]': { color: neutrals.ink, fontWeight: 700 },
 });
 
 const personCellStyle = css({
@@ -320,12 +284,7 @@ function pill(
   title?: string,
 ): RemixNode {
   return (
-    <a
-      href={href}
-      aria-current={current ? 'page' : undefined}
-      title={title}
-      mix={pillStyle}
-    >
+    <a href={href} data-active={current ? 'true' : undefined} title={title} mix={pillStyle}>
       {label} <span mix={pillCountStyle}>{count}</span>
     </a>
   );
@@ -343,6 +302,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
       status,
       followUp,
       page,
+      total,
       hasPrevious,
       hasNext,
       facts,
@@ -450,19 +410,12 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
       };
     });
 
-    let totalInView = archived
-      ? [...facts.clients.values()].filter((item) => item.lifecycleStatus === 'archived').length
-      : facts.summary.activeClientCount;
-    let firstShown = clients.length === 0 ? 0 : (page - 1) * 20 + 1;
+    let firstShown = clients.length === 0 ? 0 : (page - 1) * CLIENT_DIRECTORY_PAGE_SIZE + 1;
     let lastShown = clients.length === 0 ? 0 : firstShown + clients.length - 1;
     let shownText =
       clients.length === 0
         ? 'No clients to show'
-        : followUp === 'all'
-          ? `Showing ${firstShown}–${lastShown} of ${totalInView} clients`
-          : `Showing ${clients.length} ${
-              followUp === 'overdue' ? 'clients needing follow-up' : 'active clients'
-            } on page ${page}`;
+        : `Showing ${firstShown}–${lastShown} of ${total} clients`;
 
     return (
       <AppShell
@@ -473,20 +426,20 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
         title="Clients"
         description="Manage the clients your Organization works with."
       >
-        <header mix={pageHeaderStyle}>
-          <div>
-            <span mix={eyebrowStyle}>Relationships, made easier</span>
-            <h1 mix={headingStyle}>Clients</h1>
-            <p mix={introStyle}>
-              {archived
-                ? 'Archived clients keep their details and can be restored to the active directory.'
-                : 'Keep every client, conversation, and payment in one lovely place.'}
-            </p>
-          </div>
-          <a href={routes.app.clients.new.href()} mix={[linkButtonStyle, addClientStyle]}>
-            <span aria-hidden="true">＋</span> Add client
-          </a>
-        </header>
+        <PageHeader
+          eyebrow="Relationships, made easier"
+          title="Clients"
+          intro={
+            archived
+              ? 'Archived clients keep their details and can be restored to the active directory.'
+              : 'Keep every client, conversation, and payment in one lovely place.'
+          }
+          action={
+            <a href={routes.app.clients.new.href()} mix={[linkButtonStyle, addClientStyle]}>
+              <span aria-hidden="true">＋</span> Add client
+            </a>
+          }
+        />
 
         {error ? (
           <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
@@ -512,14 +465,14 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
               <nav aria-label="Client status" mix={statusNavStyle}>
                 <a
                   href={activeHref}
-                  aria-current={archived ? undefined : 'page'}
+                  data-active={archived ? undefined : 'true'}
                   mix={statusLinkStyle}
                 >
                   Active
                 </a>
                 <a
                   href={archivedHref}
-                  aria-current={archived ? 'page' : undefined}
+                  data-active={archived ? 'true' : undefined}
                   mix={statusLinkStyle}
                 >
                   Archived
@@ -574,7 +527,11 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                   </a>
                 </div>
               </form>
-              <div mix={filterRowStyle} role="group" aria-label="Filter clients by status">
+              <div
+                mix={filterRowStyle}
+                role="group"
+                aria-label="Filter clients by follow-up"
+              >
                 {pill('All clients', facts.summary.activeClientCount, allHref, !archived && followUp === 'all')}
                 {pill('Active', currentCount, currentHref, !archived && followUp === 'current')}
                 {pill(

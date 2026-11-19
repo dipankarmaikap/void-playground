@@ -22,10 +22,7 @@ export const primary = {
   dark: '#2f4db2',
   soft: '#eef3ff',
   mid: '#d6e2ff',
-  coral: '#ff806f',
-  mint: '#dff4e9',
   green: '#24845c',
-  amber: '#b87918',
   red: '#c94b4b',
 } as const;
 
@@ -61,14 +58,11 @@ export const softFills = {
 
 /** Effective radii after the reference's "keep the interface crisp" overrides. */
 export const radii = {
-  xs: '4px',
   sm: '6px',
   md: '7px',
   lg: '8px',
   xl: '9px',
   panel: '10px',
-  feature: '12px',
-  illustration: '14px',
 } as const;
 
 /** Reference shadows, from the subtle panel lift to the largest elevation. */
@@ -96,15 +90,16 @@ export const focus = {
 /** Inter is shipped as a local static asset; this is its same-origin URL. */
 export const fontAssetHref = '/fonts/inter-latin.woff2';
 
-/** The single font stack used by the document, form controls and headings. */
-export const fontStack = '"Inter", "Segoe UI", sans-serif';
+/** The one font stack, defined once and exported under its historical names below. */
+const INTER_FONT_STACK = '"Inter", "Segoe UI", sans-serif';
+
+export const fontStack = INTER_FONT_STACK;
 
 /** Body and heading metrics from the reference. */
 export const typography = {
   fontStack,
   bodyFontSize: '16px',
   bodyLineHeight: 1.55,
-  minWidth: '320px',
   headingLetterSpacing: '-0.02em',
 } as const;
 
@@ -122,7 +117,6 @@ export const colors = {
   accent: primary.base,
   accentHover: primary.dark,
   accentSoft: primary.soft,
-  accentMid: primary.mid,
   danger: primary.red,
   dangerSoft: statusColors.overdue.background,
   // The reference does not define a danger hover, so keep the established
@@ -133,6 +127,7 @@ export const colors = {
   onPrimary: neutrals.paper,
 } as const;
 
+/** Backward-compatible alias for `fontStack`. */
 export const fontFamily = fontStack;
 
 export const radius = {

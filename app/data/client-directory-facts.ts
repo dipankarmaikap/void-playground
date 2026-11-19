@@ -1,7 +1,7 @@
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { clients, invoicePayments, invoices } from './db.ts';
-import type { Invoice } from './db.ts';
+import type { Invoice, InvoicePayment } from './db.ts';
 import type { ClientStatus } from './client-status.ts';
 import { todayInKolkata } from './invoices/dates.ts';
 import type { InvoiceDisplayStatus } from './invoices/issuance.ts';
@@ -15,7 +15,7 @@ export interface ClientDirectorySummary {
   activeClientCount: number;
   /** Net balance due across this Organization's real invoice documents, in minor units. */
   outstandingBalanceMinor: number;
-  /** Clients created during the current Kolkata calendar month. */
+  /** Active Clients created during the current Kolkata calendar month. */
   newClientsThisMonth: number;
   /** Currency of the Organization's most recent invoice, used to format displayed balances. */
   currency: string;
@@ -41,7 +41,111 @@ export interface ClientDirectoryFacts {
   clients: Map<string, ClientFacts>;
 }
 
+/** A follow-up view derived from real Invoice display statuses. */
+export type ClientFollowUpView = 'current' | 'overdue';
+
 const MS_PER_DAY = 86_400_000;
+
+/**
+ * The Organization-scoped Invoice rows and payment totals shared by both fact derivations.
+ * `clientId` narrows the Invoice rows only; totals stay Organization-scoped so the same
+ * domain helpers can be reused unchanged.
+ */
+interface OrganizationInvoiceData {
+  invoices: Invoice[];
+  invoiceById: Map<string, Invoice>;
+  paymentTotals: Map<string, number>;
+  creditTotals: Map<string, number>;
+  refundTotals: Map<string, number>;
+  payments: InvoicePayment[];
+}
+
+async function loadOrganizationInvoiceData(
+  db: SqliteDatabase,
+  organizationId: string,
+  clientId?: string,
+): Promise<OrganizationInvoiceData> {
+  let invoiceWhere = clientId
+    ? { organization_id: organizationId, client_id: clientId, document_type: 'invoice' }
+    : { organization_id: organizationId, document_type: 'invoice' };
+  let [rows, paymentTotals, creditTotals, refundTotals, payments] = await Promise.all([
+    db.findMany(invoices, { where: invoiceWhere }),
+    activeInvoicePaymentTotals(db, organizationId),
+    activeInvoiceCreditNoteTotals(db, organizationId),
+    activeInvoiceRefundTotals(db, organizationId),
+    db.findMany(invoicePayments, {
+      where: { organization_id: organizationId, voided_at: null },
+    }),
+  ]);
+
+  return {
+    invoices: rows,
+    invoiceById: new Map(rows.map((invoice) => [invoice.id, invoice])),
+    paymentTotals,
+    creditTotals,
+    refundTotals,
+    payments,
+  };
+}
+
+/** Balances and derived display status for one real Invoice row. */
+interface DerivedInvoice {
+  invoice: Invoice;
+  creditedTotalMinor: number;
+  balances: ReturnType<typeof invoiceFinancialBalances>;
+  status: InvoiceDisplayStatus;
+}
+
+function deriveInvoice(
+  invoice: Invoice,
+  data: OrganizationInvoiceData,
+  today: string,
+): DerivedInvoice {
+  let creditedTotalMinor = data.creditTotals.get(invoice.id) ?? 0;
+  let balances = invoiceFinancialBalances(
+    invoice.total_minor,
+    creditedTotalMinor,
+    data.paymentTotals.get(invoice.id) ?? 0,
+    data.refundTotals.get(invoice.id) ?? 0,
+  );
+  return {
+    invoice,
+    creditedTotalMinor,
+    balances,
+    status: invoiceDisplayStatus(invoice, balances.netPaidMinor, today, creditedTotalMinor),
+  };
+}
+
+/** Newest Invoice first, with deterministic date/created-at/id tie-breakers. */
+function sortInvoicesNewestFirst(rows: readonly Invoice[]): Invoice[] {
+  return [...rows].sort(
+    (a, b) =>
+      b.invoice_date.localeCompare(a.invoice_date) ||
+      b.created_at - a.created_at ||
+      b.id.localeCompare(a.id),
+  );
+}
+
+function currencyOf(rows: readonly Invoice[]): string {
+  return sortInvoicesNewestFirst(rows)[0]?.currency ?? 'INR';
+}
+
+/** Mean whole days from Invoice issue to active payment, or null without honest history. */
+function collectionAverage(data: OrganizationInvoiceData): number | null {
+  let totalCollectionDays = 0;
+  let collectionSampleCount = 0;
+  for (let payment of data.payments) {
+    let invoice = data.invoiceById.get(payment.invoice_id);
+    if (!invoice) continue;
+    let days = daysBetween(invoice.invoice_date, payment.payment_date);
+    if (days === null) continue;
+    totalCollectionDays += days;
+    collectionSampleCount += 1;
+  }
+  return collectionSampleCount === 0
+    ? null
+    : Math.round((totalCollectionDays / collectionSampleCount) * 10) / 10;
+}
 
 /**
  * Derives every Clients-directory metric for one Organization at read time.
@@ -55,30 +159,23 @@ export async function getClientDirectoryFacts(
   organizationId: string,
   today: string = todayInKolkata(),
 ): Promise<ClientDirectoryFacts> {
-  let [organizationClients, organizationInvoices, paymentTotals, creditTotals, refundTotals, payments] =
-    await Promise.all([
-      db.findMany(clients, { where: { organization_id: organizationId } }),
-      db.findMany(invoices, {
-        where: { organization_id: organizationId, document_type: 'invoice' },
-      }),
-      activeInvoicePaymentTotals(db, organizationId),
-      activeInvoiceCreditNoteTotals(db, organizationId),
-      activeInvoiceRefundTotals(db, organizationId),
-      db.findMany(invoicePayments, {
-        where: { organization_id: organizationId, voided_at: null },
-      }),
-    ]);
+  let [organizationClients, data] = await Promise.all([
+    db.findMany(clients, { where: { organization_id: organizationId } }),
+    loadOrganizationInvoiceData(db, organizationId),
+  ]);
 
-  let invoiceById = new Map<string, Invoice>(organizationInvoices.map((invoice) => [invoice.id, invoice]));
   let clientFacts = new Map<string, ClientFacts>();
   let monthPrefix = today.slice(0, 7);
   let activeClientCount = 0;
   let newClientsThisMonth = 0;
 
   for (let client of organizationClients) {
-    if (client.status === 'active') activeClientCount += 1;
-    if (todayInKolkata(new Date(client.created_at)).slice(0, 7) === monthPrefix) {
-      newClientsThisMonth += 1;
+    let active = client.status === 'active';
+    if (active) {
+      activeClientCount += 1;
+      if (todayInKolkata(new Date(client.created_at)).slice(0, 7) === monthPrefix) {
+        newClientsThisMonth += 1;
+      }
     }
     clientFacts.set(client.id, {
       lifecycleStatus: client.status,
@@ -90,43 +187,30 @@ export async function getClientDirectoryFacts(
     });
   }
 
-  let currency = [...organizationInvoices]
-    .sort((a, b) =>
-      `${b.invoice_date}|${b.created_at}|${b.id}`.localeCompare(`${a.invoice_date}|${a.created_at}|${a.id}`),
-    )[0]?.currency ?? 'INR';
-
   let outstandingBalanceMinor = 0;
-  for (let invoice of organizationInvoices) {
-    let creditedTotalMinor = creditTotals.get(invoice.id) ?? 0;
-    let balances = invoiceFinancialBalances(
-      invoice.total_minor,
-      creditedTotalMinor,
-      paymentTotals.get(invoice.id) ?? 0,
-      refundTotals.get(invoice.id) ?? 0,
-    );
-    outstandingBalanceMinor += balances.balanceDueMinor;
+  for (let derived of sortInvoicesNewestFirst(data.invoices).map((invoice) =>
+    deriveInvoice(invoice, data, today),
+  )) {
+    outstandingBalanceMinor += derived.balances.balanceDueMinor;
 
-    let facts = clientFacts.get(invoice.client_id);
+    let facts = clientFacts.get(derived.invoice.client_id);
     if (!facts) continue;
-    let status = invoiceDisplayStatus(invoice, balances.netPaidMinor, today, creditedTotalMinor);
     facts.invoiceCount += 1;
-    facts.outstandingBalanceMinor += balances.balanceDueMinor;
-    if (facts.lastInvoiceDate === null || invoice.invoice_date > facts.lastInvoiceDate) {
-      facts.lastInvoiceDate = invoice.invoice_date;
-      facts.status = status;
+    facts.outstandingBalanceMinor += derived.balances.balanceDueMinor;
+    let { invoice_date: invoiceDate } = derived.invoice;
+    if (facts.lastInvoiceDate === null || invoiceDate > facts.lastInvoiceDate) {
+      facts.lastInvoiceDate = invoiceDate;
+      facts.status = derived.status;
+    } else if (
+      invoiceDate === facts.lastInvoiceDate &&
+      derived.status === 'overdue' &&
+      facts.status !== 'overdue'
+    ) {
+      // Equal-dated invoices are not an arbitrary winner: an unpaid, past-due Invoice must
+      // not be masked by a paid one just because the database returned it first.
+      facts.status = 'overdue';
     }
-    if (status === 'overdue') facts.hasOverdueInvoice = true;
-  }
-
-  let totalCollectionDays = 0;
-  let collectionSampleCount = 0;
-  for (let payment of payments) {
-    let invoice = invoiceById.get(payment.invoice_id);
-    if (!invoice) continue;
-    let days = daysBetween(invoice.invoice_date, payment.payment_date);
-    if (days === null) continue;
-    totalCollectionDays += days;
-    collectionSampleCount += 1;
+    if (derived.status === 'overdue') facts.hasOverdueInvoice = true;
   }
 
   return {
@@ -134,14 +218,29 @@ export async function getClientDirectoryFacts(
       activeClientCount,
       outstandingBalanceMinor,
       newClientsThisMonth,
-      currency,
-      averageCollectionDays:
-        collectionSampleCount === 0
-          ? null
-          : Math.round((totalCollectionDays / collectionSampleCount) * 10) / 10,
+      currency: currencyOf(data.invoices),
+      averageCollectionDays: collectionAverage(data),
     },
     clients: clientFacts,
   };
+}
+
+/**
+ * Organization-wide Client ids matching a follow-up view, taken from the same facts that feed
+ * the summary cards. The index controller passes these to `listClients` so the filter runs
+ * before pagination instead of after it.
+ */
+export function clientIdsForFollowUp(
+  facts: ClientDirectoryFacts,
+  view: ClientFollowUpView,
+): string[] {
+  let ids: string[] = [];
+  for (let [id, clientFacts] of facts.clients) {
+    if (view === 'overdue' ? clientFacts.hasOverdueInvoice : !clientFacts.hasOverdueInvoice) {
+      ids.push(id);
+    }
+  }
+  return ids;
 }
 
 /** One real Invoice row prepared for a Client's invoice-history table. */
@@ -177,82 +276,37 @@ export async function getClientProfileFacts(
   clientId: string,
   today: string = todayInKolkata(),
 ): Promise<ClientProfileFacts> {
-  let [organizationInvoices, paymentTotals, creditTotals, refundTotals, payments] =
-    await Promise.all([
-      db.findMany(invoices, {
-        where: {
-          organization_id: organizationId,
-          client_id: clientId,
-          document_type: 'invoice',
-        },
-      }),
-      activeInvoicePaymentTotals(db, organizationId),
-      activeInvoiceCreditNoteTotals(db, organizationId),
-      activeInvoiceRefundTotals(db, organizationId),
-      db.findMany(invoicePayments, {
-        where: { organization_id: organizationId, voided_at: null },
-      }),
-    ]);
-
-  let invoiceById = new Map<string, Invoice>(organizationInvoices.map((invoice) => [invoice.id, invoice]));
-  let currency =
-    [...organizationInvoices]
-      .sort((a, b) =>
-        `${b.invoice_date}|${b.created_at}|${b.id}`.localeCompare(
-          `${a.invoice_date}|${a.created_at}|${a.id}`,
-        ),
-      )[0]?.currency ?? 'INR';
+  let data = await loadOrganizationInvoiceData(db, organizationId, clientId);
+  let derived = sortInvoicesNewestFirst(data.invoices).map((invoice) =>
+    deriveInvoice(invoice, data, today),
+  );
 
   let totalInvoicedMinor = 0;
   let outstandingBalanceMinor = 0;
   let paidInvoiceCount = 0;
   let rows: ClientInvoiceRow[] = [];
 
-  for (let invoice of organizationInvoices) {
-    let creditedTotalMinor = creditTotals.get(invoice.id) ?? 0;
-    let balances = invoiceFinancialBalances(
-      invoice.total_minor,
-      creditedTotalMinor,
-      paymentTotals.get(invoice.id) ?? 0,
-      refundTotals.get(invoice.id) ?? 0,
-    );
-    let status = invoiceDisplayStatus(invoice, balances.netPaidMinor, today, creditedTotalMinor);
-    totalInvoicedMinor += invoice.total_minor;
-    outstandingBalanceMinor += balances.balanceDueMinor;
-    if (status === 'paid') paidInvoiceCount += 1;
+  for (let item of derived) {
+    totalInvoicedMinor += item.invoice.total_minor;
+    outstandingBalanceMinor += item.balances.balanceDueMinor;
+    if (item.status === 'paid') paidInvoiceCount += 1;
     rows.push({
-      id: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      invoiceDate: invoice.invoice_date,
-      totalMinor: invoice.total_minor,
-      currency: invoice.currency,
-      status,
+      id: item.invoice.id,
+      invoiceNumber: item.invoice.invoice_number,
+      invoiceDate: item.invoice.invoice_date,
+      totalMinor: item.invoice.total_minor,
+      currency: item.invoice.currency,
+      status: item.status,
     });
   }
 
-  rows.sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate) || a.id.localeCompare(b.id));
-
-  let totalCollectionDays = 0;
-  let collectionSampleCount = 0;
-  for (let payment of payments) {
-    let invoice = invoiceById.get(payment.invoice_id);
-    if (!invoice) continue;
-    let days = daysBetween(invoice.invoice_date, payment.payment_date);
-    if (days === null) continue;
-    totalCollectionDays += days;
-    collectionSampleCount += 1;
-  }
-
   return {
-    currency,
+    currency: currencyOf(data.invoices),
     totalInvoicedMinor,
     outstandingBalanceMinor,
     paidInvoiceCount,
-    invoiceCount: organizationInvoices.length,
-    averageCollectionDays:
-      collectionSampleCount === 0
-        ? null
-        : Math.round((totalCollectionDays / collectionSampleCount) * 10) / 10,
+    invoiceCount: data.invoices.length,
+    averageCollectionDays: collectionAverage(data),
     invoices: rows,
   };
 }
