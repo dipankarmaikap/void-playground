@@ -33,15 +33,16 @@ export interface ClientFormSectionContext {
 /**
  * One editable slice of the Client form.
  *
- * Later Client tickets append an entry instead of rewriting the controllers:
- * each section parses its own form fields and returns only the changes it owns.
+ * Later Client tickets append an entry instead of rewriting the controllers: the shared form
+ * schema parses the submission into {@link ClientFormValues} once, and each section validates its
+ * own slice and returns only the changes it owns.
  */
 export interface ClientFormSection {
   /** Stable identity for rendering and diagnostics. */
   key: string;
   render: (props: ClientFormSectionProps) => RemixNode;
   parse: (
-    formData: FormData,
+    values: ClientFormValues,
     context: ClientFormSectionContext,
   ) => ClientFormSectionResult | Promise<ClientFormSectionResult>;
 }

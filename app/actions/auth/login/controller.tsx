@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 
 import { Auth } from 'remix/middleware/auth';
 import type { AuthState } from 'remix/middleware/auth';
@@ -14,18 +15,20 @@ import { setAuthPayload } from '../../../data/session/auth-payload.ts';
 import { verifyPassword } from '../../../data/password.ts';
 import { routes } from '../../../routes.ts';
 import { LoginPage } from './page.tsx';
+import { LoginForm } from './public/schema.ts';
 
 const credentialsProvider = createCredentialsAuthProvider<
   { email: string; password: string },
   User
 >({
   parse(context) {
-    let formData = context.get(FormData)!;
+    let parsed = s.parseSafe(LoginForm, context.get(FormData)!);
+    let { email, password } = parsed.success
+      ? parsed.value
+      : { email: '', password: '' };
     return {
-      email: String(formData.get('email') ?? '')
-        .trim()
-        .toLowerCase(),
-      password: String(formData.get('password') ?? ''),
+      email: email.trim().toLowerCase(),
+      password,
     };
   },
   async verify({ email, password }, context) {

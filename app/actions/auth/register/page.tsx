@@ -1,11 +1,12 @@
 import type { Handle } from 'remix/component';
 
-import { APP_NAME, DISPLAY_NAME_MAX_LENGTH } from '../../../config.ts';
+import { APP_NAME } from '../../../config.ts';
 import { routes } from '../../../routes.ts';
 import { AuthLayout } from '../../../ui/auth-layout.tsx';
 import { Button } from '../../../ui/button.tsx';
 import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
+import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import {
   authHeaderStyle,
   authHeadingStyle,
@@ -16,6 +17,7 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { Document } from '../../document.tsx';
+import { registerFormFields } from './public/schema.ts';
 
 export interface RegisterPageProps {
   csrfToken: string;
@@ -49,18 +51,15 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
             <Field label="Email">
               <Input
                 name="email"
-                type="email"
-                autoComplete="email"
                 defaultValue={email ?? ''}
-                required
+                {...formFieldAttributes(registerFormFields.email)}
               />
             </Field>
             <Field label="Organization name">
               <Input
                 name="organization_name"
-                autoComplete="organization"
                 defaultValue={organizationName ?? ''}
-                required
+                {...formFieldAttributes(registerFormFields.organization_name)}
               />
             </Field>
             <Field
@@ -69,18 +68,14 @@ export function RegisterPage(handle: Handle<RegisterPageProps>) {
             >
               <Input
                 name="display_name"
-                autoComplete="nickname"
-                maxLength={DISPLAY_NAME_MAX_LENGTH}
                 defaultValue={displayName ?? ''}
+                {...formFieldAttributes(registerFormFields.display_name)}
               />
             </Field>
             <Field label="Password">
               <Input
                 name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
+                {...formFieldAttributes(registerFormFields.password)}
               />
             </Field>
             <Button type="submit">Create Organization</Button>

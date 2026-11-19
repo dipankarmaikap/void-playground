@@ -23,10 +23,11 @@ async function createUserIn(db: SqliteDatabase, email: string): Promise<string> 
   let userId = crypto.randomUUID();
   let organizationId = crypto.randomUUID();
   let now = Date.now();
+  let passwordHash = await hashPassword('password123');
   await db.create(users, { id: userId, email, email_verified: true, created_at: now });
   await db.create(userPasswords, {
     user_id: userId,
-    password_hash: hashPassword('password123'),
+    password_hash: passwordHash,
     updated_at: now,
   });
   await db.create(organizations, {

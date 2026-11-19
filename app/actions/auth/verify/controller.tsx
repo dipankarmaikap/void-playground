@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import * as s from 'remix/data-schema';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { getCsrfToken } from 'remix/middleware/csrf';
@@ -7,6 +8,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 import { users } from '../../../data/db.ts';
 import { routes } from '../../../routes.ts';
 import { VerifyEmailPage } from './page.tsx';
+import { VerifyForm } from './public/schema.ts';
 
 export default createController(routes.auth.verify, {
   actions: {
@@ -24,8 +26,8 @@ export default createController(routes.auth.verify, {
       );
     },
     async action(context) {
-      let tokenValue = context.formData.get('token');
-      let token = typeof tokenValue === 'string' ? tokenValue : '';
+      let parsed = s.parseSafe(VerifyForm, context.formData);
+      let token = parsed.success ? parsed.value.token : '';
       let user = await findValidVerificationUser(context.db, token);
 
       if (!user) {

@@ -12,7 +12,7 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
-import { clientFormValuesOf, readClientFormValues } from '../form-values.ts';
+import { clientFormValuesOf } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
 import { EditClientPage } from './page.tsx';
 
@@ -45,7 +45,7 @@ export default createController(routes.app.clients.edit, {
       let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
-      let { issues, changes, warning } = await parseClientForm(context.formData, {
+      let { values, issues, changes, warning } = await parseClientForm(context.formData, {
         db: context.db,
         organizationId: organization.id,
         clientId: client.id,
@@ -61,7 +61,7 @@ export default createController(routes.app.clients.edit, {
             identity={{ email: identity.email, displayName: identity.display_name }}
             organizationName={organization.name}
             client={client}
-            values={readClientFormValues(context.formData)}
+            values={values}
             issues={issues}
           />,
           { status: 400 },

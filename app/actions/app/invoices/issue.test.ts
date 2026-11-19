@@ -24,7 +24,7 @@ import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';
 import { invoicingFormFields } from '../settings/invoicing/test-fields.ts';
-import { readInvoiceFormValues } from './form-values.ts';
+import { parseInvoiceFormValues } from './public/schema.ts';
 import {
   createUserAndLoginWithOrganization,
   extractCsrf,
@@ -776,7 +776,8 @@ describe('invoice issue flow', () => {
     assert.equal(rejectedInvoice?.invoice_number, before.invoice_number);
     assert.equal(rejectedInvoice?.updated_at, before.updated_at);
 
-    let parsed = parseInvoiceDraft(readInvoiceFormValues(formDataOf(draftFields(client.id))));
+    let { values } = parseInvoiceFormValues(formDataOf(draftFields(client.id)));
+    let parsed = parseInvoiceDraft(values);
     assert.equal(parsed.ok, true);
     if (parsed.ok) {
       let directEdit = await updateDraftInvoice(db, organizationId, invoiceId, parsed.value);

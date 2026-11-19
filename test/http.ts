@@ -39,6 +39,7 @@ export async function createUser(
   let id = crypto.randomUUID();
   let organizationId = crypto.randomUUID();
   let now = Date.now();
+  let passwordHash = await hashPassword(password);
   await db.transaction(async (tx) => {
     await tx.create(users, {
       id,
@@ -49,7 +50,7 @@ export async function createUser(
     });
     await tx.create(userPasswords, {
       user_id: id,
-      password_hash: hashPassword(password),
+      password_hash: passwordHash,
       updated_at: now,
     });
     await tx.create(organizations, {

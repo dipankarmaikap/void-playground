@@ -20,6 +20,8 @@ export {
   creditNotePdfArtifacts,
 } from './db/tables.ts';
 
+export * from './db/relations.ts';
+
 export type {
   User,
   Organization,
@@ -46,5 +48,7 @@ export type {
  * domain modules take it as an explicit parameter (see docs/agents/data-modules.md).
  *
  * Schema application lives in `./db/migrate.ts`, awaited by server startup before it listens
- * and by the shared test bootstrap, so no request or test ever sees a half-migrated schema.
+ * and by the shared test bootstrap, so no request or test ever sees a half-migrated schema. The
+ * database is a disposable build-phase artifact (ADR-0003): the documented remedy for a stale
+ * or unrecognized dev database is deleting the file and restarting.
  */

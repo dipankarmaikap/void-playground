@@ -19,8 +19,8 @@ const isHmr = process.env.REMIX_NODE_HMR === '1';
 
 // The application database is constructed here and injected into the router; request handling
 // never imports a database instance. Migrations are applied before the HTTP server starts
-// listening, so no request ever sees a half-migrated schema. A legacy database fails closed
-// here with the operator clean-start message instead of reaching the runner.
+// listening, so no request ever sees a half-migrated schema. The dev database is disposable
+// (ADR-0003): a stale or unrecognized file is deleted by an operator, never upgraded in place.
 const db = createAppDatabase();
 await migrateDatabase(db);
 const router = createAppRouter({ db });
