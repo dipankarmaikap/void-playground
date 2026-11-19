@@ -121,7 +121,7 @@ async function setInvoicingDefaults(
 }
 
 async function makeClient(organizationId: string, overrides: Record<string, unknown> = {}) {
-  return createClient(organizationId, {
+  return createClient(db, organizationId, {
     type: 'individual',
     legal_name: unique('Draft Client'),
     billing_line1: '12 Residency Road',

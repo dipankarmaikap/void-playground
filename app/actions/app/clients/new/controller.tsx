@@ -38,6 +38,7 @@ export default createController(routes.app.clients.new, {
     async action(context) {
       let organization = context.get(CurrentOrganization);
       let { issues, changes, warning } = await parseClientForm(context.formData, {
+        db: context.db,
         organizationId: organization.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -57,7 +58,7 @@ export default createController(routes.app.clients.new, {
         );
       }
 
-      let client = await createClient(organization.id, changes);
+      let client = await createClient(context.db, organization.id, changes);
       context.session.flash(
         'message',
         warning ? `Client created. ${warning}` : 'Client created',

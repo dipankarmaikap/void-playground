@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 
 import { Auth, requireAuth } from 'remix/middleware/auth';
@@ -30,6 +31,7 @@ import { InvoiceShowPage } from '../show-page.tsx';
 import type { InvoiceShowPageProps, RefundFormValues } from '../show-page.tsx';
 
 type RefundRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  db: SqliteDatabase;
   formData: FormData;
   render: RenderFunction;
 };
@@ -48,7 +50,7 @@ async function renderRefundError(
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, client, paymentData] = await Promise.all([
     findInvoiceLines(organization.id, invoice.id),
-    findClient(organization.id, invoice.client_id),
+    findClient(context.db, organization.id, invoice.client_id),
     invoiceActivityData(organization.id, invoice),
   ]);
   return context.render(

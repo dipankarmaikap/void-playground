@@ -1,6 +1,7 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { Auth, requireAuth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
@@ -33,6 +34,7 @@ import type { InvoiceShowPageProps } from '../show-page.tsx';
  */
 type InvoiceShowRequestContext = RequestContext<AnyParams, ContextEntries> & {
   render: RenderFunction;
+  db: SqliteDatabase;
 };
 
 /**
@@ -51,7 +53,7 @@ async function renderInvoiceShowPageError(
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, client, paymentData] = await Promise.all([
     findInvoiceLines(organization.id, invoice.id),
-    findClient(organization.id, invoice.client_id),
+    findClient(context.db, organization.id, invoice.client_id),
     invoiceActivityData(organization.id, invoice),
   ]);
   return context.render(

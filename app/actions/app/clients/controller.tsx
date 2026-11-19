@@ -42,7 +42,12 @@ export default createController(routes.app.clients, {
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
       let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
-      let directory = await listClients(organization.id, { q: query, type, status, page });
+      let directory = await listClients(context.db, organization.id, {
+        q: query,
+        type,
+        status,
+        page,
+      });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
@@ -62,7 +67,7 @@ export default createController(routes.app.clients, {
     },
     async show(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
       let invoiceCount = await countClientInvoices(organization.id, client.id);
 

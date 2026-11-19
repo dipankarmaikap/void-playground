@@ -24,7 +24,7 @@ export default createController(routes.app.clients.edit, {
   actions: {
     async index(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -42,10 +42,11 @@ export default createController(routes.app.clients.edit, {
     },
     async action(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let { issues, changes, warning } = await parseClientForm(context.formData, {
+        db: context.db,
         organizationId: organization.id,
         clientId: client.id,
       });
@@ -67,7 +68,7 @@ export default createController(routes.app.clients.edit, {
         );
       }
 
-      let updated = await updateClient(organization.id, client.id, changes);
+      let updated = await updateClient(context.db, organization.id, client.id, changes);
       if (!updated) return new Response('Client not found', { status: 404 });
       context.session.flash(
         'message',

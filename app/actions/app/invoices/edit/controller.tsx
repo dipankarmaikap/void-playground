@@ -37,7 +37,7 @@ export default createController(routes.app.invoices.edit, {
 
       let [lines, client] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
-        findClient(organization.id, invoice.client_id),
+        findClient(context.db, organization.id, invoice.client_id),
       ]);
       let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
@@ -85,7 +85,7 @@ export default createController(routes.app.invoices.edit, {
             identity={identity}
             organizationName={organization.name}
             invoice={invoice}
-            client={await findClient(organization.id, invoice.client_id)}
+            client={await findClient(context.db, organization.id, invoice.client_id)}
             lines={savedLines}
             values={withAdditionalLine(values)}
             gstRatePresets={gstRatePresets}
@@ -95,7 +95,7 @@ export default createController(routes.app.invoices.edit, {
 
       let parsed = parseInvoiceDraft(values, taxConfig);
       if (!parsed.ok) {
-        let client = await findClient(organization.id, invoice.client_id);
+        let client = await findClient(context.db, organization.id, invoice.client_id);
         return context.render(
           <EditInvoicePage
             csrfToken={csrfToken}

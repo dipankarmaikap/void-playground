@@ -63,7 +63,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-partial',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -144,7 +144,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-overdue',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Overdue Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -205,7 +205,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-currency',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Currency Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -240,7 +240,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-concurrent',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Concurrent Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -272,7 +272,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-void',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Void Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -334,7 +334,7 @@ describe('invoice payments', () => {
       router,
       'invoice-payment-rejections',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Rejected Payment Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -381,12 +381,12 @@ describe('invoice payments', () => {
   it('scopes payment recording and voiding to the authenticated Organization', async () => {
     let owner = await createUserAndLoginWithOrganization(router, 'invoice-payment-scope-owner');
     let other = await createUserAndLoginWithOrganization(router, 'invoice-payment-scope-other');
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Payment Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Payment Client ${crypto.randomUUID()}`,
       status: 'active',

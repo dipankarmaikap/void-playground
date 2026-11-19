@@ -128,7 +128,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-draft-preview',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Draft Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -181,7 +181,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-internal-note',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Internal Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -212,7 +212,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-issued-immutability',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Immutability Client ${crypto.randomUUID()}`,
       billing_line1: 'Client Address Before Issue',
@@ -307,7 +307,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-detail-link',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Link Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -337,12 +337,12 @@ describe('invoice PDF downloads', () => {
     let other = await createUserAndLoginWithOrganization(router, 'invoice-pdf-scope-other');
     await setSellerProfile(owner.organizationId);
     await setSellerProfile(other.organizationId);
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -394,7 +394,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-usd-words',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Usd Client ${crypto.randomUUID()}`,
       status: 'active',

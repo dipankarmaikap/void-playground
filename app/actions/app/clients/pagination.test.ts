@@ -75,7 +75,7 @@ describe('Client directory pagination', () => {
     assert.ok(first.includes('Paged Client 020'));
     assert.ok(!first.includes('Paged Client 021'));
 
-    let directory = await listClients(organizationId);
+    let directory = await listClients(db, organizationId);
     assert.equal(directory.clients.length, 20);
     assert.ok(directory.clients[0]);
     for (let field of ['tax_value', 'billing_line1', 'created_at']) {

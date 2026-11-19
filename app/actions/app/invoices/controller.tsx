@@ -44,7 +44,7 @@ export default createController(routes.app.invoices, {
       let organization = context.get(CurrentOrganization);
       let query = (context.url.searchParams.get('q') ?? '').trim();
       let clientId = (context.url.searchParams.get('clientId') ?? '').trim();
-      let filteredClient = clientId ? await findClient(organization.id, clientId) : null;
+      let filteredClient = clientId ? await findClient(context.db, organization.id, clientId) : null;
       let status = parseInvoiceStatusFilter(context.url.searchParams.get('status'));
       let from = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('from'));
       let to = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('to'));
@@ -85,7 +85,7 @@ export default createController(routes.app.invoices, {
 
       let [lines, client, paymentData] = await Promise.all([
         findInvoiceLines(organization.id, invoice.id),
-        findClient(organization.id, invoice.client_id),
+        findClient(context.db, organization.id, invoice.client_id),
         invoiceActivityData(organization.id, invoice),
       ]);
       let message = context.session.get('message');

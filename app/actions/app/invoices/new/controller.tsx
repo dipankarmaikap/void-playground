@@ -30,9 +30,9 @@ export default createController(routes.app.invoices.new, {
     async index(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let directory = await listClients(organization.id, { status: 'active' });
+      let directory = await listClients(context.db, organization.id, { status: 'active' });
       let clientId = context.url.searchParams.get('clientId') ?? '';
-      let selectedClient = clientId ? await findClient(organization.id, clientId) : null;
+      let selectedClient = clientId ? await findClient(context.db, organization.id, clientId) : null;
 
       if (clientId && !selectedClient) return new Response('Client not found', { status: 404 });
       if (selectedClient?.status === 'archived') {
@@ -78,7 +78,7 @@ export default createController(routes.app.invoices.new, {
 
       // A new Draft can only start from an Active Client in the resolved Organization. A foreign
       // id is indistinguishable from a missing one; an archived Client is rejected explicitly.
-      let client = values.client_id ? await findClient(organization.id, values.client_id) : null;
+      let client = values.client_id ? await findClient(context.db, organization.id, values.client_id) : null;
       if (!client) return new Response('Client not found', { status: 404 });
       if (client.status === 'archived') {
         return context.render(
@@ -86,7 +86,7 @@ export default createController(routes.app.invoices.new, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={values}
             gstRatePresets={gstRatePresets}
@@ -107,7 +107,7 @@ export default createController(routes.app.invoices.new, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={withAdditionalLine(values)}
             gstRatePresets={gstRatePresets}
@@ -122,7 +122,7 @@ export default createController(routes.app.invoices.new, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={values}
             issues={parsed.issues}

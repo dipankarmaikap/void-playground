@@ -1,6 +1,8 @@
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
+
 import { clientDisplayLabel } from './client-names.ts';
 import { validateClientTextFields } from './client-text.ts';
-import { clients, db } from './db.ts';
+import { clients } from './db.ts';
 import type { Client } from './db.ts';
 import { findIndiaStateByCode } from './india-states.ts';
 
@@ -205,6 +207,7 @@ export function parseClientTax(input: ClientTaxInput): ClientTaxResult {
  * Duplicates are allowed; callers use this only to surface a non-blocking warning.
  */
 export async function findClientWithTaxValue(
+  db: SqliteDatabase,
   organizationId: string,
   value: string,
   excludeClientId?: string,

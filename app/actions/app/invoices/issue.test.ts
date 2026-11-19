@@ -150,7 +150,7 @@ describe('invoice issue flow', () => {
       router,
       'invoice-issue-incomplete-seller',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Issue Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -191,7 +191,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-recipient-gates',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Recipient Gate Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -255,7 +255,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-seller-gst-gates',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Seller GST Gate Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -286,7 +286,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-valid-uin',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `UIN Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -317,7 +317,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-snapshot',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: 'Original Client Profile',
       billing_line1: 'Original Client Address',
@@ -366,7 +366,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-default-legal-name',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Default Legal Name Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -388,7 +388,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-status',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Status Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -447,7 +447,7 @@ describe('invoice issue flow', () => {
       invoice_prefix: 'FY',
       invoice_starting_number: '50',
     });
-    let firstClient = await createClient(first.organizationId, {
+    let firstClient = await createClient(db, first.organizationId, {
       type: 'individual',
       legal_name: `Sequence Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -514,7 +514,7 @@ describe('invoice issue flow', () => {
       invoice_prefix: 'ALT',
       invoice_starting_number: '7',
     });
-    let secondClient = await createClient(second.organizationId, {
+    let secondClient = await createClient(db, second.organizationId, {
       type: 'individual',
       legal_name: `Other Sequence Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -536,7 +536,7 @@ describe('invoice issue flow', () => {
       invoice_prefix: 'PAR',
       invoice_starting_number: '1',
     });
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Concurrent Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -589,7 +589,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-finalizer-rollback',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Finalizer Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -635,7 +635,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-preserved-snapshot',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: 'Client Before Issue',
       billing_line1: 'Client Profile Address',
@@ -731,7 +731,7 @@ describe('invoice issue flow', () => {
       'invoice-issue-immutable',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Immutable Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -826,12 +826,12 @@ describe('invoice issue flow', () => {
     let other = await createUserAndLoginWithOrganization(router, 'invoice-issue-scope-other');
     await setSellerProfile(owner.organizationId);
     await setSellerProfile(other.organizationId);
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Issue Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Issue Client ${crypto.randomUUID()}`,
       status: 'active',

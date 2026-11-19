@@ -168,7 +168,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-full',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -208,7 +208,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-partial-cn',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Partial Credit Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -251,7 +251,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-rejections',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Rejected Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -297,7 +297,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-payment-void-invariant',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Payment Void Invariant Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -367,7 +367,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-net-paid-status',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Net Paid Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -420,7 +420,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-void',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Void Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -480,7 +480,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-void-balances',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Void Balance Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -524,12 +524,12 @@ describe('invoice refunds', () => {
   it('scopes refund recording, voiding, and views to the authenticated Organization', async () => {
     let owner = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-owner');
     let other = await createUserAndLoginWithOrganization(router, 'invoice-refund-scope-other');
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Refund Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Refund Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -598,7 +598,7 @@ describe('invoice refunds', () => {
       router,
       'invoice-refund-csrf',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Csrf Refund Client ${crypto.randomUUID()}`,
       status: 'active',
