@@ -5,22 +5,15 @@ import { redirect } from 'remix/response/redirect';
 import type { User } from '../data/db.ts';
 import { routes } from '../routes.ts';
 
-export interface RequireAuthOptions {
-  /** The sign-in destination; defaults to the login form. */
-  redirectTo?: Route;
-}
-
 /**
  * Guards an authenticated controller, sending anonymous visitors to login with their current
  * destination preserved in a sanitized `returnTo` search parameter.
  */
-export function requireAuth(options?: RequireAuthOptions) {
-  let redirectTo = options?.redirectTo ?? routes.auth.login.index;
-
+export function requireAuth() {
   return requireAuthenticated<User>({
     onFailure(context) {
       return redirect(
-        redirectTo.href(undefined, {
+        routes.auth.login.index.href(undefined, {
           searchParams: {
             returnTo:
               getSafeReturnTo(context.url.searchParams.get('returnTo')) ??
