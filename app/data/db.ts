@@ -22,6 +22,8 @@ export {
   creditNotePdfArtifacts,
 } from './db/tables.ts';
 
+export * from './db/relations.ts';
+
 export type {
   User,
   Organization,
@@ -48,7 +50,7 @@ export type {
  * database is a disposable build-phase artifact (ADR-0003): the documented remedy for a stale
  * or unrecognized dev database is deleting the file and restarting.
  *
- * The re-exported tables and row types above are the app-facing contract blessed by
+ * The re-exported tables, relations, and row types above are the app-facing contract blessed by
  * docs/agents/data-modules.md: query code stays unaffected by how the schema is applied.
  */
 export const db: SqliteDatabase = createAppDatabase();
