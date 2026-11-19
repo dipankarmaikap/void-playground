@@ -71,8 +71,8 @@ async function createDraft(
 ): Promise<string> {
   let response = await submitForm(
     router,
-    routes.app.invoices.new.index.href({}, { searchParams: { clientId } }),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.new.href({}, { searchParams: { clientId } }),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -689,9 +689,10 @@ describe('invoice issue flow', () => {
     assert.equal(settingsUpdate.status, 302);
     let clientUpdate = await submitForm(
       router,
-      routes.app.clients.edit.index.href({ clientId: client.id }),
-      routes.app.clients.edit.action.href({ clientId: client.id }),
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
       {
+        _method: 'PUT',
         ...clientFormValuesOf(client),
         legal_name: 'Client After Issue',
         billing_line1: 'Changed Client Address',
@@ -745,7 +746,7 @@ describe('invoice issue flow', () => {
     assert.ok(before);
 
     let editPage = await router.fetch(new URL(
-      routes.app.invoices.edit.index.href({ invoiceId }),
+      routes.app.invoices.edit.href({ invoiceId }),
       origin,
     ), {
       headers: { Cookie: sessionCookie },
@@ -754,8 +755,9 @@ describe('invoice issue flow', () => {
     let attemptedEdit = await submitForm(
       router,
       showPath,
-      routes.app.invoices.edit.action.href({ invoiceId }),
+      routes.app.invoices.update.href({ invoiceId }),
       {
+        _method: 'PUT',
         ...draftFields(client.id),
         recipient_legal_name: 'Attempted overwrite',
         line_description: 'Attempted replacement line',

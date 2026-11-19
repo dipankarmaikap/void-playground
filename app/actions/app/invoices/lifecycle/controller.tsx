@@ -4,7 +4,7 @@ import { redirect } from 'remix/response/redirect';
 import * as s from 'remix/data-schema';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
@@ -20,6 +20,7 @@ import {
   findInvoiceLines,
   updateIssuedInvoiceInternalNote,
 } from '../../../../data/invoices/records.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -75,7 +76,7 @@ async function renderInvoiceShowPageError(
 
 export default createController(routes.app.invoices.lifecycle, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

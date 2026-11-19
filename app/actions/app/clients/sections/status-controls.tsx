@@ -6,6 +6,7 @@ import { routes } from '../../../../routes.ts';
 import { Button } from '../../../../ui/button.tsx';
 import { Icon } from '../../../../ui/icon.tsx';
 import { colors } from '../../../../ui/theme.ts';
+import { RestfulForm } from '../../../../ui/public/restful-form.tsx';
 
 export interface ClientStatusControlsProps {
   csrfToken: string;
@@ -46,13 +47,13 @@ export function ClientStatusControls(handle: Handle<ClientStatusControlsProps>) 
 
     return (
       <div mix={groupStyle}>
-        <form method="post" action={action} mix={formStyle}>
+        <RestfulForm method="PUT" action={action} mix={formStyle}>
           <input type="hidden" name="_csrf" value={csrfToken} />
           <Button variant={archived ? 'primary' : 'secondary'}>
             <Icon name="archive" />
             <span>{archived ? 'Restore client' : 'Archive client'}</span>
           </Button>
-        </form>
+        </RestfulForm>
         <p mix={noteStyle}>
           {archived
             ? 'Restoring returns this client to the active directory.'

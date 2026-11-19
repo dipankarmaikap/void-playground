@@ -60,11 +60,13 @@ describe('app controller', () => {
       let response = await router.fetch(new URL(path, origin));
 
       assert.equal(response.status, 302, `${path} should redirect`);
+      let location = new URL(response.headers.get('Location') ?? '', origin);
       assert.equal(
-        response.headers.get('Location'),
+        location.pathname,
         routes.auth.login.index.href(),
         `${path} should redirect to login`,
       );
+      assert.equal(location.searchParams.get('returnTo'), path, 'login keeps the destination');
     }
   });
 
@@ -430,7 +432,7 @@ describe('app controller', () => {
     let { sessionCookie } = await loginNewUser();
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: `Cache Client ${crypto.randomUUID()}` },
       sessionCookie,
     );
@@ -446,8 +448,8 @@ describe('app controller', () => {
       routes.app.settings.sessions.index.href(),
       routes.app.clients.index.href(),
       clientPath,
-      routes.app.clients.new.index.href(),
-      routes.app.clients.edit.index.href({ clientId }),
+      routes.app.clients.new.href(),
+      routes.app.clients.edit.href({ clientId }),
     ];
 
     for (let path of paths) {

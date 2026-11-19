@@ -44,7 +44,7 @@ async function createProfile(
 ) {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     clientFields(fields),
     sessionCookie,
   );
@@ -111,7 +111,7 @@ describe('client tax identifiers', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, new RegExp(`name="tax_value"[^>]*value="${VALID_GSTIN}"`));
@@ -124,7 +124,7 @@ describe('client tax identifiers', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         tax_country: 'IN',
@@ -154,10 +154,12 @@ describe('client tax identifiers', () => {
     let client = await db.findOne(clients, { where: { legal_name: existingName } });
     assert.ok(client);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: client.id }),
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: existingName,
         tax_country: 'IN',
         tax_type: 'gstin',
@@ -213,12 +215,12 @@ describe('client tax identifiers', () => {
     assert.doesNotMatch(profile, /<h2[^>]*>Tax identifier<\/h2>/);
     assert.doesNotMatch(profile, /unregistered/i);
 
-    let newPage = await getHtml(router, routes.app.clients.new.index.href(), sessionCookie);
+    let newPage = await getHtml(router, routes.app.clients.new.href(), sessionCookie);
     assert.doesNotMatch(newPage, /unregistered/i);
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.doesNotMatch(editPage, /unregistered/i);
@@ -237,10 +239,11 @@ describe('client tax identifiers', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let cleared = await postForm(
+    let cleared = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      clientFields({ legal_name: legalName }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      clientFields({ _method: 'PUT',   legal_name: legalName }),
       sessionCookie,
     );
     assert.equal(cleared.status, 302);
@@ -262,7 +265,7 @@ describe('client tax identifiers', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         tax_country: 'IN',
@@ -291,7 +294,7 @@ describe('client tax identifiers', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         tax_country: 'IN',
@@ -315,7 +318,7 @@ describe('client tax identifiers', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         tax_country: 'IN',
@@ -339,7 +342,7 @@ describe('client tax identifiers', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       clientFields({
         legal_name: legalName,
         tax_country: 'IN',
@@ -366,10 +369,12 @@ describe('client tax identifiers', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         tax_country: 'IN',
         tax_type: 'gstin',
@@ -388,7 +393,7 @@ describe('client tax identifiers', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.equal(
@@ -451,10 +456,12 @@ describe('client tax identifiers', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         tax_country: 'IN',
         tax_type: 'gstin',
@@ -493,8 +500,9 @@ describe('client tax identifiers', () => {
     let edited = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       clientFields({
+        _method: 'PUT',
         legal_name: legalName,
         tax_country: 'US',
         tax_type: 'EIN',
@@ -514,7 +522,7 @@ describe('client tax identifiers', () => {
     let sessionCookie = await createUserAndLogin(router, 'tax');
     let legalName = uniqueName('No CSRF Tax Client');
 
-    let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

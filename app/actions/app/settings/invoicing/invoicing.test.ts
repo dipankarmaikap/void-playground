@@ -374,7 +374,9 @@ describe('organization invoicing settings', () => {
     ]) {
       let response = await router.fetch(new URL(path, origin));
       assert.equal(response.status, 302, `${path} should redirect anonymous requests`);
-      assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+      let location = new URL(response.headers.get('Location') ?? '', origin);
+      assert.equal(location.pathname, routes.auth.login.index.href());
+      assert.equal(location.searchParams.get('returnTo'), path);
     }
 
     let noCsrf = await router.fetch(new URL(routes.app.settings.invoicing.action.href(), origin), {

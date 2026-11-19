@@ -4,7 +4,7 @@ import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 import * as s from 'remix/data-schema';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
@@ -21,6 +21,7 @@ import {
 } from '../../../../data/invoices/payments.ts';
 import type { InvoicePaymentMethod } from '../../../../data/invoices/payments.ts';
 import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -75,7 +76,7 @@ async function renderPaymentError(
 
 export default createController(routes.app.invoices.payments, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

@@ -18,6 +18,7 @@ import { Field } from '../../../../ui/field.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import { Input } from '../../../../ui/input.tsx';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
+import { RestfulForm } from '../../../../ui/public/restful-form.tsx';
 import {
   pageHeaderStyle,
   pageHeadingStyle,
@@ -38,6 +39,7 @@ export interface CreditNoteDraftPageProps {
   creditableQuantities: ReadonlyMap<string, CreditNoteLineCapacity>;
   creditDate: string;
   action: string;
+  method?: 'POST' | 'PUT';
   heading: string;
   submitLabel: string;
   values: CreditNoteFormValues;
@@ -105,6 +107,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
       creditableQuantities,
       creditDate,
       action,
+      method = 'POST',
       heading,
       submitLabel,
       values,
@@ -204,8 +207,8 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
           </section>
         ) : null}
 
-        <form
-          method="post"
+        <RestfulForm
+          method={method}
           action={action}
           aria-labelledby="credit-note-details-heading"
         >
@@ -306,7 +309,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
             ))}
             <Button type="submit">{submitLabel}</Button>
           </section>
-        </form>
+        </RestfulForm>
         {creditNote ? (
           <div mix={actionsStyle}>
             <a

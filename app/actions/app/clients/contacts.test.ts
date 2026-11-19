@@ -32,7 +32,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone },
       sessionCookie,
     );
@@ -54,10 +54,11 @@ describe('client contacts', () => {
 
     let updatedEmail = uniqueEmail('person-updated');
     let updatedPhone = '(020) 7946-0000';
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: legalName, email: updatedEmail, phone: updatedPhone },
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: legalName, email: updatedEmail, phone: updatedPhone },
       sessionCookie,
     );
     assert.equal(edited.status, 302);
@@ -78,7 +79,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: legalName,
@@ -109,7 +110,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       sessionCookie,
     );
@@ -134,7 +135,7 @@ describe('client contacts', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email: badEmail, phone },
       sessionCookie,
     );
@@ -159,7 +160,7 @@ describe('client contacts', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone: badPhone },
       sessionCookie,
     );
@@ -187,7 +188,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -227,10 +228,12 @@ describe('client contacts', () => {
     assert.ok(profile.includes(contactPhone));
 
     let updatedRole = 'Finance director';
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: legalName,
         email: sharedEmail,
@@ -260,7 +263,7 @@ describe('client contacts', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -290,7 +293,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -318,7 +321,7 @@ describe('client contacts', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -355,7 +358,7 @@ describe('client contacts', () => {
     for (let legalName of [firstName, secondName]) {
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         {
           type: 'business',
           legal_name: legalName,
@@ -388,7 +391,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email, phone },
       firstCookie,
     );
@@ -410,8 +413,8 @@ describe('client contacts', () => {
     let edited = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: legalName, email, phone: updatedPhone },
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: legalName, email, phone: updatedPhone },
       secondCookie,
     );
     assert.equal(edited.status, 404);
@@ -430,7 +433,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: legalName,
@@ -448,10 +451,12 @@ describe('client contacts', () => {
 
     // The form keeps the hidden Business group in the submission, so an Individual switch
     // must not erase the primary contact.
-    let toIndividual = await postForm(
+    let toIndividual = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'individual',
         legal_name: legalName,
         contact_name: contactName,
@@ -477,16 +482,18 @@ describe('client contacts', () => {
 
     let individualEdit = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(individualEdit, new RegExp(`name="contact_name"[^>]*value="${contactName}"`));
     assert.match(individualEdit, /name="contact_email"/);
 
-    let backToBusiness = await postForm(
+    let backToBusiness = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: legalName,
         contact_name: contactName,
@@ -509,7 +516,7 @@ describe('client contacts', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, email: originalEmail },
       sessionCookie,
     );
@@ -518,7 +525,7 @@ describe('client contacts', () => {
     assert.ok(row);
 
     let response = await router.fetch(
-      new URL(routes.app.clients.edit.action.href({ clientId: row.id }), origin),
+      new URL(routes.app.clients.update.href({ clientId: row.id }), origin),
       {
         method: 'POST',
         headers: {
@@ -526,6 +533,7 @@ describe('client contacts', () => {
           Cookie: sessionCookie,
         },
         body: new URLSearchParams({
+          _method: 'PUT',
           type: 'individual',
           legal_name: legalName,
           email: uniqueEmail('tampered'),

@@ -1,15 +1,19 @@
-import { form, get, post, route } from 'remix/routes';
+import { del, get, post, resources, route } from 'remix/routes';
 
 /**
- * Leaves are explicit because this app has no method-override middleware. `/new` is static, so it
- * wins over the `:invoiceId` parameter.
+ * The CRUD-shaped leaves come from the framework's resource builder, restricted to the leaves
+ * this app has today; the collection is nested under /app. `/new` is static, so it wins over the
+ * `:invoiceId` parameter. Non-CRUD shapes — the PDF preview, the issue/discard transitions, and
+ * the nested payments, refunds, and credit notes — stay explicit declarations. Voiding a
+ * payment or refund is a delete of that money movement, submitted as DELETE through the
+ * method-override middleware.
  */
 export const invoiceRoutes = route({
-  index: get('/'),
-  new: form('/new'),
-  show: get('/:invoiceId'),
+  ...resources('/', {
+    only: ['index', 'new', 'show', 'edit', 'create', 'update'],
+    param: 'invoiceId',
+  }),
   pdf: get('/:invoiceId/pdf'),
-  edit: form('/:invoiceId/edit'),
   lifecycle: route('/:invoiceId', {
     issue: post('/issue'),
     discard: post('/discard'),
@@ -17,15 +21,17 @@ export const invoiceRoutes = route({
   }),
   payments: route('/:invoiceId/payments', {
     record: post('/'),
-    void: post('/:paymentId/void'),
+    void: del('/:paymentId/void'),
   }),
   refunds: route('/:invoiceId/refunds', {
     record: post('/'),
-    void: post('/:refundId/void'),
+    void: del('/:refundId/void'),
   }),
   creditNotes: route('/:invoiceId/credit-notes', {
-    new: form('/new'),
-    edit: form('/:creditNoteId/edit'),
+    ...resources('/', {
+      only: ['new', 'edit', 'create', 'update'],
+      param: 'creditNoteId',
+    }),
     pdf: get('/:creditNoteId/pdf'),
     lifecycle: route('/:creditNoteId', {
       issue: post('/issue'),

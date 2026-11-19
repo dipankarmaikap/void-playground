@@ -2,7 +2,7 @@ import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 import * as s from 'remix/data-schema';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -11,6 +11,7 @@ import type { User } from '../../../../data/db.ts';
 import { parseDisplayName } from '../../../../data/display-name.ts';
 import { parseOrganizationName } from '../../../../data/organization/name.ts';
 import { renameOwnedOrganizationForUser } from '../../../../data/organization/access.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -26,7 +27,7 @@ const ORGANIZATION_MESSAGE_FLASH_KEY = 'organization_message';
 
 export default createController(routes.app.settings.profile, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

@@ -63,8 +63,8 @@ async function createDraft(
 ): Promise<string> {
   let response = await submitForm(
     router,
-    routes.app.invoices.new.index.href({}, { searchParams: { clientId } }),
-    routes.app.invoices.new.action.href(),
+    routes.app.invoices.new.href({}, { searchParams: { clientId } }),
+    routes.app.invoices.create.href(),
     draftFields(clientId, overrides),
     cookie,
   );
@@ -276,9 +276,10 @@ describe('invoice PDF downloads', () => {
     assert.equal(settingsUpdate.status, 302);
     let clientUpdate = await submitForm(
       router,
-      routes.app.clients.edit.index.href({ clientId: client.id }),
-      routes.app.clients.edit.action.href({ clientId: client.id }),
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
       {
+        _method: 'PUT',
         ...clientFormValuesOf(client),
         legal_name: 'Client After Issue',
         billing_line1: 'Changed Client Address',

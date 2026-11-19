@@ -1,7 +1,7 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -18,6 +18,7 @@ import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../../data/organization/invoicing.ts';
+import { requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -33,7 +34,7 @@ function identityOf(auth: GoodAuth<User>) {
 
 export default createController(routes.app.settings.invoicing, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

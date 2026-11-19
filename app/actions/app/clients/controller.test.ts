@@ -12,6 +12,7 @@ import {
   getHtml,
   origin,
   postForm,
+  submitForm,
 } from '../../../../test/http.ts';
 
 const router = createAppRouter({ db });
@@ -24,20 +25,22 @@ describe('clients controller', () => {
   it('redirects anonymous visitors from client pages to /login', async () => {
     let paths = [
       routes.app.clients.index.href(),
-      routes.app.clients.new.index.href(),
+      routes.app.clients.new.href(),
       routes.app.clients.show.href({ clientId: crypto.randomUUID() }),
-      routes.app.clients.edit.index.href({ clientId: crypto.randomUUID() }),
+      routes.app.clients.edit.href({ clientId: crypto.randomUUID() }),
     ];
 
     for (let path of paths) {
       let response = await router.fetch(new URL(path, origin));
 
       assert.equal(response.status, 302, `${path} should redirect`);
+      let location = new URL(response.headers.get('Location') ?? '', origin);
       assert.equal(
-        response.headers.get('Location'),
+        location.pathname,
         routes.auth.login.index.href(),
         `${path} should redirect to login`,
       );
+      assert.equal(location.searchParams.get('returnTo'), path, 'login keeps the destination');
     }
   });
 
@@ -65,14 +68,14 @@ describe('clients controller', () => {
     assert.match(directory, /<meta name="description" content="[^"]*client/i);
     assert.match(directory, /<meta name="robots" content="noindex"/);
     assert.match(directory, /<h1[^>]*>Clients<\/h1>/);
-    assert.match(directory, new RegExp(`href="${routes.app.clients.new.index.href()}"`));
+    assert.match(directory, new RegExp(`href="${routes.app.clients.new.href()}"`));
 
-    let newPage = await getHtml(router, routes.app.clients.new.index.href(), sessionCookie);
+    let newPage = await getHtml(router, routes.app.clients.new.href(), sessionCookie);
     assert.match(newPage, /<title>New client \| My Remix App<\/title>/);
     assert.match(newPage, /<meta name="robots" content="noindex"/);
     assert.match(
       newPage,
-      new RegExp(`<form[^>]*method="post"[^>]*action="${routes.app.clients.new.action.href()}"`),
+      new RegExp(`<form[^>]*method="POST"[^>]*action="${routes.app.clients.create.href()}"`),
     );
     assert.match(newPage, /name="_csrf" value="[^"]+"/);
     assert.match(newPage, /name="type"/);
@@ -85,7 +88,7 @@ describe('clients controller', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: legalName,
@@ -115,7 +118,7 @@ describe('clients controller', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, /<title>Edit Ada \| My Remix App<\/title>/);
@@ -123,10 +126,11 @@ describe('clients controller', () => {
     assert.ok(editPage.includes(legalName), 'the edit form should load the stored name');
 
     let updatedName = uniqueName('Ada King');
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: updatedName, preferred_name: 'Ada' },
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: updatedName, preferred_name: 'Ada' },
       sessionCookie,
     );
 
@@ -151,7 +155,7 @@ describe('clients controller', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: '', legal_name: '', preferred_name: preferredName },
       sessionCookie,
     );
@@ -175,7 +179,7 @@ describe('clients controller', () => {
     let legalName = uniqueName('Grace Hopper');
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       sessionCookie,
     );
@@ -184,10 +188,11 @@ describe('clients controller', () => {
     assert.ok(row);
 
     let preferredName = uniqueName('Amazing Grace');
-    let response = await postForm(
+    let response = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      { type: 'individual', legal_name: '', preferred_name: preferredName },
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      { _method: 'PUT', type: 'individual', legal_name: '', preferred_name: preferredName },
       sessionCookie,
     );
 
@@ -219,7 +224,7 @@ describe('clients controller', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       invalidValues,
       sessionCookie,
     );
@@ -240,7 +245,7 @@ describe('clients controller', () => {
     let legalName = uniqueName('Unchanged client');
     let seed = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName },
       sessionCookie,
     );
@@ -248,10 +253,11 @@ describe('clients controller', () => {
     let client = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(client);
 
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: client.id }),
-      invalidValues,
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
+      { ...invalidValues, _method: 'PUT' },
       sessionCookie,
     );
     assert.equal(edited.status, 400);
@@ -279,7 +285,7 @@ describe('clients controller', () => {
     let sessionCookie = await createUserAndLogin(router, 'clients');
     let legalName = uniqueName('No Token');
 
-    let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -300,7 +306,7 @@ describe('clients controller', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: legalName, preferred_name: preferredName },
       sessionCookie,
     );
@@ -318,7 +324,7 @@ describe('clients controller', () => {
     let fallbackName = uniqueName('Dorothy Vaughan');
     let fallback = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: fallbackName, preferred_name: '' },
       sessionCookie,
     );
@@ -337,7 +343,7 @@ describe('clients controller', () => {
 
     await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       { type: 'individual', legal_name: activeName },
       sessionCookie,
     );
@@ -363,7 +369,7 @@ describe('clients controller', () => {
 
     for (let path of [
       routes.app.clients.show.href({ clientId }),
-      routes.app.clients.edit.index.href({ clientId }),
+      routes.app.clients.edit.href({ clientId }),
     ]) {
       let response = await router.fetch(new URL(path, origin), {
         headers: { Cookie: sessionCookie },
@@ -371,10 +377,10 @@ describe('clients controller', () => {
       assert.equal(response.status, 404, `${path} should be 404`);
     }
 
-    let newPage = await getHtml(router, routes.app.clients.new.index.href(), sessionCookie);
+    let newPage = await getHtml(router, routes.app.clients.new.href(), sessionCookie);
     let csrf = extractCsrf(newPage);
     let write = await router.fetch(
-      new URL(routes.app.clients.edit.action.href({ clientId }), origin),
+      new URL(routes.app.clients.update.href({ clientId }), origin),
       {
         method: 'POST',
         headers: {
@@ -382,6 +388,7 @@ describe('clients controller', () => {
           Cookie: sessionCookie,
         },
         body: new URLSearchParams({
+          _method: 'PUT',
           type: 'individual',
           legal_name: uniqueName('Ghost'),
           _csrf: csrf,

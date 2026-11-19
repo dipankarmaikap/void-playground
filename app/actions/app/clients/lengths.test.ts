@@ -5,7 +5,7 @@ import { clients } from '../../../data/db.ts';
 import { testDb as db } from '../../../../test/db-setup.ts';
 import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { createUserAndLogin, postForm } from '../../../../test/http.ts';
+import { createUserAndLogin, postForm, submitForm } from '../../../../test/http.ts';
 
 const router = createAppRouter({ db });
 
@@ -68,7 +68,7 @@ describe('Client free-text length limits', () => {
     let values = maxLengthValues();
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       values,
       sessionCookie,
     );
@@ -99,7 +99,7 @@ describe('Client free-text length limits', () => {
 
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         fields,
         sessionCookie,
       );
@@ -165,7 +165,7 @@ describe('Client free-text length limits', () => {
 
       let response = await postForm(
         router,
-        routes.app.clients.new.action.href(),
+        routes.app.clients.create.href(),
         fields,
         sessionCookie,
       );
@@ -191,7 +191,7 @@ describe('Client free-text length limits', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       fields,
       sessionCookie,
     );
@@ -211,7 +211,7 @@ describe('Client free-text length limits', () => {
     let values = maxLengthValues();
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       values,
       sessionCookie,
     );
@@ -229,10 +229,11 @@ describe('Client free-text length limits', () => {
       billing_country: ` ${'Z'.repeat(100)}`,
       billing_currency: 'usd ',
     };
-    let response = await postForm(
+    let response = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: client.id }),
-      submitted,
+      routes.app.clients.edit.href({ clientId: client.id }),
+      routes.app.clients.update.href({ clientId: client.id }),
+      { ...submitted, _method: 'PUT' },
       sessionCookie,
     );
 

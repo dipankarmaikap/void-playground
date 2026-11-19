@@ -176,7 +176,9 @@ describe('session flow', () => {
       headers: { Cookie: cookieFromResponse(response) },
     });
     assert.equal(followUp.status, 302);
-    assert.equal(followUp.headers.get('Location'), routes.auth.login.index.href());
+    let loginLocation = new URL(followUp.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), routes.app.dashboard.href());
   });
 
   it('does not report successful Log out when Session deletion fails', async () => {

@@ -97,8 +97,8 @@ async function issueCreditNote(
 ): Promise<void> {
   let created = await submitForm(
     router,
-    routes.app.invoices.creditNotes.new.index.href({ invoiceId }),
-    routes.app.invoices.creditNotes.new.action.href({ invoiceId }),
+    routes.app.invoices.creditNotes.new.href({ invoiceId }),
+    routes.app.invoices.creditNotes.create.href({ invoiceId }),
     {
       credit_date: todayInKolkata(),
       reason: 'Service scope reduced',
@@ -113,7 +113,7 @@ async function issueCreditNote(
   let creditNoteId = new URL(location!, 'https://test.invalid').pathname.split('/').at(-2)!;
   let issued = await submitForm(
     router,
-    routes.app.invoices.creditNotes.edit.index.href({ invoiceId, creditNoteId }),
+    routes.app.invoices.creditNotes.edit.href({ invoiceId, creditNoteId }),
     routes.app.invoices.creditNotes.lifecycle.issue.href({ invoiceId, creditNoteId }),
     {},
     sessionCookie,
@@ -331,7 +331,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       paymentVoidAction,
-      { reason: 'Reverse the original receipt' },
+      { _method: 'DELETE', reason: 'Reverse the original receipt' },
       sessionCookie,
     );
     assert.equal(rejected.status, 400);
@@ -397,7 +397,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction,
-      { reason: 'Duplicate receipt' },
+      { _method: 'DELETE', reason: 'Duplicate receipt' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -440,7 +440,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: ' \t ' },
+      { _method: 'DELETE', reason: ' \t ' },
       sessionCookie,
     );
     assert.equal(missingReason.status, 400);
@@ -450,7 +450,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: 'Refund sent to the wrong account' },
+      { _method: 'DELETE', reason: 'Refund sent to the wrong account' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -471,7 +471,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: 'Second attempt' },
+      { _method: 'DELETE', reason: 'Second attempt' },
       sessionCookie,
     );
     assert.equal(alreadyVoided.status, 409);
@@ -510,7 +510,7 @@ describe('invoice refunds', () => {
       router,
       showPath,
       voidAction,
-      { reason: 'Refund reversed by the bank' },
+      { _method: 'DELETE', reason: 'Refund reversed by the bank' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -569,7 +569,7 @@ describe('invoice refunds', () => {
       router,
       ownerShowPath,
       otherVoid.action,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       owner.sessionCookie,
     );
     assert.equal(foreignVoid.status, 404);
@@ -578,7 +578,7 @@ describe('invoice refunds', () => {
       router,
       otherShowPath,
       ownerVoid.action,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       other.sessionCookie,
     );
     assert.equal(foreignInvoiceVoid.status, 404);
