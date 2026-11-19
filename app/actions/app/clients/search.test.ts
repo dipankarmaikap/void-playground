@@ -2,6 +2,7 @@ import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
 import { clients, invoices } from '../../../data/db.ts';
+import { APP_NAME } from '../../../config.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
 import { createTestRouter } from '../../../../test/router.ts';
@@ -283,7 +284,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, indexHref({ q: legalName }), secondCookie);
     assert.match(html, /No clients match your search and filters\./);
-    assert.doesNotMatch(html, /<li\b/);
+    assert.doesNotMatch(html, /<tbody\b/);
   });
 
   it('distinguishes an empty Client book from an empty search result', async () => {
@@ -340,7 +341,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, /<title>Clients \| My Remix App<\/title>/);
+    assert.ok(html.includes(`<title>Clients | ${APP_NAME}</title>`));
   });
 
   it('treats percent and underscore as literal search characters', async () => {
