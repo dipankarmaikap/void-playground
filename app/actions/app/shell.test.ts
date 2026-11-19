@@ -28,12 +28,6 @@ function sidebarOf(html: string) {
   return sidebar[0];
 }
 
-function topbarOf(html: string) {
-  let topbar = html.match(/<header[\s\S]*?<\/header>/);
-  assert.ok(topbar, 'the authenticated shell should render a breadcrumb top bar');
-  return topbar[0];
-}
-
 async function signIn(area: string) {
   let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
     router,
@@ -47,12 +41,11 @@ async function signIn(area: string) {
 }
 
 describe('authenticated shell', () => {
-  it('renders the reference sidebar and breadcrumb top bar on every authenticated area', async () => {
+  it('renders the reference sidebar on every authenticated area', async () => {
     for (let [area, href] of authenticatedAreas) {
       let { sessionCookie, organizationName } = await signIn(area);
       let html = await getHtml(router, href(), sessionCookie);
       let sidebar = sidebarOf(html);
-      let topbar = topbarOf(html);
 
       // Brand and the current Organization come from config and request context.
       assert.ok(html.includes(APP_NAME), `${area}: product name should be ${APP_NAME}`);
@@ -92,15 +85,12 @@ describe('authenticated shell', () => {
       assert.match(sidebar, /<form[^>]*method="post"[^>]*action="\/logout"/, `${area}: Log out form`);
       assert.match(sidebar, /Log out/, `${area}: Log out control`);
 
-      // Minimal breadcrumb top bar: context and identity only.
-      assert.match(topbar, /<nav aria-label="Breadcrumb"/, `${area}: breadcrumb navigation`);
-      assert.match(
-        topbar,
-        new RegExp(`href="${routes.app.dashboard.href()}"`),
-        `${area}: breadcrumb links back to the dashboard`,
+      // No mock top bar: content starts directly under the shell, identity stays in the sidebar.
+      assert.doesNotMatch(html, /aria-label="Breadcrumb"/, `${area}: no breadcrumb top bar`);
+      assert.ok(
+        sidebar.includes('Ada Lovelace'),
+        `${area}: signed-in identity stays in the sidebar`,
       );
-      assert.match(topbar, /aria-current="page"/, `${area}: current breadcrumb`);
-      assert.ok(topbar.includes('Ada Lovelace'), `${area}: signed-in identity in the top bar`);
 
       // No decorative mock affordances or invented content.
       assert.doesNotMatch(html, /Search anything/, `${area}: no mock global search`);
@@ -152,23 +142,11 @@ describe('authenticated shell', () => {
     let csrf = extractCsrf(html);
 
     assert.ok(sidebarOf(html).includes(email), 'the email is the identity when no display name is set');
-    assert.ok(topbarOf(html).includes(email), 'the top bar shows the same identity');
     assert.match(
       sidebarOf(html),
       new RegExp(`name="_csrf" value="${csrf}"`),
       'the Log out form carries the request CSRF token',
     );
-  });
-
-  it('builds breadcrumb context from the section and page title', async () => {
-    let { sessionCookie } = await signIn('breadcrumb');
-    let html = await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
-    let topbar = topbarOf(html);
-
-    assert.ok(topbar.includes('Settings'), 'the parent section is shown');
-    assert.ok(topbar.includes('Invoicing'), 'the current page title is shown');
-    assert.match(topbar, /aria-current="page"/);
-    assert.match(topbar, new RegExp(`href="${routes.app.settings.profile.index.href()}"`));
   });
 
   it('preserves the mobile drawer, skip link, and navigation semantics', async () => {

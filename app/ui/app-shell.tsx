@@ -404,73 +404,6 @@ const mainAreaStyle = css({
   minWidth: 0,
 });
 
-const topbarStyle = css({
-  position: 'sticky',
-  top: 0,
-  zIndex: 3,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '1rem',
-  boxSizing: 'border-box',
-  minHeight: '4.25rem',
-  padding: '0 2.25rem',
-  borderBottom: `1px solid ${neutrals.line}`,
-  background: neutrals.paper,
-  '@media (max-width: 47.999rem)': {
-    position: 'static',
-    minHeight: '3.5rem',
-    padding: '0 1rem',
-  },
-});
-
-const breadcrumbStyle = css({
-  display: 'flex',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: '0.5rem',
-  minWidth: 0,
-  fontSize: '0.8125rem',
-});
-
-const breadcrumbSegmentStyle = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  minWidth: 0,
-});
-
-const breadcrumbSeparatorStyle = css({
-  color: neutrals.softMuted,
-});
-
-const breadcrumbLinkStyle = css({
-  color: neutrals.muted,
-  textDecoration: 'none',
-  '&:hover': {
-    color: primary.base,
-  },
-  '&:focus-visible': {
-    outline: focus.outline,
-    outlineOffset: focus.offset,
-    borderRadius: radii.sm,
-  },
-});
-
-const breadcrumbCurrentStyle = css({
-  color: neutrals.ink,
-  fontWeight: 700,
-});
-
-const topbarIdentityStyle = css({
-  color: neutrals.muted,
-  fontSize: '0.8125rem',
-  fontWeight: 600,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-});
-
 const mainStyle = css({
   boxSizing: 'border-box',
   width: '100%',
@@ -604,7 +537,6 @@ export function AppShell(handle: Handle<AppShellProps>) {
       description,
       children,
     } = handle.props;
-    let identity = identityOf(userIdentity);
     let settingsActive =
       section === 'profile' || section === 'invoicing' || section === 'sessions';
     let dashboardHref = routes.app.dashboard.href();
@@ -689,14 +621,6 @@ export function AppShell(handle: Handle<AppShellProps>) {
       },
     ];
 
-    // The breadcrumb parent comes from the section's own navigation item, not from comparing
-    // the page title to a hard-coded label. Renaming a page title can never drop its section.
-    let sectionItem = mainNavGroups.flatMap((group) => group.items).find((item) => item.active);
-    let breadcrumbParents: { label: string; href: string }[] =
-      section === 'dashboard' || !sectionItem
-        ? []
-        : [{ label: sectionItem.label, href: sectionItem.href }];
-
     let sidebarProps = {
       csrfToken,
       identity: userIdentity,
@@ -721,32 +645,6 @@ export function AppShell(handle: Handle<AppShellProps>) {
           </details>
           <AppSidebar {...sidebarProps} variant="desktop" />
           <div mix={mainAreaStyle}>
-            <header mix={topbarStyle}>
-              <nav aria-label="Breadcrumb" mix={breadcrumbStyle}>
-                <a href={dashboardHref} data-rmx-document="" mix={breadcrumbLinkStyle}>
-                  {APP_NAME}
-                </a>
-                {breadcrumbParents.map((parent) => (
-                  <span key={parent.href} mix={breadcrumbSegmentStyle}>
-                    <span aria-hidden="true" mix={breadcrumbSeparatorStyle}>
-                      /
-                    </span>
-                    <a href={parent.href} data-rmx-document="" mix={breadcrumbLinkStyle}>
-                      {parent.label}
-                    </a>
-                  </span>
-                ))}
-                <span mix={breadcrumbSegmentStyle}>
-                  <span aria-hidden="true" mix={breadcrumbSeparatorStyle}>
-                    /
-                  </span>
-                  <strong aria-current="page" mix={breadcrumbCurrentStyle}>
-                    {title}
-                  </strong>
-                </span>
-              </nav>
-              <span mix={topbarIdentityStyle}>{identity.name}</span>
-            </header>
             <main id="main" mix={mainStyle}>
               {children}
             </main>
