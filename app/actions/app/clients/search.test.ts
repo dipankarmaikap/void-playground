@@ -1,8 +1,8 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
-import { clients, invoices } from '../../../data/db.ts';
 import { APP_NAME } from '../../../config.ts';
+import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
 import { createTestRouter } from '../../../../test/router.ts';

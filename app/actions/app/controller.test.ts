@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../config.ts';
 import { createTestRouter } from '../../../test/router.ts';
 import { routes } from '../../routes.ts';
 import { organizationMemberships, users } from '../../data/db.ts';
@@ -73,7 +74,7 @@ describe('app controller', () => {
     let { email, sessionCookie } = await loginNewUser();
     let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
 
-    assert.match(html, /<title>Dashboard \| My Remix App<\/title>/);
+    assert.match(html, new RegExp(`<title>Dashboard \\| ${APP_NAME}<\\/title>`));
     assert.match(html, /<meta name="description" content="[^"]*dashboard/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<summary[^>]*>[\s\S]*?Menu[\s\S]*?<\/summary>/);
@@ -122,7 +123,7 @@ describe('app controller', () => {
     let sidebar = beforeLogout(html);
 
     assert.ok(sidebar.includes(organization.name));
-    assert.ok(sidebar.includes('My Remix App'));
+    assert.ok(sidebar.includes(APP_NAME));
     assert.ok(sidebar.includes('Ada Lovelace'));
     assert.ok(sidebar.includes(email));
   });
@@ -143,7 +144,7 @@ describe('app controller', () => {
       sessionCookie,
     );
 
-    assert.match(html, /<title>Profile \| My Remix App<\/title>/);
+    assert.match(html, new RegExp(`<title>Profile \\| ${APP_NAME}<\\/title>`));
     assert.match(html, /<meta name="description" content="[^"]*display name/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<nav aria-label="Main"/);
@@ -414,7 +415,7 @@ describe('app controller', () => {
       sessionCookie,
     );
 
-    assert.match(html, /<title>Sessions \| My Remix App<\/title>/);
+    assert.match(html, new RegExp(`<title>Sessions \\| ${APP_NAME}<\\/title>`));
     assert.match(html, /<meta name="description" content="[^"]*browsers signed in/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(
