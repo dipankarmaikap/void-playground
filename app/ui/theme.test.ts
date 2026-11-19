@@ -38,10 +38,7 @@ describe('shared theme', () => {
       dark: '#2f4db2',
       soft: '#eef3ff',
       mid: '#d6e2ff',
-      coral: '#ff806f',
-      mint: '#dff4e9',
       green: '#24845c',
-      amber: '#b87918',
       red: '#c94b4b',
     });
   });
@@ -71,14 +68,11 @@ describe('shared theme', () => {
 
   it('carries the effective radii, shadows, gradients and focus ring', () => {
     assert.deepEqual(radii, {
-      xs: '4px',
       sm: '6px',
       md: '7px',
       lg: '8px',
       xl: '9px',
       panel: '10px',
-      feature: '12px',
-      illustration: '14px',
     });
 
     assert.deepEqual(shadows, {
@@ -101,9 +95,17 @@ describe('shared theme', () => {
   it('exposes one Inter font stack for every consumer', () => {
     assert.equal(fontStack, INTER_STACK);
     assert.equal(fontFamily, INTER_STACK);
+    assert.equal(typography.fontStack, INTER_STACK);
     assert.equal(fontAssetHref, '/fonts/inter-latin.woff2');
     assert.equal(typography.bodyFontSize, '16px');
     assert.equal(typography.bodyLineHeight, 1.55);
+  });
+
+  it('does not carry tokens that no component consumes', () => {
+    assert.equal('accentMid' in colors, false);
+    assert.equal('minWidth' in typography, false);
+    for (let token of ['coral', 'mint', 'amber']) assert.equal(token in primary, false);
+    for (let token of ['xs', 'feature', 'illustration']) assert.equal(token in radii, false);
   });
 
   it('keeps the legacy token names pointing at the reference palette', () => {

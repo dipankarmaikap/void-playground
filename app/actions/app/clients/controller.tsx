@@ -5,6 +5,7 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
 import {
+  clientIdsForFollowUp,
   getClientDirectoryFacts,
   getClientProfileFacts,
 } from '../../../data/client-directory-facts.ts';
@@ -50,36 +51,30 @@ export default createController(routes.app.clients, {
       let followUpParam = context.url.searchParams.get('followup');
       let followUp: ClientFollowUpFilter =
         followUpParam === 'overdue' || followUpParam === 'current' ? followUpParam : 'all';
-      let [directory, facts] = await Promise.all([
-        listClients(context.db, organization.id, {
-          q: query,
-          type,
-          status,
-          page,
-        }),
-        getClientDirectoryFacts(context.db, organization.id),
-      ]);
-      let visibleClients =
-        followUp === 'all'
-          ? directory.clients
-          : directory.clients.filter((client) => {
-              let clientFacts = facts.clients.get(client.id);
-              return followUp === 'overdue'
-                ? Boolean(clientFacts?.hasOverdueInvoice)
-                : !clientFacts?.hasOverdueInvoice;
-            });
+      // The follow-up set is Organization-wide and comes from the same facts that feed the
+      // summary cards. Passing it into listClients filters before pagination, so counts and
+      // Next/Previous links describe the filtered view instead of the unfiltered directory.
+      let facts = await getClientDirectoryFacts(context.db, organization.id);
+      let directory = await listClients(context.db, organization.id, {
+        q: query,
+        type,
+        status,
+        page,
+        clientIds: followUp === 'all' ? undefined : clientIdsForFollowUp(facts, followUp),
+      });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
           identity={{ email: identity.email, displayName: identity.display_name }}
           organizationName={organization.name}
-          clients={visibleClients}
+          clients={directory.clients}
           query={query}
           type={type}
           status={status}
           followUp={followUp}
           facts={facts}
           page={directory.page}
+          total={directory.total}
           hasPrevious={directory.hasPrevious}
           hasNext={directory.hasNext}
           error={typeof error === 'string' ? error : undefined}

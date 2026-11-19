@@ -5,7 +5,6 @@ import { clientDisplayLabel } from '../../../../data/client-names.ts';
 import type { Client } from '../../../../data/db.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
-import { linkButtonStyle } from '../../../../ui/button.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import { ClientForm } from '../client-form.tsx';
 import { FormPageHeader } from '../form-page-header.tsx';
@@ -40,11 +39,6 @@ export function EditClientPage(handle: Handle<EditClientPageProps>) {
           eyebrow="Client profile"
           title={`Edit ${label}`}
           intro="Changes apply to your Organization's Client book."
-          action={
-            <a href={showHref} data-variant="secondary" mix={linkButtonStyle}>
-              Cancel
-            </a>
-          }
         />
         <ClientForm
           csrfToken={csrfToken}

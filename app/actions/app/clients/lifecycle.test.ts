@@ -178,7 +178,7 @@ describe('client lifecycle', () => {
     assert.doesNotMatch(activeDirectory, new RegExp(archivedName));
     assert.match(
       statusToggle(activeDirectory),
-      /href="\/app\/clients"[^>]*aria-current="page"[^>]*>Active<\/a>/,
+      /href="\/app\/clients"[^>]*data-active="true"[^>]*>Active<\/a>/,
     );
     assert.match(statusToggle(activeDirectory), /href="[^"]*status=archived"[^>]*>Archived<\/a>/);
 
@@ -187,7 +187,7 @@ describe('client lifecycle', () => {
     assert.doesNotMatch(archivedDirectory, new RegExp(keptName));
     assert.match(
       statusToggle(archivedDirectory),
-      /href="[^"]*status=archived"[^>]*aria-current="page"[^>]*>Archived<\/a>/,
+      /href="[^"]*status=archived"[^>]*data-active="true"[^>]*>Archived<\/a>/,
     );
     assert.match(statusToggle(archivedDirectory), /href="\/app\/clients"[^>]*>Active<\/a>/);
   });

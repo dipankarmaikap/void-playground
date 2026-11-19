@@ -11,15 +11,16 @@ import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
 import { DataTable, amountCellStyle } from '../../../ui/data-table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
+import { headingStyle } from '../../../ui/page-header.tsx';
 import { Panel, PanelBody, PanelFooter, PanelHeader } from '../../../ui/panel.tsx';
 import {
   noticeErrorStyle,
   noticeSpacingStyle,
   noticeStatusStyle,
 } from '../../../ui/page-styles.ts';
-import { StatCard } from '../../../ui/stat-card.tsx';
+import { StatCard, statGridStyle } from '../../../ui/stat-card.tsx';
 import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/status-pill.tsx';
-import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
+import { neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
@@ -66,16 +67,6 @@ const detailMetaStyle = css({
   minWidth: 0,
 });
 
-const headingStyle = css({
-  margin: 0,
-  color: neutrals.ink,
-  fontFamily: fontStack,
-  fontSize: '1.625rem',
-  fontWeight: 800,
-  letterSpacing: '-0.02em',
-  lineHeight: 1.2,
-});
-
 const contextStyle = css({
   margin: '4px 0 8px',
   color: neutrals.muted,
@@ -88,13 +79,6 @@ const headerActionsStyle = css({
   flexWrap: 'wrap',
   alignItems: 'center',
   gap: '0.75rem',
-});
-
-const statGridStyle = css({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-  gap: '14px',
-  marginBottom: '18px',
 });
 
 const contentGridStyle = css({

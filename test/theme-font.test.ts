@@ -40,8 +40,12 @@ describe('Inter typography on rendered pages', () => {
 
     let style = fontStyleTag(html);
     assert.match(style.open, new RegExp(`nonce="${escapeRegExp(nonce)}"`));
-    assert.match(style.body, /font-family:\s*"Inter",\s*"Segoe UI",\s*sans-serif/);
+    // The authored, nonce-bearing style is only the font face and control inheritance;
+    // body typography is declared once through css() on <body>.
+    assert.match(style.body, /font-family:\s*inherit/);
+    assert.doesNotMatch(style.body, /\bbody\s*\{/);
     assert.match(style.body, new RegExp(`src:\\s*url\\(['"]?${escapeRegExp(fontAssetHref)}`));
+    assert.match(html, /font-family:\s*"Inter",\s*"Segoe UI",\s*sans-serif/);
 
     assert.match(html, /<link\b[^>]*rel="preload"[^>]*as="font"[^>]*>/);
     assert.match(html, new RegExp(`href="${escapeRegExp(fontAssetHref)}"`));

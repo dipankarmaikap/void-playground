@@ -205,6 +205,41 @@ describe('Client detail, new and edit pages', () => {
     assert.ok(html.includes(routes.app.clients.index.href()));
   });
 
+  it('keeps the section breadcrumb when a page title matches the section label', async () => {
+    let tenant = await createUserAndLoginWithOrganization(router, db, 'profile-breadcrumb');
+    organizationId = tenant.organizationId;
+    let client = await seedClient({ legal_name: 'Clients' });
+
+    let html = await getHtml(
+      router,
+      routes.app.clients.show.href({ clientId: client.id }),
+      tenant.sessionCookie,
+    );
+    let breadcrumb = html.match(/<nav aria-label="Breadcrumb"[\s\S]*?<\/nav>/)?.[0] ?? '';
+
+    assert.match(breadcrumb, /aria-current="page"[^>]*>Clients<\/strong>/);
+    assert.ok(
+      breadcrumb.includes(`href="${routes.app.clients.index.href()}"`),
+      'the Clients section link must not disappear just because the page title is Clients',
+    );
+  });
+
+  it('renders exactly one Cancel link on the new and edit forms', async () => {
+    let tenant = await createUserAndLoginWithOrganization(router, db, 'profile-cancel');
+    organizationId = tenant.organizationId;
+    let client = await seedClient({ legal_name: 'Cancel Client' });
+
+    let newPage = await getHtml(router, routes.app.clients.new.href(), tenant.sessionCookie);
+    assert.equal(newPage.match(/>Cancel<\/a>/g)?.length ?? 0, 1);
+
+    let editPage = await getHtml(
+      router,
+      routes.app.clients.edit.href({ clientId: client.id }),
+      tenant.sessionCookie,
+    );
+    assert.equal(editPage.match(/>Cancel<\/a>/g)?.length ?? 0, 1);
+  });
+
   it('renders reference form panels with hints and keeps the no-JS form contract', async () => {
     let tenant = await createUserAndLoginWithOrganization(router, db, 'profile-forms');
     organizationId = tenant.organizationId;

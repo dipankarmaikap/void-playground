@@ -5,6 +5,14 @@ import { fontStack, neutrals, primary, radii, shadows, softFills } from './theme
 
 export type StatCardTone = 'primary' | 'coral' | 'green' | 'amber';
 
+/** The responsive grid that groups summary cards on both directory and profile pages. */
+export const statGridStyle = css({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: '14px',
+  marginBottom: '18px',
+});
+
 export const statCardStyle = css({
   display: 'flex',
   flexDirection: 'column',

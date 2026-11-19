@@ -207,6 +207,75 @@ describe('client directory facts', () => {
     assert.equal(facts.summary.activeClientCount, 3);
   });
 
+  it('picks an overdue status when equal-dated invoices tie, regardless of row order', async () => {
+    let paidFirst = await seedClient({ legal_name: 'Paid First Client' });
+    let overdueFirst = await seedClient({ legal_name: 'Overdue First Client' });
+    let now = Date.now();
+
+    let unpaidFirst = await seedInvoice({
+      id: 'zz-unpaid-first',
+      client_id: paidFirst.id,
+      invoice_date: '2026-10-01',
+      due_date: '2026-10-15',
+      created_at: now,
+    });
+    let paidLast = await seedInvoice({
+      id: 'aa-paid-last',
+      client_id: paidFirst.id,
+      invoice_date: '2026-10-01',
+      due_date: '2026-10-15',
+      created_at: now,
+    });
+    await seedPayment(paidLast.id, '2026-10-05', 100_000);
+    assert.ok(unpaidFirst);
+
+    let paidInvoice = await seedInvoice({
+      id: 'aa-paid-first',
+      client_id: overdueFirst.id,
+      invoice_date: '2026-10-01',
+      due_date: '2026-10-15',
+      created_at: now,
+    });
+    let unpaidLast = await seedInvoice({
+      id: 'zz-unpaid-last',
+      client_id: overdueFirst.id,
+      invoice_date: '2026-10-01',
+      due_date: '2026-10-15',
+      created_at: now,
+    });
+    await seedPayment(paidInvoice.id, '2026-10-05', 100_000);
+    assert.ok(unpaidLast);
+
+    let facts = await getClientDirectoryFacts(testDb, organizationId, '2026-11-19');
+
+    assert.equal(facts.clients.get(paidFirst.id)?.status, 'overdue');
+    assert.equal(facts.clients.get(paidFirst.id)?.hasOverdueInvoice, true);
+    assert.equal(facts.clients.get(overdueFirst.id)?.status, 'overdue');
+    assert.equal(facts.clients.get(overdueFirst.id)?.hasOverdueInvoice, true);
+  });
+
+  it('excludes archived Clients from the new-this-month count', async () => {
+    await seedClient({
+      legal_name: 'Active This Month',
+      created_at: Date.parse('2026-11-02T05:00:00Z'),
+    });
+    await seedClient({
+      legal_name: 'Archived This Month',
+      status: 'archived',
+      archived_at: Date.parse('2026-11-10T05:00:00Z'),
+      created_at: Date.parse('2026-11-03T05:00:00Z'),
+    });
+    await seedClient({
+      legal_name: 'Active Last Month',
+      created_at: Date.parse('2026-10-03T05:00:00Z'),
+    });
+
+    let facts = await getClientDirectoryFacts(testDb, organizationId, '2026-11-19');
+
+    assert.equal(facts.summary.newClientsThisMonth, 1);
+    assert.equal(facts.summary.activeClientCount, 2);
+  });
+
   it('never mixes another Organization into its summary or per-Client facts', async () => {
     let ownClient = await seedClient({ legal_name: 'Own Organization Client' });
     let ownInvoice = await seedInvoice({ client_id: ownClient.id, total_minor: 70_000 });

@@ -689,15 +689,13 @@ export function AppShell(handle: Handle<AppShellProps>) {
       },
     ];
 
-    // The breadcrumb is derived from the section and the page title only.
-    let breadcrumbParents: { label: string; href: string }[] = [];
-    if (section === 'clients' && title !== 'Clients') {
-      breadcrumbParents.push({ label: 'Clients', href: clientsHref });
-    } else if (section === 'invoices' && title !== 'Invoices') {
-      breadcrumbParents.push({ label: 'Invoices', href: invoicesHref });
-    } else if (settingsActive) {
-      breadcrumbParents.push({ label: 'Settings', href: profileHref });
-    }
+    // The breadcrumb parent comes from the section's own navigation item, not from comparing
+    // the page title to a hard-coded label. Renaming a page title can never drop its section.
+    let sectionItem = mainNavGroups.flatMap((group) => group.items).find((item) => item.active);
+    let breadcrumbParents: { label: string; href: string }[] =
+      section === 'dashboard' || !sectionItem
+        ? []
+        : [{ label: sectionItem.label, href: sectionItem.href }];
 
     let sidebarProps = {
       csrfToken,

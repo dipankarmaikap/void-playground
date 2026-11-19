@@ -225,6 +225,36 @@ describe('Clients directory from real data', () => {
     assert.ok(archived);
   });
 
+  it('labels the follow-up group accurately and reserves aria-current for the current page', async () => {
+    let tenant = await createUserAndLoginWithOrganization(router, db, 'directory-a11y');
+    organizationId = tenant.organizationId;
+    for (let number = 1; number <= 21; number += 1) {
+      let client = await seedClient({
+        id: `a11y-${String(number).padStart(2, '0')}`,
+        legal_name: `A11y Client ${String(number).padStart(2, '0')}`,
+      });
+      if (number === 1) await seedInvoice({ client_id: client.id, total_minor: 10_000 });
+    }
+
+    let html = await getHtml(router, indexHref(), tenant.sessionCookie);
+
+    assert.match(html, /role="group" aria-label="Filter clients by follow-up"/);
+    assert.doesNotMatch(html, /aria-label="Filter clients by status"/);
+    assert.match(html, /name="status"/);
+
+    let followUpGroup =
+      html.match(/<div[^>]*aria-label="Filter clients by follow-up"[^>]*>[\s\S]*?<\/div>/)?.[0] ??
+      '';
+    assert.ok(followUpGroup.includes('Needs follow-up'));
+    assert.doesNotMatch(followUpGroup, /aria-current/);
+
+    let statusNav = html.match(/<nav aria-label="Client status"[\s\S]*?<\/nav>/)?.[0] ?? '';
+    assert.match(statusNav, /Active/);
+    assert.doesNotMatch(statusNav, /aria-current/);
+
+    assert.match(html, /<span aria-current="page"[^>]*>\d+<\/span>/);
+  });
+
   it('never shows another Organization’s Clients or Invoices', async () => {
     let owner = await createUserAndLoginWithOrganization(router, db, 'directory-owner');
     organizationId = owner.organizationId;
