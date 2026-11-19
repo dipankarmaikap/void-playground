@@ -23,5 +23,13 @@
       "directory": "./app/data/db/migrations"
     },
     "seed": "./app/data/db/seed.sql"
+  },
+  "test": {
+    "exclude": ["node_modules/**", "tmp/**"],
+    "type": ["server"],
+    "playwright": {
+      "configFile": "./playwright.config.ts",
+      "projects": ["chromium"]
+    }
   }
 }
