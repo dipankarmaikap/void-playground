@@ -49,6 +49,40 @@ function identityOf(auth: GoodAuth<User>) {
   return { email: auth.identity.email, displayName: auth.identity.display_name };
 }
 
+type InvoiceLookup = { invoice: Invoice } | { response: Response };
+
+/**
+ * The invoice this credit-note action targets, or the 404 response to return when it does not
+ * exist as an issued-or-draftable Invoice document.
+ */
+async function loadInvoice(
+  context: CreditNoteRequestContext,
+  organization: Organization,
+): Promise<InvoiceLookup> {
+  let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
+  if (!invoice || invoice.document_type !== 'invoice') {
+    return { response: new Response('Invoice not found', { status: 404 }) };
+  }
+  return { invoice };
+}
+
+/**
+ * The invoice this credit-note draft action targets, or the error response to return: a 404 when
+ * it does not exist, or the 409 named by `notIssuedMessage` when it is not issued.
+ */
+async function loadIssuedInvoice(
+  context: CreditNoteRequestContext,
+  organization: Organization,
+  notIssuedMessage: string,
+): Promise<InvoiceLookup> {
+  let lookup = await loadInvoice(context, organization);
+  if ('response' in lookup) return lookup;
+  if (lookup.invoice.status !== 'issued') {
+    return { response: new Response(notIssuedMessage, { status: 409 }) };
+  }
+  return lookup;
+}
+
 async function renderNewForm(
   context: CreditNoteRequestContext,
   organization: Organization,
@@ -135,15 +169,13 @@ export default createController(routes.app.invoices.creditNotes, {
     async new(context) {
       let organization = context.get(CurrentOrganization);
       let auth = authedUser(context);
-      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
-      if (!invoice || invoice.document_type !== 'invoice') {
-        return new Response('Invoice not found', { status: 404 });
-      }
-      if (invoice.status !== 'issued') {
-        return new Response('Credit notes can be created only for issued invoices', {
-          status: 409,
-        });
-      }
+      let lookup = await loadIssuedInvoice(
+        context,
+        organization,
+        'Credit notes can be created only for issued invoices',
+      );
+      if ('response' in lookup) return lookup.response;
+      let invoice = lookup.invoice;
       if (
         (await remainingCreditableValue(context.db, organization.id, invoice.id, invoice.total_minor)) <= 0
       ) {
@@ -187,15 +219,13 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async create(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
-      if (!invoice || invoice.document_type !== 'invoice') {
-        return new Response('Invoice not found', { status: 404 });
-      }
-      if (invoice.status !== 'issued') {
-        return new Response('Credit notes can be created only for issued invoices', {
-          status: 409,
-        });
-      }
+      let lookup = await loadIssuedInvoice(
+        context,
+        organization,
+        'Credit notes can be created only for issued invoices',
+      );
+      if ('response' in lookup) return lookup.response;
+      let invoice = lookup.invoice;
 
       let values = parseCreditNoteFormValues(context.formData);
       let result = await createCreditNoteDraft(context.db, organization.id, invoice.id, values);
@@ -228,13 +258,13 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async edit(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
-      if (!invoice || invoice.document_type !== 'invoice') {
-        return new Response('Invoice not found', { status: 404 });
-      }
-      if (invoice.status !== 'issued') {
-        return new Response('Credit note Drafts require an issued invoice', { status: 409 });
-      }
+      let lookup = await loadIssuedInvoice(
+        context,
+        organization,
+        'Credit note Drafts require an issued invoice',
+      );
+      if ('response' in lookup) return lookup.response;
+      let invoice = lookup.invoice;
       let creditNote = await findCreditNote(
         context.db,
         organization.id,
@@ -282,13 +312,13 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async update(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
-      if (!invoice || invoice.document_type !== 'invoice') {
-        return new Response('Invoice not found', { status: 404 });
-      }
-      if (invoice.status !== 'issued') {
-        return new Response('Credit note Drafts require an issued invoice', { status: 409 });
-      }
+      let lookup = await loadIssuedInvoice(
+        context,
+        organization,
+        'Credit note Drafts require an issued invoice',
+      );
+      if ('response' in lookup) return lookup.response;
+      let invoice = lookup.invoice;
       let values = parseCreditNoteFormValues(context.formData);
       let result = await updateCreditNoteDraft(
         context.db,
@@ -328,10 +358,9 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async pdf(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
-      if (!invoice || invoice.document_type !== 'invoice') {
-        return new Response('Invoice not found', { status: 404 });
-      }
+      let lookup = await loadInvoice(context, organization);
+      if ('response' in lookup) return lookup.response;
+      let invoice = lookup.invoice;
       let creditNote = await findCreditNote(
         context.db,
         organization.id,
