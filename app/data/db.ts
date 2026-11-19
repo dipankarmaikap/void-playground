@@ -44,9 +44,9 @@ export type {
 /**
  * The application's single database instance. Importing this module creates the connection only:
  * schema application lives in `./db/migrate.ts`, awaited by server startup before it listens and
- * by the shared test bootstrap, so no request or test ever sees a half-migrated schema. Startup
- * fails closed rather than upgrading a database that predates Organization ownership or the
- * migration journal.
+ * by the shared test bootstrap, so no request or test ever sees a half-migrated schema. The
+ * database is a disposable build-phase artifact (ADR-0003): the documented remedy for a stale
+ * or unrecognized dev database is deleting the file and restarting.
  *
  * The re-exported tables and row types above are the app-facing contract blessed by
  * docs/agents/data-modules.md: query code stays unaffected by how the schema is applied.
