@@ -49,22 +49,23 @@ export type FormFieldAttributes<D extends FormFieldDescriptor = FormFieldDescrip
 
 /**
  * Derives the browser input attributes for one field from its descriptor, marking the field
- * `aria-invalid` when parsing produced an issue for it.
+ * `aria-invalid` when parsing produced an error for it (a schema issue, an error message, or an
+ * error object with a message).
  */
 export function formFieldAttributes<D extends FormFieldDescriptor>(
   descriptor: D,
-  issue?: Issue,
+  issue?: Issue | { message: string } | string,
 ): FormFieldAttributes<D> {
   let isInput = descriptor.control === undefined || descriptor.control === 'input';
   let attributes: Record<string, unknown> = {};
   if (isInput) attributes.type = descriptor.type ?? 'text';
-  if (descriptor.required) attributes.required = true;
   if (descriptor.minLength != null) attributes.minLength = descriptor.minLength;
   if (descriptor.maxLength != null) attributes.maxLength = descriptor.maxLength;
   if (descriptor.min != null) attributes.min = descriptor.min;
   if (descriptor.max != null) attributes.max = descriptor.max;
   if (descriptor.step != null) attributes.step = descriptor.step;
   if (descriptor.autoComplete) attributes.autoComplete = descriptor.autoComplete;
+  if (descriptor.required) attributes.required = true;
   if (issue) attributes['aria-invalid'] = true;
   return attributes as FormFieldAttributes<D>;
 }
