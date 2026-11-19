@@ -1,6 +1,20 @@
-import { column as c, table } from 'remix/data-table';
+import { column as c, fail, table } from 'remix/data-table';
 
 import { CLIENT_TYPES } from '../client-names.ts';
+
+/** Decimal strings the database can canonicalize without changing their numeric value. */
+const CANONICAL_RATE_PATTERN = /^\d+(?:\.\d+)?$/;
+
+/** Returns a copy of the write payload with the named text fields trimmed in place. */
+function trimText<T extends Record<string, unknown>>(value: T, fields: Array<keyof T & string>): T {
+  let next = { ...value };
+  for (let field of fields) {
+    if (typeof next[field] === 'string') {
+      next[field] = (next[field] as string).trim();
+    }
+  }
+  return next;
+}
 
 export const users = table({
   name: 'users',
@@ -14,6 +28,25 @@ export const users = table({
     created_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    let next = { ...value };
+    if (typeof next.email === 'string') {
+      next.email = next.email.trim().toLowerCase();
+    }
+    if (typeof next.display_name === 'string') {
+      next.display_name = next.display_name.trim();
+    }
+    return { value: next };
+  },
+  validate({ operation, value }) {
+    if (operation === 'create' && typeof value.email !== 'string') {
+      return fail('Email is required.', ['email']);
+    }
+    if (typeof value.email === 'string' && value.email.trim() === '') {
+      return fail('Email is required.', ['email']);
+    }
+    return { value };
+  },
   afterRead({ value }) {
     if ('email_verified' in value) {
       return { value: { ...value, email_verified: Boolean(value.email_verified) } };
@@ -31,6 +64,22 @@ export const organizations = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    let next = { ...value };
+    if (typeof next.name === 'string') {
+      next.name = next.name.trim();
+    }
+    return { value: next };
+  },
+  validate({ operation, value }) {
+    if (operation === 'create' && typeof value.name !== 'string') {
+      return fail('Organization name is required.', ['name']);
+    }
+    if (typeof value.name === 'string' && value.name.trim() === '') {
+      return fail('Organization name is required.', ['name']);
+    }
+    return { value };
+  },
 });
 
 /**
@@ -71,6 +120,47 @@ export const organizationInvoicingProfiles = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'organization_id',
+  beforeWrite({ value }) {
+    let next = trimText(value, [
+      'legal_name',
+      'address_line1',
+      'address_locality',
+      'address_region',
+      'address_postal_code',
+      'address_country',
+      'billing_email',
+      'billing_phone',
+      'pan',
+      'gstin',
+      'gst_state_code',
+      'gst_state_name',
+      'custom_payment_terms',
+      'payment_instructions',
+      'customer_notes',
+      'signatory_name',
+      'signatory_designation',
+    ]);
+    if (typeof next.pan === 'string') {
+      next.pan = next.pan.toUpperCase();
+    }
+    if (typeof next.gstin === 'string') {
+      next.gstin = next.gstin.toUpperCase();
+    }
+    return { value: next };
+  },
+  validate({ value }) {
+    let issues: Array<{ message: string; path: Array<string | number> }> = [];
+    for (let field of ['legal_name', 'billing_email', 'billing_phone'] as const) {
+      let text = value[field];
+      if (typeof text === 'string' && text.trim() === '') {
+        issues.push({ message: 'Saved text fields cannot be blank.', path: [field] });
+      }
+    }
+    if (typeof value.pan === 'string' && value.pan.length !== 10) {
+      issues.push({ message: 'PAN must be exactly 10 characters.', path: ['pan'] });
+    }
+    return issues.length > 0 ? { issues } : { value };
+  },
   afterRead({ value }) {
     if ('gst_registered' in value) {
       return { value: { ...value, gst_registered: Boolean(value.gst_registered) } };
@@ -93,6 +183,21 @@ export const organizationGstRatePresets = table({
     updated_at: c.integer().notNull(),
   },
   primaryKey: 'id',
+  beforeWrite({ value }) {
+    let next = { ...value };
+    if (typeof next.rate === 'string') {
+      let trimmed = next.rate.trim();
+      next.rate = CANONICAL_RATE_PATTERN.test(trimmed) ? String(Number(trimmed)) : trimmed;
+    }
+    return { value: next };
+  },
+  validate({ value }) {
+    if (typeof value.rate !== 'string') return { value };
+    if (!CANONICAL_RATE_PATTERN.test(value.rate) || Number(value.rate) > 100) {
+      return fail('Rate must be a decimal percentage from 0 to 100.', ['rate']);
+    }
+    return { value };
+  },
 });
 
 export const organizationMemberships = table({
