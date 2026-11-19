@@ -144,6 +144,9 @@ export default createController(routes.auth.register, {
       console.log(verifyUrl.href);
 
       context.session.flash('message', 'Check your email to verify your account');
+      // Registration deliberately signs nobody in: no Session is minted here, so an unverified
+      // registration never holds an authenticated Session. The first authenticated Session is
+      // minted at login, where the framework rotates the Session id.
       return redirect(routes.auth.login.index.href());
     },
   },
