@@ -1,5 +1,18 @@
 {
   "$schema": "./node_modules/remix/schema/remix.json",
+  "assets": {
+    "rootDir": ".",
+    "basePath": "/assets",
+    "allowFiles": [
+      "app/routes.ts",
+      "app/actions/app/routes.ts",
+      "app/actions/app/clients/routes.ts",
+      "app/actions/app/invoices/routes.ts",
+      "app/**/public/**"
+    ],
+    "allowPackages": ["remix"],
+    "denyFiles": ["app/**/*.test.*"]
+  },
   "db": {
     "adapter": {
       "type": "sqlite",

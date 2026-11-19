@@ -62,7 +62,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 - `app/middleware/` holds custom middleware (e.g. request context).
 - `app/ui/` holds components shared by more than one route; route-local UI stays beside its controller. `app-shell.tsx` renders the authenticated document (sidebar, drawer, Dashboard/Clients/Settings destinations, settings subnavigation, identity, Log out) around page content; `auth-layout.tsx` renders the standalone public/auth card; `button`, `icon`, `field`, `input`, `select`, and `theme` are shared primitives; `identity.ts` bundles a User's email and display name and derives the display name-or-email label; `page-styles.ts` holds the shared page header, notice, form, footer, and text-link styles.
 - `app/actions/public/` contains the browser runtime entry.
-- `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware.
+- `app/assets.ts` owns the server-side asset pipeline used by the asset route and render middleware; the JSON-compatible mapping (root directory, allow and deny lists) lives in the `assets` block of `remix.json` and is loaded with `loadConfig`.
 - Root `public/` contains static files served unchanged from the app root.
 - `test/` holds cross-cutting request-flow tests and shared helpers.
 
