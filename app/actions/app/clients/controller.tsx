@@ -4,7 +4,10 @@ import { redirect } from 'remix/response/redirect';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
-import { getClientDirectoryFacts } from '../../../data/client-directory-facts.ts';
+import {
+  getClientDirectoryFacts,
+  getClientProfileFacts,
+} from '../../../data/client-directory-facts.ts';
 import {
   createClient,
   findClient,
@@ -14,7 +17,6 @@ import {
 } from '../../../data/clients.ts';
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
-import { countClientInvoices } from '../../../data/invoices/records.ts';
 import { authedUser, requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
@@ -102,7 +104,7 @@ export default createController(routes.app.clients, {
       let organization = context.get(CurrentOrganization);
       let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
-      let invoiceCount = await countClientInvoices(context.db, organization.id, client.id);
+      let facts = await getClientProfileFacts(context.db, organization.id, client.id);
 
       let auth = authedUser(context);
       let identity = auth.identity;
@@ -115,7 +117,8 @@ export default createController(routes.app.clients, {
           identity={{ email: identity.email, displayName: identity.display_name }}
           organizationName={organization.name}
           client={client}
-          invoiceCount={invoiceCount}
+          facts={facts}
+          invoiceCount={facts.invoiceCount}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,

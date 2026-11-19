@@ -144,6 +144,119 @@ export async function getClientDirectoryFacts(
   };
 }
 
+/** One real Invoice row prepared for a Client's invoice-history table. */
+export interface ClientInvoiceRow {
+  id: string;
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  totalMinor: number;
+  currency: string;
+  status: InvoiceDisplayStatus;
+}
+
+/** Real Invoice-derived facts used by a single Client profile page. */
+export interface ClientProfileFacts {
+  currency: string;
+  totalInvoicedMinor: number;
+  outstandingBalanceMinor: number;
+  paidInvoiceCount: number;
+  invoiceCount: number;
+  averageCollectionDays: number | null;
+  /** Most recent Invoice first. */
+  invoices: ClientInvoiceRow[];
+}
+
+/**
+ * Derives one Client's Invoice history and summary from real, Organization-scoped rows.
+ * Every balance and display status comes from the Invoice domain helpers; when there is no
+ * honest payment history the collection average is null so the UI can show an empty indicator.
+ */
+export async function getClientProfileFacts(
+  db: SqliteDatabase,
+  organizationId: string,
+  clientId: string,
+  today: string = todayInKolkata(),
+): Promise<ClientProfileFacts> {
+  let [organizationInvoices, paymentTotals, creditTotals, refundTotals, payments] =
+    await Promise.all([
+      db.findMany(invoices, {
+        where: {
+          organization_id: organizationId,
+          client_id: clientId,
+          document_type: 'invoice',
+        },
+      }),
+      activeInvoicePaymentTotals(db, organizationId),
+      activeInvoiceCreditNoteTotals(db, organizationId),
+      activeInvoiceRefundTotals(db, organizationId),
+      db.findMany(invoicePayments, {
+        where: { organization_id: organizationId, voided_at: null },
+      }),
+    ]);
+
+  let invoiceById = new Map<string, Invoice>(organizationInvoices.map((invoice) => [invoice.id, invoice]));
+  let currency =
+    [...organizationInvoices]
+      .sort((a, b) =>
+        `${b.invoice_date}|${b.created_at}|${b.id}`.localeCompare(
+          `${a.invoice_date}|${a.created_at}|${a.id}`,
+        ),
+      )[0]?.currency ?? 'INR';
+
+  let totalInvoicedMinor = 0;
+  let outstandingBalanceMinor = 0;
+  let paidInvoiceCount = 0;
+  let rows: ClientInvoiceRow[] = [];
+
+  for (let invoice of organizationInvoices) {
+    let creditedTotalMinor = creditTotals.get(invoice.id) ?? 0;
+    let balances = invoiceFinancialBalances(
+      invoice.total_minor,
+      creditedTotalMinor,
+      paymentTotals.get(invoice.id) ?? 0,
+      refundTotals.get(invoice.id) ?? 0,
+    );
+    let status = invoiceDisplayStatus(invoice, balances.netPaidMinor, today, creditedTotalMinor);
+    totalInvoicedMinor += invoice.total_minor;
+    outstandingBalanceMinor += balances.balanceDueMinor;
+    if (status === 'paid') paidInvoiceCount += 1;
+    rows.push({
+      id: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      invoiceDate: invoice.invoice_date,
+      totalMinor: invoice.total_minor,
+      currency: invoice.currency,
+      status,
+    });
+  }
+
+  rows.sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate) || a.id.localeCompare(b.id));
+
+  let totalCollectionDays = 0;
+  let collectionSampleCount = 0;
+  for (let payment of payments) {
+    let invoice = invoiceById.get(payment.invoice_id);
+    if (!invoice) continue;
+    let days = daysBetween(invoice.invoice_date, payment.payment_date);
+    if (days === null) continue;
+    totalCollectionDays += days;
+    collectionSampleCount += 1;
+  }
+
+  return {
+    currency,
+    totalInvoicedMinor,
+    outstandingBalanceMinor,
+    paidInvoiceCount,
+    invoiceCount: organizationInvoices.length,
+    averageCollectionDays:
+      collectionSampleCount === 0
+        ? null
+        : Math.round((totalCollectionDays / collectionSampleCount) * 10) / 10,
+    invoices: rows,
+  };
+}
+
 /** Whole UTC calendar days between two ISO dates; anomalous negative intervals are ignored. */
 function daysBetween(invoiceDate: string, paymentDate: string): number | null {
   let start = Date.parse(`${invoiceDate}T00:00:00Z`);

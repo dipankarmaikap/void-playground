@@ -115,6 +115,8 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
 
 export const contactSection: ClientFormSection = {
   key: 'contacts',
+  title: 'Contact details',
+  hint: 'The best ways to reach this client.',
   render: (props) => (
     <ContactFields
       values={props.values}

@@ -110,6 +110,8 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
 
 export const profileSection: ClientFormSection = {
   key: 'profile',
+  title: 'Client details',
+  hint: 'Tell us who you will be working with.',
   render: (props) => (
     <ProfileFields
       values={props.values}
