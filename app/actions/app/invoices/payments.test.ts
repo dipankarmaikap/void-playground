@@ -292,12 +292,20 @@ describe('invoice payments', () => {
     let showPath = routes.app.invoices.show.href({ invoiceId });
     let detail = await getHtml(router, showPath, sessionCookie);
     let voidAction = voidActionFrom(detail);
+    assert.match(
+      detail,
+      new RegExp(
+        `action="${voidAction.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[\\s\\S]*?` +
+          '<input type="hidden" name="_method" value="DELETE" />',
+      ),
+      'the no-JS void form should submit DELETE through the method override field',
+    );
 
     let missingReason = await submitForm(
       router,
       showPath,
       voidAction.action,
-      { reason: ' \t ' },
+      { _method: 'DELETE', reason: ' \t ' },
       sessionCookie,
     );
     assert.equal(missingReason.status, 400);
@@ -307,7 +315,7 @@ describe('invoice payments', () => {
       router,
       showPath,
       voidAction.action,
-      { reason: 'Duplicate entry' },
+      { _method: 'DELETE', reason: 'Duplicate entry' },
       sessionCookie,
     );
     assert.equal(voided.status, 302);
@@ -422,7 +430,7 @@ describe('invoice payments', () => {
       router,
       ownerShowPath,
       otherPaymentAction,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       owner.sessionCookie,
     );
     assert.equal(foreignVoid.status, 404);
@@ -431,7 +439,7 @@ describe('invoice payments', () => {
       router,
       otherShowPath,
       ownerPaymentAction,
-      { reason: 'Cross-Organization request' },
+      { _method: 'DELETE', reason: 'Cross-Organization request' },
       other.sessionCookie,
     );
     assert.equal(foreignInvoiceVoid.status, 404);

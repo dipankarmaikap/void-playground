@@ -40,7 +40,8 @@ export function EditClientPage(handle: Handle<EditClientPageProps>) {
         </header>
         <ClientForm
           csrfToken={csrfToken}
-          action={routes.app.clients.edit.action.href({ clientId: client.id })}
+          action={routes.app.clients.update.href({ clientId: client.id })}
+          method="PUT"
           submitLabel="Save client"
           values={values ?? clientFormValuesOf(client)}
           issues={issues}

@@ -237,7 +237,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
           </p>
         ) : null}
         <div mix={toolbarStyle}>
-          <a href={routes.app.clients.new.index.href()} mix={linkButtonStyle}>
+          <a href={routes.app.clients.new.href()} mix={linkButtonStyle}>
             New client
           </a>
           <nav aria-label="Client status" mix={statusNavStyle}>

@@ -2,7 +2,7 @@ import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth, requireAuth } from 'remix/middleware/auth';
+import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
@@ -19,6 +19,7 @@ import { creditNoteFormValuesOf } from '../../../../../data/invoices/credit-note
 import type { Invoice, Organization, User } from '../../../../../data/db.ts';
 import { storeIssuedCreditNotePdf } from '../../../../../data/invoices/credit-note-pdf-artifacts.ts';
 import { findInvoice, findInvoiceLines } from '../../../../../data/invoices/records.ts';
+import { requireAuth } from '../../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -62,10 +63,11 @@ async function renderIssueError(
       lines={sourceLines}
       creditableQuantities={creditableQuantities}
       creditDate={creditNote.credit_date}
-      action={routes.app.invoices.creditNotes.edit.action.href({
+      action={routes.app.invoices.creditNotes.update.href({
         invoiceId: invoice.id,
         creditNoteId: creditNote.id,
       })}
+      method="PUT"
       heading="Edit credit note draft"
       submitLabel="Save credit note draft"
       values={creditNoteFormValuesOf(creditNote, sourceLines, savedLines)}
@@ -77,7 +79,7 @@ async function renderIssueError(
 
 export default createController(routes.app.invoices.creditNotes.lifecycle, {
   middleware: [
-    requireAuth<User>({ onFailure: () => redirect(routes.auth.login.index.href()) }),
+    requireAuth(),
     requireOrganizationContext,
   ],
   actions: {

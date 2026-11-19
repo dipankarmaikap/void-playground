@@ -30,7 +30,7 @@ function newClientFields(fields: Record<string, string>) {
 async function createBusiness(sessionCookie: string, fields: Record<string, string>) {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     newClientFields(fields),
     sessionCookie,
   );
@@ -76,7 +76,7 @@ describe('business clients', () => {
     assert.match(directory, new RegExp(legalName));
     assert.match(directory, new RegExp(industry));
 
-    let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
+    let editPath = routes.app.clients.edit.href({ clientId: row.id });
     let editPage = await getHtml(router, editPath, sessionCookie);
     assert.match(editPage, new RegExp(`<title>Edit ${tradingName} \\| My Remix App<\\/title>`));
     assert.match(editPage, new RegExp(`name="legal_name"[^>]*value="${legalName}"`));
@@ -85,10 +85,12 @@ describe('business clients', () => {
 
     let updatedLegalName = uniqueName('Northwind Global Private Limited');
     let updatedIndustry = uniqueName('International freight');
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       newClientFields({
+        _method: 'PUT',
         legal_name: updatedLegalName,
         trading_name: tradingName,
         industry: updatedIndustry,
@@ -117,7 +119,7 @@ describe('business clients', () => {
 
     let response = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       newClientFields({
         legal_name: '',
         trading_name: tradingName,
@@ -161,7 +163,7 @@ describe('business clients', () => {
 
     let editPage = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(editPage, /name="trading_name"[^>]*value=""/);
@@ -213,7 +215,7 @@ describe('business clients', () => {
     let individualPhone = '+61 2 9374 4000';
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: individualName,
@@ -242,7 +244,7 @@ describe('business clients', () => {
 
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: legalName,
@@ -260,10 +262,12 @@ describe('business clients', () => {
     assert.equal(row.type, 'individual');
     assert.equal(row.preferred_name, preferredName);
 
-    let toBusiness = await postForm(
+    let toBusiness = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       newClientFields({
+        _method: 'PUT',
         legal_name: legalName,
         preferred_name: preferredName,
         trading_name: tradingName,
@@ -291,16 +295,18 @@ describe('business clients', () => {
     // The hidden Individual group stays in the Business edit form, so its value survives.
     let businessEdit = await getHtml(
       router,
-      routes.app.clients.edit.index.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
     assert.match(businessEdit, new RegExp(`name="preferred_name"[^>]*value="${preferredName}"`));
     assert.match(businessEdit, new RegExp(`name="industry"[^>]*value="${industry}"`));
 
-    let toIndividual = await postForm(
+    let toIndividual = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       {
+        _method: 'PUT',
         type: 'individual',
         legal_name: legalName,
         preferred_name: preferredName,
@@ -333,15 +339,17 @@ describe('business clients', () => {
     assert.doesNotMatch(individualDirectory, new RegExp(industry));
 
     // Switching back to Business restores the preserved values without re-entering them.
-    let editPath = routes.app.clients.edit.index.href({ clientId: row.id });
+    let editPath = routes.app.clients.edit.href({ clientId: row.id });
     let individualEdit = await getHtml(router, editPath, sessionCookie);
     assert.match(individualEdit, new RegExp(`name="trading_name"[^>]*value="${tradingName}"`));
     assert.match(individualEdit, new RegExp(`name="industry"[^>]*value="${industry}"`));
 
-    let backToBusiness = await postForm(
+    let backToBusiness = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       newClientFields({
+        _method: 'PUT',
         legal_name: legalName,
         preferred_name: preferredName,
         trading_name: tradingName,
@@ -390,8 +398,9 @@ describe('business clients', () => {
     let edited = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       newClientFields({
+        _method: 'PUT',
         legal_name: legalName,
         trading_name: tradingName,
         industry: updatedIndustry,
@@ -405,14 +414,16 @@ describe('business clients', () => {
 
     let anonymous = await router.fetch(new URL(location, origin));
     assert.equal(anonymous.status, 302);
-    assert.equal(anonymous.headers.get('Location'), routes.auth.login.index.href());
+    let loginLocation = new URL(anonymous.headers.get('Location') ?? '', origin);
+    assert.equal(loginLocation.pathname, routes.auth.login.index.href());
+    assert.equal(loginLocation.searchParams.get('returnTo'), location);
   });
 
   it('rejects Business mutations without a CSRF token', async () => {
     let sessionCookie = await createUserAndLogin(router, 'business');
     let legalName = uniqueName('No Token Business');
 
-    let response = await router.fetch(new URL(routes.app.clients.new.action.href(), origin), {
+    let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -441,10 +452,11 @@ describe('business clients', () => {
     assert.ok(row);
     assert.equal(row.industry, 'Professional services');
 
-    let cleared = await postForm(
+    let cleared = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
-      newClientFields({ legal_name: legalName, industry: '   ' }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
+      newClientFields({ _method: 'PUT',   legal_name: legalName, industry: '   ' }),
       sessionCookie,
     );
     assert.equal(cleared.status, 302);
@@ -468,10 +480,12 @@ describe('business clients', () => {
     let row = await db.findOne(clients, { where: { legal_name: legalName } });
     assert.ok(row);
 
-    let response = await postForm(
+    let response = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: row.id }),
+      routes.app.clients.edit.href({ clientId: row.id }),
+      routes.app.clients.update.href({ clientId: row.id }),
       newClientFields({
+        _method: 'PUT',
         legal_name: '',
         trading_name: tradingName,
         industry: 'Wholesale',

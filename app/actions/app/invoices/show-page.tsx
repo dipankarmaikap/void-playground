@@ -37,6 +37,7 @@ import { Field } from '../../../ui/field.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
 import { Input } from '../../../ui/input.tsx';
 import { formFieldAttributes } from '../../../ui/public/form-field.ts';
+import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import {
   noticeSpacingStyle,
   noticeStatusStyle,
@@ -565,8 +566,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>Void reason: {payment.void_reason}</p>
                         </>
                       ) : (
-                        <form
-                          method="post"
+                        <RestfulForm
+                          method="DELETE"
                           action={voidAction}
                           aria-labelledby={`invoice-payment-${payment.id}-heading`}
                         >
@@ -589,7 +590,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <Button type="submit" variant="danger">
                             Void payment
                           </Button>
-                        </form>
+                        </RestfulForm>
                       )}
                     </li>
                   );
@@ -745,8 +746,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>Void reason: {refund.void_reason}</p>
                         </>
                       ) : (
-                        <form
-                          method="post"
+                        <RestfulForm
+                          method="DELETE"
                           action={routes.app.invoices.refunds.void.href({
                             invoiceId: invoice.id,
                             refundId: refund.id,
@@ -772,7 +773,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <Button type="submit" variant="danger">
                             Void refund
                           </Button>
-                        </form>
+                        </RestfulForm>
                       )}
                     </li>
                   );
@@ -910,7 +911,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                         {draft ? (
                           <>
                             <a
-                              href={routes.app.invoices.creditNotes.edit.index.href({
+                              href={routes.app.invoices.creditNotes.edit.href({
                                 invoiceId: invoice.id,
                                 creditNoteId: creditNote.id,
                               })}
@@ -964,7 +965,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             )}
             {revisedTotalMinor > 0 ? (
               <a
-                href={routes.app.invoices.creditNotes.new.index.href({
+                href={routes.app.invoices.creditNotes.new.href({
                   invoiceId: invoice.id,
                 })}
                 mix={linkButtonStyle}
@@ -1018,7 +1019,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           <>
             <div mix={actionsStyle}>
               <a
-                href={routes.app.invoices.edit.index.href({ invoiceId: invoice.id })}
+                href={routes.app.invoices.edit.href({ invoiceId: invoice.id })}
                 mix={linkButtonStyle}
               >
                 Edit draft

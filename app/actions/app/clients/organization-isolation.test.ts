@@ -32,7 +32,7 @@ async function createClient(
 ): Promise<{ id: string; location: string }> {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     fields,
     sessionCookie,
   );
@@ -169,7 +169,7 @@ describe('Client Organization isolation', () => {
     assert.doesNotMatch(foreignBody, new RegExp(secretTaxValue));
 
     let foreignEditPage = await router.fetch(
-      new URL(routes.app.clients.edit.index.href({ clientId: id }), origin),
+      new URL(routes.app.clients.edit.href({ clientId: id }), origin),
       { headers: { Cookie: other.sessionCookie } },
     );
     assert.equal(foreignEditPage.status, 404);
@@ -177,8 +177,9 @@ describe('Client Organization isolation', () => {
     let foreignEdit = await submitForm(
       router,
       routes.app.clients.index.href(),
-      routes.app.clients.edit.action.href({ clientId: id }),
+      routes.app.clients.update.href({ clientId: id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: uniqueName('Tampered Business'),
         billing_line1: uniqueName('Tampered address'),
@@ -197,7 +198,7 @@ describe('Client Organization isolation', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       other.sessionCookie,
     );
     assert.equal(foreignArchive.status, 404);
@@ -207,7 +208,7 @@ describe('Client Organization isolation', () => {
       router,
       location,
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       owner.sessionCookie,
     );
     assert.equal(ownerArchive.status, 302);
@@ -217,7 +218,7 @@ describe('Client Organization isolation', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       other.sessionCookie,
     );
     assert.equal(foreignRestore.status, 404);
@@ -227,7 +228,7 @@ describe('Client Organization isolation', () => {
       router,
       location,
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       owner.sessionCookie,
     );
     assert.equal(ownerRestore.status, 302);
@@ -241,7 +242,7 @@ describe('Client Organization isolation', () => {
     let originalName = uniqueName('Owner Client');
     let created = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'business',
         legal_name: originalName,
@@ -258,10 +259,12 @@ describe('Client Organization isolation', () => {
     assert.equal(original.organization_id, owner.organizationId);
 
     let updatedName = uniqueName('Renamed Owner Client');
-    let edited = await postForm(
+    let edited = await submitForm(
       router,
-      routes.app.clients.edit.action.href({ clientId: original.id }),
+      routes.app.clients.edit.href({ clientId: original.id }),
+      routes.app.clients.update.href({ clientId: original.id }),
       {
+        _method: 'PUT',
         type: 'business',
         legal_name: updatedName,
         organization_id: other.organizationId,
@@ -279,7 +282,7 @@ describe('Client Organization isolation', () => {
     let otherName = uniqueName('Other Organization Client');
     let otherCreated = await postForm(
       router,
-      routes.app.clients.new.action.href(),
+      routes.app.clients.create.href(),
       {
         type: 'individual',
         legal_name: otherName,
@@ -315,7 +318,7 @@ describe('Client Organization isolation', () => {
     });
     let newPage = await getHtml(
       router,
-      routes.app.clients.new.index.href(),
+      routes.app.clients.new.href(),
       tenant.sessionCookie,
     );
     let csrf = extractCsrf(newPage);
@@ -329,9 +332,9 @@ describe('Client Organization isolation', () => {
 
     for (let path of [
       routes.app.clients.index.href(),
-      routes.app.clients.new.index.href(),
+      routes.app.clients.new.href(),
       routes.app.clients.show.href({ clientId: id }),
-      routes.app.clients.edit.index.href({ clientId: id }),
+      routes.app.clients.edit.href({ clientId: id }),
     ]) {
       let response = await router.fetch(new URL(path, origin), {
         headers: { Cookie: tenant.sessionCookie },
@@ -340,22 +343,24 @@ describe('Client Organization isolation', () => {
     }
 
     for (let path of [
-      routes.app.clients.new.action.href(),
-      routes.app.clients.edit.action.href({ clientId: id }),
+      routes.app.clients.create.href(),
+      routes.app.clients.update.href({ clientId: id }),
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
     ]) {
+      let body = new URLSearchParams({
+        _csrf: csrf,
+        type: 'individual',
+        legal_name: uniqueName('Must Not Be Created'),
+      });
+      if (path !== routes.app.clients.create.href()) body.set('_method', 'PUT');
       let response = await router.fetch(new URL(path, origin), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Cookie: tenant.sessionCookie,
         },
-        body: new URLSearchParams({
-          _csrf: csrf,
-          type: 'individual',
-          legal_name: uniqueName('Must Not Be Created'),
-        }).toString(),
+        body: body.toString(),
       });
       assert.equal(response.status, 403, `${path} should deny missing Organization context`);
     }

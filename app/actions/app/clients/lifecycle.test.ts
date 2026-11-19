@@ -40,7 +40,7 @@ function statusToggle(html: string) {
 async function createClient(sessionCookie: string, fields: Record<string, string>) {
   let response = await postForm(
     router,
-    routes.app.clients.new.action.href(),
+    routes.app.clients.create.href(),
     fields,
     sessionCookie,
   );
@@ -55,7 +55,7 @@ function archive(sessionCookie: string, clientId: string) {
     router,
     routes.app.clients.show.href({ clientId }),
     routes.app.clients.lifecycle.archive.href({ clientId }),
-    {},
+    { _method: 'PUT' },
     sessionCookie,
   );
 }
@@ -65,7 +65,7 @@ function restore(sessionCookie: string, clientId: string) {
     router,
     routes.app.clients.show.href({ clientId }),
     routes.app.clients.lifecycle.restore.href({ clientId }),
-    {},
+    { _method: 'PUT' },
     sessionCookie,
   );
 }
@@ -102,7 +102,8 @@ describe('client lifecycle', () => {
       profile,
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
     );
-    assert.match(archiveForm, /method="post"/);
+    assert.match(archiveForm, /method="POST"/);
+    assert.match(archiveForm, /<input type="hidden" name="_method" value="PUT" \/>/);
     assert.match(archiveForm, /name="_csrf" value="[^"]+"/);
     assert.doesNotMatch(archiveForm, /Restore client/);
   });
@@ -147,7 +148,8 @@ describe('client lifecycle', () => {
       profile,
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
     );
-    assert.match(restoreForm, /method="post"/);
+    assert.match(restoreForm, /method="POST"/);
+    assert.match(restoreForm, /<input type="hidden" name="_method" value="PUT" \/>/);
     assert.match(restoreForm, /name="_csrf" value="[^"]+"/);
   });
 
@@ -233,7 +235,7 @@ describe('client lifecycle', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.archive.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       secondCookie,
     );
     assert.equal(foreignArchive.status, 404);
@@ -246,7 +248,7 @@ describe('client lifecycle', () => {
       router,
       routes.app.clients.index.href(),
       routes.app.clients.lifecycle.restore.href({ clientId: id }),
-      {},
+      { _method: 'PUT' },
       secondCookie,
     );
     assert.equal(foreignRestore.status, 404);
@@ -309,7 +311,9 @@ describe('client lifecycle', () => {
     ]) {
       let response = await router.fetch(new URL(path, origin));
       assert.equal(response.status, 302, `${path} should redirect`);
-      assert.equal(response.headers.get('Location'), routes.auth.login.index.href());
+      let location = new URL(response.headers.get('Location') ?? '', origin);
+      assert.equal(location.pathname, routes.auth.login.index.href());
+      assert.equal(location.searchParams.get('returnTo'), path);
     }
   });
 
@@ -328,7 +332,7 @@ describe('client lifecycle', () => {
           'Content-Type': 'application/x-www-form-urlencoded',
           Cookie: sessionCookie,
         },
-        body: new URLSearchParams({ _csrf: csrf }).toString(),
+        body: new URLSearchParams({ _csrf: csrf, _method: 'PUT' }).toString(),
       });
       assert.equal(response.status, 404, `${path} should be 404`);
     }
