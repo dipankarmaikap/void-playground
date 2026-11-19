@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../../config.ts';
 import { clients } from '../../../data/db.ts';
 import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
@@ -63,7 +64,7 @@ describe('business clients', () => {
     assert.equal(row.status, 'active');
 
     let profile = await getHtml(router, location, sessionCookie);
-    assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(profile, new RegExp(`<title>${tradingName} \\| ${APP_NAME}<\\/title>`));
     assert.match(profile, new RegExp(`<p role="status"[^>]*>Client created<\\/p>`));
     assert.match(profile, /Business client profile/);
     assert.match(profile, new RegExp(`>${tradingName}<`));
@@ -79,7 +80,7 @@ describe('business clients', () => {
 
     let editPath = routes.app.clients.edit.href({ clientId: row.id });
     let editPage = await getHtml(router, editPath, sessionCookie);
-    assert.match(editPage, new RegExp(`<title>Edit ${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(editPage, new RegExp(`<title>Edit ${tradingName} \\| ${APP_NAME}<\\/title>`));
     assert.match(editPage, new RegExp(`name="legal_name"[^>]*value="${legalName}"`));
     assert.match(editPage, new RegExp(`name="trading_name"[^>]*value="${tradingName}"`));
     assert.match(editPage, new RegExp(`name="industry"[^>]*value="${industry}"`));
@@ -156,7 +157,7 @@ describe('business clients', () => {
     assert.equal(row.industry, null);
 
     let profile = await getHtml(router, location, sessionCookie);
-    assert.match(profile, new RegExp(`<title>${legalName} \\| My Remix App<\\/title>`));
+    assert.match(profile, new RegExp(`<title>${legalName} \\| ${APP_NAME}<\\/title>`));
     assert.doesNotMatch(profile, /<dt[^>]*>Industry<\/dt>/);
 
     let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
@@ -184,7 +185,7 @@ describe('business clients', () => {
     assert.ok(location);
 
     let profile = await getHtml(router, location, sessionCookie);
-    assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(profile, new RegExp(`<title>${tradingName} \\| ${APP_NAME}<\\/title>`));
     assert.match(profile, new RegExp(`<h1[^>]*>${tradingName}<\\/h1>`));
 
     let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
@@ -285,7 +286,7 @@ describe('business clients', () => {
     assert.equal(businessRow?.industry, industry);
 
     let businessProfile = await getHtml(router, location, sessionCookie);
-    assert.match(businessProfile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(businessProfile, new RegExp(`<title>${tradingName} \\| ${APP_NAME}<\\/title>`));
     assert.match(businessProfile, new RegExp(industry));
     assert.match(businessProfile, /<dt[^>]*>Trading name<\/dt>/);
     assert.doesNotMatch(businessProfile, /<dt[^>]*>Preferred name<\/dt>/);
@@ -325,7 +326,7 @@ describe('business clients', () => {
     assert.equal(individualRow?.industry, industry, 'the hidden industry should persist');
 
     let individualProfile = await getHtml(router, location, sessionCookie);
-    assert.match(individualProfile, new RegExp(`<title>${preferredName} \\| My Remix App<\\/title>`));
+    assert.match(individualProfile, new RegExp(`<title>${preferredName} \\| ${APP_NAME}<\\/title>`));
     assert.match(individualProfile, /<dt[^>]*>Preferred name<\/dt>/);
     assert.doesNotMatch(individualProfile, new RegExp(industry));
     assert.doesNotMatch(individualProfile, new RegExp(tradingName));
@@ -366,7 +367,7 @@ describe('business clients', () => {
     assert.equal(restored?.industry, industry);
 
     let restoredProfile = await getHtml(router, location, sessionCookie);
-    assert.match(restoredProfile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(restoredProfile, new RegExp(`<title>${tradingName} \\| ${APP_NAME}<\\/title>`));
     assert.match(restoredProfile, new RegExp(industry));
   });
 
@@ -507,6 +508,6 @@ describe('business clients', () => {
     assert.equal(stored?.industry, 'Retail');
 
     let profile = await getHtml(router, location, sessionCookie);
-    assert.match(profile, new RegExp(`<title>${tradingName} \\| My Remix App<\\/title>`));
+    assert.match(profile, new RegExp(`<title>${tradingName} \\| ${APP_NAME}<\\/title>`));
   });
 });

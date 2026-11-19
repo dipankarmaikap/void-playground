@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../../config.ts';
 import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
@@ -340,7 +341,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, /<title>Clients \| My Remix App<\/title>/);
+    assert.match(html, new RegExp(`<title>Clients \\| ${APP_NAME}<\\/title>`));
   });
 
   it('treats percent and underscore as literal search characters', async () => {
