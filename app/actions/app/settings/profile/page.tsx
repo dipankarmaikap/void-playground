@@ -16,8 +16,10 @@ import {
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../../ui/theme.ts';
-import { APP_NAME, DISPLAY_NAME_MAX_LENGTH } from '../../../../config.ts';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
+import { APP_NAME } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
+import { displayNameFormFields, organizationNameFormFields } from './public/schema.ts';
 
 export interface ProfilePageProps {
   csrfToken: string;
@@ -129,11 +131,10 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             <Field label="Organization name">
               <Input
                 name="organization_name"
-                autoComplete="organization"
-                required
                 aria-invalid={organizationError ? 'true' : undefined}
                 aria-describedby={organizationError ? 'organization-name-error' : undefined}
                 defaultValue={organizationNameValue ?? organizationName}
+                {...formFieldAttributes(organizationNameFormFields.organization_name)}
               />
             </Field>
             <Button type="submit">Save Organization name</Button>
@@ -177,9 +178,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             <Field label="Display name" hint="Leave blank to use your email address instead.">
               <Input
                 name="display_name"
-                autoComplete="nickname"
-                maxLength={DISPLAY_NAME_MAX_LENGTH}
                 defaultValue={formValue}
+                {...formFieldAttributes(displayNameFormFields.display_name)}
               />
             </Field>
             <Button type="submit">Save profile</Button>

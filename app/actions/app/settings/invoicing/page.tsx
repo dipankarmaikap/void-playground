@@ -3,7 +3,6 @@ import { css } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
 
 import { COUNTRIES, CURRENCIES, countryName } from '../../../../data/client-billing.ts';
-import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import type { OrganizationGstRatePreset } from '../../../../data/db.ts';
 import { INDIA_STATES } from '../../../../data/india-states.ts';
 import {
@@ -27,9 +26,11 @@ import {
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
 import { colors, radius, shadow } from '../../../../ui/theme.ts';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { APP_NAME } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
 import type { InvoicingFormValues } from './form-values.ts';
+import { invoicingFormFields, presetFormFields } from './public/schema.ts';
 
 export interface InvoicingPageProps {
   csrfToken: string;
@@ -277,11 +278,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="legal_name"
-                autoComplete="organization"
-                maxLength={CLIENT_TEXT_LIMITS.legal_name}
                 defaultValue={values.legal_name}
-                aria-invalid={legalNameIssue ? true : undefined}
                 variant={legalNameIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.legal_name, legalNameIssue)}
               />
             </Field>
 
@@ -293,11 +292,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               >
                 <Input
                   name="address_line1"
-                  autoComplete="address-line1"
-                  maxLength={CLIENT_TEXT_LIMITS.billing_line1}
                   defaultValue={values.address_line1}
-                  aria-invalid={line1Issue ? true : undefined}
                   variant={line1Issue ? 'error' : 'default'}
+                  {...formFieldAttributes(invoicingFormFields.address_line1, line1Issue)}
                 />
               </Field>
               <Field
@@ -307,11 +304,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               >
                 <Input
                   name="address_locality"
-                  autoComplete="address-level2"
-                  maxLength={CLIENT_TEXT_LIMITS.billing_locality}
                   defaultValue={values.address_locality}
-                  aria-invalid={localityIssue ? true : undefined}
                   variant={localityIssue ? 'error' : 'default'}
+                  {...formFieldAttributes(invoicingFormFields.address_locality, localityIssue)}
                 />
               </Field>
               <Field
@@ -321,21 +316,20 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               >
                 <Input
                   name="address_region"
-                  autoComplete="address-level1"
-                  maxLength={CLIENT_TEXT_LIMITS.billing_region}
                   defaultValue={values.address_region}
-                  aria-invalid={regionIssue ? true : undefined}
                   variant={regionIssue ? 'error' : 'default'}
+                  {...formFieldAttributes(invoicingFormFields.address_region, regionIssue)}
                 />
               </Field>
               <Field label="Postal code" hint="Optional." error={postalCodeIssue?.message}>
                 <Input
                   name="address_postal_code"
-                  autoComplete="postal-code"
-                  maxLength={CLIENT_TEXT_LIMITS.billing_postal_code}
                   defaultValue={values.address_postal_code}
-                  aria-invalid={postalCodeIssue ? true : undefined}
                   variant={postalCodeIssue ? 'error' : 'default'}
+                  {...formFieldAttributes(
+                    invoicingFormFields.address_postal_code,
+                    postalCodeIssue,
+                  )}
                 />
               </Field>
               <Field
@@ -345,16 +339,14 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               >
                 <Input
                   name="address_country"
-                  autoComplete="country-name"
                   list="invoicing-countries"
-                  maxLength={CLIENT_TEXT_LIMITS.billing_country}
                   defaultValue={
                     submitted || countryIssue
                       ? values.address_country
                       : countryName(values.address_country)
                   }
-                  aria-invalid={countryIssue ? true : undefined}
                   variant={countryIssue ? 'error' : 'default'}
+                  {...formFieldAttributes(invoicingFormFields.address_country, countryIssue)}
                 />
                 <datalist id="invoicing-countries">
                   {COUNTRIES.map((option) => (
@@ -367,23 +359,17 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             <Field label="Billing email" hint="Optional." error={emailIssue?.message}>
               <Input
                 name="billing_email"
-                type="email"
-                autoComplete="email"
-                maxLength={CLIENT_TEXT_LIMITS.email}
                 defaultValue={values.billing_email}
-                aria-invalid={emailIssue ? true : undefined}
                 variant={emailIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.billing_email, emailIssue)}
               />
             </Field>
             <Field label="Billing phone" hint="Optional." error={phoneIssue?.message}>
               <Input
                 name="billing_phone"
-                type="tel"
-                autoComplete="tel"
-                maxLength={CLIENT_TEXT_LIMITS.phone}
                 defaultValue={values.billing_phone}
-                aria-invalid={phoneIssue ? true : undefined}
                 variant={phoneIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.billing_phone, phoneIssue)}
               />
             </Field>
 
@@ -400,11 +386,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="pan"
-                maxLength={10}
-                autoComplete="off"
                 defaultValue={values.pan}
-                aria-invalid={panIssue ? true : undefined}
                 variant={panIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.pan, panIssue)}
               />
             </Field>
 
@@ -414,6 +398,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
                 name="gst_registered"
                 value="on"
                 defaultChecked={Boolean(values.gst_registered)}
+                {...formFieldAttributes(invoicingFormFields.gst_registered)}
               />
               <span>GST registration is enabled for this Organization</span>
             </label>
@@ -425,11 +410,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="gstin"
-                maxLength={15}
-                autoComplete="off"
                 defaultValue={values.gstin}
-                aria-invalid={gstinIssue ? true : undefined}
                 variant={gstinIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.gstin, gstinIssue)}
               />
             </Field>
             <Field
@@ -439,8 +422,8 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Select
                 name="gst_state_code"
-                aria-invalid={gstStateIssue ? true : undefined}
                 variant={gstStateIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.gst_state_code, gstStateIssue)}
               >
                 <option value="" selected={!values.gst_state_code}>
                   Not recorded
@@ -474,11 +457,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               <Input
                 name="default_currency"
                 list="invoicing-currencies"
-                maxLength={3}
-                autoComplete="off"
                 defaultValue={values.default_currency}
-                aria-invalid={currencyIssue ? true : undefined}
                 variant={currencyIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.default_currency, currencyIssue)}
               />
               <datalist id="invoicing-currencies">
                 {CURRENCIES.map((currency) => (
@@ -494,8 +475,8 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Select
                 name="payment_term"
-                aria-invalid={paymentTermIssue ? true : undefined}
                 variant={paymentTermIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.payment_term, paymentTermIssue)}
               >
                 {values.payment_term &&
                 !PAYMENT_TERMS.some((term) => term === values.payment_term) ? (
@@ -518,10 +499,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <textarea
                 name="custom_payment_terms"
-                maxLength={200}
                 mix={textAreaStyle}
                 defaultValue={values.custom_payment_terms}
-                aria-invalid={customTermsIssue ? true : undefined}
+                {...formFieldAttributes(
+                  invoicingFormFields.custom_payment_terms,
+                  customTermsIssue,
+                )}
               />
             </Field>
 
@@ -532,10 +515,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <textarea
                 name="payment_instructions"
-                maxLength={1000}
                 mix={textAreaStyle}
                 defaultValue={values.payment_instructions}
-                aria-invalid={instructionsIssue ? true : undefined}
+                {...formFieldAttributes(
+                  invoicingFormFields.payment_instructions,
+                  instructionsIssue,
+                )}
               />
             </Field>
 
@@ -546,10 +531,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <textarea
                 name="customer_notes"
-                maxLength={1000}
                 mix={textAreaStyle}
                 defaultValue={values.customer_notes}
-                aria-invalid={notesIssue ? true : undefined}
+                {...formFieldAttributes(invoicingFormFields.customer_notes, notesIssue)}
               />
             </Field>
           </section>
@@ -569,11 +553,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="invoice_prefix"
-                maxLength={12}
-                autoComplete="off"
                 defaultValue={values.invoice_prefix}
-                aria-invalid={invoicePrefixIssue ? true : undefined}
                 variant={invoicePrefixIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.invoice_prefix, invoicePrefixIssue)}
               />
             </Field>
             <Field
@@ -584,10 +566,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               <Input
                 name="invoice_starting_number"
                 inputMode="numeric"
-                autoComplete="off"
                 defaultValue={values.invoice_starting_number}
-                aria-invalid={invoiceNumberIssue ? true : undefined}
                 variant={invoiceNumberIssue ? 'error' : 'default'}
+                {...formFieldAttributes(
+                  invoicingFormFields.invoice_starting_number,
+                  invoiceNumberIssue,
+                )}
               />
             </Field>
             <Field
@@ -597,11 +581,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="credit_note_prefix"
-                maxLength={12}
-                autoComplete="off"
                 defaultValue={values.credit_note_prefix}
-                aria-invalid={creditNotePrefixIssue ? true : undefined}
                 variant={creditNotePrefixIssue ? 'error' : 'default'}
+                {...formFieldAttributes(
+                  invoicingFormFields.credit_note_prefix,
+                  creditNotePrefixIssue,
+                )}
               />
             </Field>
             <Field
@@ -612,10 +597,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               <Input
                 name="credit_note_starting_number"
                 inputMode="numeric"
-                autoComplete="off"
                 defaultValue={values.credit_note_starting_number}
-                aria-invalid={creditNoteNumberIssue ? true : undefined}
                 variant={creditNoteNumberIssue ? 'error' : 'default'}
+                {...formFieldAttributes(
+                  invoicingFormFields.credit_note_starting_number,
+                  creditNoteNumberIssue,
+                )}
               />
             </Field>
           </section>
@@ -639,10 +626,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="logo"
-                autoComplete="off"
                 defaultValue={values.logo}
-                aria-invalid={logoIssue ? true : undefined}
                 variant={logoIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.logo, logoIssue)}
               />
             </Field>
             <label mix={checkboxStyle}>
@@ -651,6 +637,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
                 name="remove_logo"
                 value="on"
                 defaultChecked={Boolean(values.remove_logo)}
+                {...formFieldAttributes(invoicingFormFields.remove_logo)}
               />
               <span>Remove the saved logo</span>
             </label>
@@ -669,10 +656,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="signature_image"
-                autoComplete="off"
                 defaultValue={values.signature_image}
-                aria-invalid={signatureIssue ? true : undefined}
                 variant={signatureIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.signature_image, signatureIssue)}
               />
             </Field>
             <label mix={checkboxStyle}>
@@ -681,6 +667,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
                 name="remove_signature_image"
                 value="on"
                 defaultChecked={Boolean(values.remove_signature_image)}
+                {...formFieldAttributes(invoicingFormFields.remove_signature_image)}
               />
               <span>Remove the saved signature image</span>
             </label>
@@ -692,11 +679,9 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="signatory_name"
-                maxLength={120}
-                autoComplete="name"
                 defaultValue={values.signatory_name}
-                aria-invalid={signatoryNameIssue ? true : undefined}
                 variant={signatoryNameIssue ? 'error' : 'default'}
+                {...formFieldAttributes(invoicingFormFields.signatory_name, signatoryNameIssue)}
               />
             </Field>
             <Field
@@ -706,11 +691,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             >
               <Input
                 name="signatory_designation"
-                maxLength={100}
-                autoComplete="organization-title"
                 defaultValue={values.signatory_designation}
-                aria-invalid={signatoryDesignationIssue ? true : undefined}
                 variant={signatoryDesignationIssue ? 'error' : 'default'}
+                {...formFieldAttributes(
+                  invoicingFormFields.signatory_designation,
+                  signatoryDesignationIssue,
+                )}
               />
             </Field>
           </section>
@@ -746,11 +732,14 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
                   <Input
                     name="rate"
                     aria-label={`GST rate preset ${preset.rate}%`}
-                    aria-invalid={presetErrorId === preset.id ? true : undefined}
                     aria-describedby={presetErrorId === preset.id ? 'preset-error' : undefined}
                     mix={presetRateInputStyle}
                     variant={presetErrorId === preset.id ? 'error' : 'default'}
                     defaultValue={presetErrorId === preset.id ? presetRate : preset.rate}
+                    {...formFieldAttributes(
+                      presetFormFields.rate,
+                      presetErrorId === preset.id ? presetError : undefined,
+                    )}
                   />
                   <Button type="submit" variant="secondary">
                     Save
@@ -781,8 +770,8 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               <Input
                 name="rate"
                 defaultValue={presetRate}
-                aria-invalid={presetError ? true : undefined}
                 variant={presetError ? 'error' : 'default'}
+                {...formFieldAttributes(presetFormFields.rate, presetError)}
               />
             </Field>
             <Button type="submit" variant="secondary">

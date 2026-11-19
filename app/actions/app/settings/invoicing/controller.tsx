@@ -23,7 +23,8 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
-import { invoicingFormValuesOf, readInvoicingFormValues } from './form-values.ts';
+import { invoicingFormValuesOf } from './form-values.ts';
+import { invoicingValuesOf, presetValuesOf } from './public/schema.ts';
 import { InvoicingPage } from './page.tsx';
 
 function identityOf(auth: GoodAuth<User>) {
@@ -65,12 +66,7 @@ export default createController(routes.app.settings.invoicing, {
 
       if (form === 'preset_add' || form === 'preset_update' || form === 'preset_remove') {
         let presets = await ensureGstPresets(organization.id);
-        let text = (name: string) => {
-          let value = context.formData.get(name);
-          return typeof value === 'string' ? value : '';
-        };
-        let rate = text('rate');
-        let presetId = text('preset_id');
+        let { rate, presetId } = presetValuesOf(context.formData);
 
         let result =
           form === 'preset_add'
@@ -115,7 +111,7 @@ export default createController(routes.app.settings.invoicing, {
         );
       }
 
-      let submitted = readInvoicingFormValues(context.formData);
+      let submitted = invoicingValuesOf(context.formData);
       let presets = await ensureGstPresets(organization.id);
       let parsed = parseInvoicingProfile(submitted, view);
 
