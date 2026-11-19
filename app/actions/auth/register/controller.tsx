@@ -88,7 +88,7 @@ export default createController(routes.auth.register, {
         return redirect(routes.auth.register.index.href());
       }
 
-      let passwordHash = hashPassword(password);
+      let passwordHash = await hashPassword(password);
       let token = crypto.randomUUID();
       let expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       let userId = crypto.randomUUID();

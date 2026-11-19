@@ -8,6 +8,7 @@
     },
     "migrations": {
       "directory": "./app/data/db/migrations"
-    }
+    },
+    "seed": "./app/data/db/seed.sql"
   }
 }
