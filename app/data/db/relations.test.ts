@@ -7,7 +7,6 @@ import {
   creditNoteLines,
   creditNoteLinesByPosition,
   creditNotes,
-  db,
   invoiceForCreditNote,
   invoiceLineForCreditNoteLine,
   invoiceLines,
@@ -26,7 +25,7 @@ import {
   sessionsForUser,
   users,
 } from '../db.ts';
-import '../../../test/db-setup.ts';
+import { testDb as db } from '../../../test/db-setup.ts';
 
 async function createOrganization(name: string): Promise<string> {
   let id = crypto.randomUUID();

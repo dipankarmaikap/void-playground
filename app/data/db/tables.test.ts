@@ -2,8 +2,8 @@ import * as assert from 'remix/assert';
 import { DataTableValidationError } from 'remix/data-table';
 import { describe, it } from 'remix/test';
 
-import { db, clients, creditNoteLines, creditNotes, invoiceLines, invoicePayments, invoiceRefunds, invoices, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
-import '../../../test/db-setup.ts';
+import { clients, creditNoteLines, creditNotes, invoiceLines, invoicePayments, invoiceRefunds, invoices, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
+import { testDb as db } from '../../../test/db-setup.ts';
 
 async function createOrganization(name: string): Promise<string> {
   let id = crypto.randomUUID();

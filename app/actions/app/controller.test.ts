@@ -1,12 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../../router.ts';
+import { createAppRouter } from '../../router.ts';
 import { routes } from '../../routes.ts';
-import { db, organizationMemberships, users } from '../../data/db.ts';
-import '../../../test/db-setup.ts';
+import { organizationMemberships, users } from '../../data/db.ts';
+import { testDb as db } from '../../../test/db-setup.ts';
 import { findOrganizationForUser } from '../../data/organization/access.ts';
 import { createUser, login, origin, postForm } from '../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 async function loginNewUser(displayName: string | null = null) {
   let email = `app-${crypto.randomUUID()}@example.com`;
@@ -114,7 +116,7 @@ describe('app controller', () => {
 
   it('identifies the current Organization without replacing product or User identity', async () => {
     let { email, userId, sessionCookie } = await loginNewUser('Ada Lovelace');
-    let organization = await findOrganizationForUser({ id: userId });
+    let organization = await findOrganizationForUser(db, { id: userId });
     assert.ok(organization);
 
     let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
@@ -158,7 +160,7 @@ describe('app controller', () => {
 
   it('shows the current Organization and an accessible name form in Settings', async () => {
     let { email, userId, sessionCookie } = await loginNewUser('Ada Lovelace');
-    let organization = await findOrganizationForUser({ id: userId });
+    let organization = await findOrganizationForUser(db, { id: userId });
     assert.ok(organization);
 
     let html = await getAuthenticatedHtml(
@@ -179,8 +181,8 @@ describe('app controller', () => {
   it('renames only the owner Organization and keeps the User display name unchanged', async () => {
     let owner = await loginNewUser('Ada Lovelace');
     let other = await loginNewUser('Grace Hopper');
-    let organization = await findOrganizationForUser({ id: owner.userId });
-    let otherOrganization = await findOrganizationForUser({ id: other.userId });
+    let organization = await findOrganizationForUser(db, { id: owner.userId });
+    let otherOrganization = await findOrganizationForUser(db, { id: other.userId });
     assert.ok(organization);
     assert.ok(otherOrganization);
     let renamed = `Renamed Studio ${crypto.randomUUID()}`;
@@ -200,8 +202,8 @@ describe('app controller', () => {
     assert.match(html, /<p role="status"[^>]*>Organization name updated<\/p>/);
     assert.match(html, new RegExp(`name="organization_name"[^>]*value="${renamed}"`));
     assert.ok(html.includes('Ada Lovelace'));
-    assert.equal((await findOrganizationForUser({ id: owner.userId }))?.name, renamed);
-    assert.equal((await findOrganizationForUser({ id: other.userId }))?.name, otherOrganization.name);
+    assert.equal((await findOrganizationForUser(db, { id: owner.userId }))?.name, renamed);
+    assert.equal((await findOrganizationForUser(db, { id: other.userId }))?.name, otherOrganization.name);
 
     let user = await db.find(users, owner.userId);
     assert.equal(user?.display_name, 'Ada Lovelace');
@@ -210,7 +212,7 @@ describe('app controller', () => {
   it('does not let a non-owner rename their Organization', async () => {
     let owner = await loginNewUser();
     let member = await loginNewUser();
-    let organization = await findOrganizationForUser({ id: owner.userId });
+    let organization = await findOrganizationForUser(db, { id: owner.userId });
     assert.ok(organization);
 
     await db.deleteMany(organizationMemberships, { where: { user_id: member.userId } });
@@ -227,12 +229,12 @@ describe('app controller', () => {
     });
 
     assert.equal(response.status, 403);
-    assert.equal((await findOrganizationForUser({ id: owner.userId }))?.name, organization.name);
+    assert.equal((await findOrganizationForUser(db, { id: owner.userId }))?.name, organization.name);
   });
 
   it('rejects a blank Organization name with accessible feedback and keeps the saved name', async () => {
     let { userId, sessionCookie } = await loginNewUser();
-    let organization = await findOrganizationForUser({ id: userId });
+    let organization = await findOrganizationForUser(db, { id: userId });
     assert.ok(organization);
 
     let response = await postProfile(sessionCookie, { organization_name: '   ' });
@@ -248,12 +250,12 @@ describe('app controller', () => {
     );
     assert.match(html, /name="organization_name"[^>]*aria-invalid="true"/);
     assert.match(html, /name="organization_name"[^>]*value=" {3}"/);
-    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
+    assert.equal((await findOrganizationForUser(db, { id: userId }))?.name, organization.name);
   });
 
   it('rejects an Organization rename without a CSRF token', async () => {
     let { userId, sessionCookie } = await loginNewUser();
-    let organization = await findOrganizationForUser({ id: userId });
+    let organization = await findOrganizationForUser(db, { id: userId });
     assert.ok(organization);
 
     let response = await postProfile(
@@ -263,14 +265,14 @@ describe('app controller', () => {
     );
 
     assert.equal(response.status, 403);
-    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
+    assert.equal((await findOrganizationForUser(db, { id: userId }))?.name, organization.name);
   });
 
   it('allows different Organizations to use the same name through Settings', async () => {
     let first = await loginNewUser();
     let second = await loginNewUser();
-    let firstOrganization = await findOrganizationForUser({ id: first.userId });
-    let secondOrganization = await findOrganizationForUser({ id: second.userId });
+    let firstOrganization = await findOrganizationForUser(db, { id: first.userId });
+    let secondOrganization = await findOrganizationForUser(db, { id: second.userId });
     assert.ok(firstOrganization);
     assert.ok(secondOrganization);
 
@@ -280,11 +282,11 @@ describe('app controller', () => {
     assert.equal(response.status, 302);
 
     assert.equal(
-      (await findOrganizationForUser({ id: first.userId }))?.name,
+      (await findOrganizationForUser(db, { id: first.userId }))?.name,
       secondOrganization.name,
     );
     assert.equal(
-      (await findOrganizationForUser({ id: second.userId }))?.name,
+      (await findOrganizationForUser(db, { id: second.userId }))?.name,
       secondOrganization.name,
     );
   });
@@ -308,7 +310,7 @@ describe('app controller', () => {
 
   it('updates the display name through the CSRF-protected profile form', async () => {
     let { userId, sessionCookie } = await loginNewUser();
-    let organization = await findOrganizationForUser({ id: userId });
+    let organization = await findOrganizationForUser(db, { id: userId });
     assert.ok(organization);
     let response = await postProfile(sessionCookie, { display_name: '  Grace Hopper  ' });
 
@@ -324,7 +326,7 @@ describe('app controller', () => {
 
     let user = await db.find(users, userId);
     assert.equal(user?.display_name, 'Grace Hopper');
-    assert.equal((await findOrganizationForUser({ id: userId }))?.name, organization.name);
+    assert.equal((await findOrganizationForUser(db, { id: userId }))?.name, organization.name);
   });
 
   it('clears the display name with a blank submission', async () => {

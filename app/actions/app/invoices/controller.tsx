@@ -55,11 +55,11 @@ export default createController(routes.app.invoices, {
       let organization = context.get(CurrentOrganization);
       let query = (context.url.searchParams.get('q') ?? '').trim();
       let clientId = (context.url.searchParams.get('clientId') ?? '').trim();
-      let filteredClient = clientId ? await findClient(organization.id, clientId) : null;
+      let filteredClient = clientId ? await findClient(context.db, organization.id, clientId) : null;
       let status = parseInvoiceStatusFilter(context.url.searchParams.get('status'));
       let from = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('from'));
       let to = parseInvoiceDirectoryDateFilter(context.url.searchParams.get('to'));
-      let directory = await listInvoices(organization.id, {
+      let directory = await listInvoices(context.db, organization.id, {
         q: query,
         clientId,
         status,
@@ -91,13 +91,13 @@ export default createController(routes.app.invoices, {
     async show(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
 
       let [lines, client, paymentData] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
-        findClient(organization.id, invoice.client_id),
-        invoiceActivityData(organization.id, invoice),
+        findInvoiceLines(context.db, organization.id, invoice.id),
+        findClient(context.db, organization.id, invoice.client_id),
+        invoiceActivityData(context.db, organization.id, invoice),
       ]);
       let message = context.session.get('message');
       return context.render(
@@ -115,7 +115,7 @@ export default createController(routes.app.invoices, {
     },
     async pdf(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
 
       let filename = invoicePdfFilename(invoice);
@@ -123,7 +123,7 @@ export default createController(routes.app.invoices, {
       // Issued invoices download the exact bytes preserved at issue time; a missing artifact is a
       // 404 rather than a regeneration so the historical document can never drift.
       if (invoice.status !== 'draft') {
-        let stored = await findIssuedInvoicePdfBytes(organization.id, invoice.id);
+        let stored = await findIssuedInvoicePdfBytes(context.db, organization.id, invoice.id);
         if (!stored) return new Response('Invoice PDF not found', { status: 404 });
         return new Response(new Blob([stored as BlobPart]), {
           headers: {
@@ -138,8 +138,8 @@ export default createController(routes.app.invoices, {
       // cannot reach the renderer.
       let { internal_note: _internalNote, ...draftDocument } = invoice;
       let [lines, profileView] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
-        getInvoicingProfileView(organization),
+        findInvoiceLines(context.db, organization.id, invoice.id),
+        getInvoicingProfileView(context.db, organization),
       ]);
       let pdf = renderInvoicePdf({
         invoice: draftDocument,
@@ -157,19 +157,19 @@ export default createController(routes.app.invoices, {
     async new(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let directory = await listClients(organization.id, { status: 'active' });
+      let directory = await listClients(context.db, organization.id, { status: 'active' });
       let clientId = context.url.searchParams.get('clientId') ?? '';
-      let selectedClient = clientId ? await findClient(organization.id, clientId) : null;
+      let selectedClient = clientId ? await findClient(context.db, organization.id, clientId) : null;
 
       if (clientId && !selectedClient) return new Response('Client not found', { status: 404 });
       if (selectedClient?.status === 'archived') {
         return new Response('Client not found', { status: 404 });
       }
 
-      let profile = selectedClient ? await getInvoicingProfileView(organization) : null;
+      let profile = selectedClient ? await getInvoicingProfileView(context.db, organization) : null;
       let gstRatePresets =
         profile?.gst_registered
-          ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
+          ? (await findGstPresets(context.db, organization.id)).map((preset) => preset.rate)
           : [];
       let values = selectedClient && profile
         ? draftFormValuesFor(selectedClient, profile, todayInKolkata())
@@ -190,19 +190,19 @@ export default createController(routes.app.invoices, {
     async edit(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be edited', { status: 409 });
       }
 
       let [lines, client] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
-        findClient(organization.id, invoice.client_id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
+        findClient(context.db, organization.id, invoice.client_id),
       ]);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await findGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await findGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       return context.render(
         <EditInvoicePage
@@ -221,9 +221,9 @@ export default createController(routes.app.invoices, {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
       let { values, issues: formIssues } = parseInvoiceFormValues(context.formData);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await ensureGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       let taxConfig = {
         gstRegistered: profile.gst_registered,
@@ -235,7 +235,7 @@ export default createController(routes.app.invoices, {
 
       // A new Draft can only start from an Active Client in the resolved Organization. A foreign
       // id is indistinguishable from a missing one; an archived Client is rejected explicitly.
-      let client = values.client_id ? await findClient(organization.id, values.client_id) : null;
+      let client = values.client_id ? await findClient(context.db, organization.id, values.client_id) : null;
       if (!client) return new Response('Client not found', { status: 404 });
       if (client.status === 'archived') {
         return context.render(
@@ -243,7 +243,7 @@ export default createController(routes.app.invoices, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={values}
             gstRatePresets={gstRatePresets}
@@ -264,7 +264,7 @@ export default createController(routes.app.invoices, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={withAdditionalLine(values)}
             gstRatePresets={gstRatePresets}
@@ -278,7 +278,7 @@ export default createController(routes.app.invoices, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={values}
             issues={formIssues}
@@ -295,7 +295,7 @@ export default createController(routes.app.invoices, {
             csrfToken={csrfToken}
             identity={identity}
             organizationName={organization.name}
-            clients={(await listClients(organization.id, { status: 'active' })).clients}
+            clients={(await listClients(context.db, organization.id, { status: 'active' })).clients}
             selectedClient={client}
             values={values}
             issues={parsed.issues}
@@ -305,7 +305,7 @@ export default createController(routes.app.invoices, {
         );
       }
 
-      let invoice = await createDraftInvoice(organization.id, client.id, parsed.value);
+      let invoice = await createDraftInvoice(context.db, organization.id, client.id, parsed.value);
       if (!invoice) return new Response('Invoice could not be created', { status: 500 });
       context.session.flash('message', 'Invoice draft created');
       return redirect(routes.app.invoices.show.href({ invoiceId: invoice.id }));
@@ -313,7 +313,7 @@ export default createController(routes.app.invoices, {
     async update(context) {
       let auth = context.get(Auth) as GoodAuth<User>;
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
       if (invoice.status !== 'draft') {
         return new Response('Issued invoices cannot be edited', { status: 409 });
@@ -322,16 +322,16 @@ export default createController(routes.app.invoices, {
       let identity = { email: auth.identity.email, displayName: auth.identity.display_name };
       let csrfToken = getCsrfToken(context);
       let { values, issues: formIssues } = parseInvoiceFormValues(context.formData);
-      let profile = await getInvoicingProfileView(organization);
+      let profile = await getInvoicingProfileView(context.db, organization);
       let gstRatePresets = profile.gst_registered
-        ? (await ensureGstPresets(organization.id)).map((preset) => preset.rate)
+        ? (await ensureGstPresets(context.db, organization.id)).map((preset) => preset.rate)
         : [];
       let taxConfig = {
         gstRegistered: profile.gst_registered,
         gstStateCode: profile.gst_state_code,
         gstRatePresets,
       };
-      let savedLines = await findInvoiceLines(organization.id, invoice.id);
+      let savedLines = await findInvoiceLines(context.db, organization.id, invoice.id);
       if (isAddLineIntent(context.formData)) {
         return context.render(
           <EditInvoicePage
@@ -339,7 +339,7 @@ export default createController(routes.app.invoices, {
             identity={identity}
             organizationName={organization.name}
             invoice={invoice}
-            client={await findClient(organization.id, invoice.client_id)}
+            client={await findClient(context.db, organization.id, invoice.client_id)}
             lines={savedLines}
             values={withAdditionalLine(values)}
             gstRatePresets={gstRatePresets}
@@ -348,7 +348,7 @@ export default createController(routes.app.invoices, {
       }
 
       if (formIssues.length > 0) {
-        let client = await findClient(organization.id, invoice.client_id);
+        let client = await findClient(context.db, organization.id, invoice.client_id);
         return context.render(
           <EditInvoicePage
             csrfToken={csrfToken}
@@ -367,7 +367,7 @@ export default createController(routes.app.invoices, {
 
       let parsed = parseInvoiceDraft(values, taxConfig);
       if (!parsed.ok) {
-        let client = await findClient(organization.id, invoice.client_id);
+        let client = await findClient(context.db, organization.id, invoice.client_id);
         return context.render(
           <EditInvoicePage
             csrfToken={csrfToken}
@@ -385,7 +385,7 @@ export default createController(routes.app.invoices, {
       }
 
       // The Client is fixed for this Draft; a forged `client_id` in the form is ignored.
-      let updated = await updateDraftInvoice(organization.id, invoice.id, parsed.value);
+      let updated = await updateDraftInvoice(context.db, organization.id, invoice.id, parsed.value);
       if (!updated) return new Response('Only a Draft invoice can be edited', { status: 409 });
 
       context.session.flash('message', 'Invoice draft updated');

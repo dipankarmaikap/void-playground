@@ -2,9 +2,12 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { assets } from '../app/assets.ts';
-import { router } from '../app/router.ts';
+import { createAppRouter } from '../app/router.ts';
+import { testDb } from './db-setup.ts';
 import { routes } from '../app/routes.ts';
 import { createUserAndLogin, extractCsrf, origin } from './http.ts';
+
+const router = createAppRouter({ db: testDb });
 
 describe('browser asset graph', () => {
   it('allows only the shared route contract and its browser-safe route modules', async () => {

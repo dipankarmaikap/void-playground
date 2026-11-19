@@ -17,7 +17,7 @@ export default createController(routes.app.clients.lifecycle, {
   actions: {
     async archive(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await archiveClient(organization.id, context.params.clientId);
+      let client = await archiveClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       context.session.flash('message', 'Client archived');
@@ -25,7 +25,7 @@ export default createController(routes.app.clients.lifecycle, {
     },
     async restore(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await restoreClient(organization.id, context.params.clientId);
+      let client = await restoreClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       context.session.flash('message', 'Client restored');

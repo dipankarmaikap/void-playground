@@ -1,14 +1,12 @@
 import { createCookie } from 'remix/cookie';
 import { createSessionAuthScheme } from 'remix/middleware/auth';
 
-import { db, users } from '../db.ts';
+import { users } from '../db.ts';
 import type { User } from '../db.ts';
+import { databaseContext } from '../../middleware/database.ts';
 import { AUTH_SESSION_KEY, readAuthPayload } from './auth-payload.ts';
 import type { AuthPayload } from './auth-payload.ts';
-import {
-  createHybridSessionStorage,
-  SESSION_TTL_SECONDS,
-} from './storage.ts';
+import { SESSION_TTL_SECONDS } from './storage.ts';
 
 let sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret && process.env.NODE_ENV === 'production') {
@@ -23,11 +21,13 @@ export const sessionCookie = createCookie('__session', {
   maxAge: SESSION_TTL_SECONDS,
 });
 
-export const sessionStorage = createHybridSessionStorage();
-
 export const sessionScheme = createSessionAuthScheme<User, AuthPayload>({
   read: readAuthPayload,
-  async verify(value) {
+  async verify(value, context) {
+    let db = context.get(databaseContext);
+    if (db == null) {
+      throw new Error('Expected loadDatabase() middleware before auth()');
+    }
     return (await db.find(users, value.userId)) ?? null;
   },
   invalidate(session) {

@@ -2,8 +2,8 @@ import { createServer } from 'node:http';
 import { createRequestListener } from 'remix/node-fetch-server';
 
 import { assets } from './app/assets.ts';
-import { router } from './app/router.ts';
-import { db } from './app/data/db.ts';
+import { createAppRouter } from './app/router.ts';
+import { createAppDatabase } from './app/data/db.ts';
 import { migrateDatabase } from './app/data/db/migrate.ts';
 import {
   getNodeRequestListenerOptions,
@@ -17,10 +17,13 @@ const hmrProxyPort = process.env.HMR_PROXY_PORT
   : null;
 const isHmr = process.env.REMIX_NODE_HMR === '1';
 
-// Migrations are applied before the HTTP server starts listening, so no request ever sees a
-// half-migrated schema. The dev database is disposable (ADR-0003): a stale or unrecognized
-// file is deleted by an operator, never upgraded in place.
+// The application database is constructed here and injected into the router; request handling
+// never imports a database instance. Migrations are applied before the HTTP server starts
+// listening, so no request ever sees a half-migrated schema. The dev database is disposable
+// (ADR-0003): a stale or unrecognized file is deleted by an operator, never upgraded in place.
+const db = createAppDatabase();
 await migrateDatabase(db);
+const router = createAppRouter({ db });
 
 const server = createServer(createRequestListener(router.fetch, getNodeRequestListenerOptions()));
 

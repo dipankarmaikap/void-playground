@@ -1,5 +1,6 @@
 import { createController } from 'remix/router';
 import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 
 import { Auth } from 'remix/middleware/auth';
@@ -40,6 +41,7 @@ import { parseCreditNoteFormValues } from './public/schema.ts';
 import { CreditNoteDraftPage } from './form-page.tsx';
 
 type CreditNoteRequestContext = RequestContext<AnyParams, ContextEntries> & {
+  db: SqliteDatabase;
   formData: FormData;
   render: RenderFunction;
 };
@@ -56,8 +58,9 @@ async function renderNewForm(
   issues: readonly CreditNoteDraftIssue[] = [],
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
-  let lines = await findInvoiceLines(organization.id, invoice.id);
+  let lines = await findInvoiceLines(context.db, organization.id, invoice.id);
   let creditableQuantities = await remainingCreditNoteLineCapacity(
+    context.db,
     organization.id,
     invoice,
     lines,
@@ -91,10 +94,11 @@ async function renderEditForm(
 ) {
   let auth = context.get(Auth) as GoodAuth<User>;
   let [lines, creditNote] = await Promise.all([
-    findInvoiceLines(organization.id, invoice.id),
-    findCreditNote(organization.id, invoice.id, creditNoteId),
+    findInvoiceLines(context.db, organization.id, invoice.id),
+    findCreditNote(context.db, organization.id, invoice.id, creditNoteId),
   ]);
   let creditableQuantities = await remainingCreditNoteLineCapacity(
+    context.db,
     organization.id,
     invoice,
     lines,
@@ -132,7 +136,7 @@ export default createController(routes.app.invoices.creditNotes, {
     async new(context) {
       let organization = context.get(CurrentOrganization);
       let auth = context.get(Auth) as GoodAuth<User>;
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -142,13 +146,14 @@ export default createController(routes.app.invoices.creditNotes, {
         });
       }
       if (
-        (await remainingCreditableValue(organization.id, invoice.id, invoice.total_minor)) <= 0
+        (await remainingCreditableValue(context.db, organization.id, invoice.id, invoice.total_minor)) <= 0
       ) {
         return new Response('This invoice has no remaining creditable value', { status: 409 });
       }
 
-      let lines = await findInvoiceLines(organization.id, invoice.id);
+      let lines = await findInvoiceLines(context.db, organization.id, invoice.id);
       let creditableQuantities = await remainingCreditNoteLineCapacity(
+        context.db,
         organization.id,
         invoice,
         lines,
@@ -183,7 +188,7 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async create(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -194,7 +199,7 @@ export default createController(routes.app.invoices.creditNotes, {
       }
 
       let values = parseCreditNoteFormValues(context.formData);
-      let result = await createCreditNoteDraft(organization.id, invoice.id, values);
+      let result = await createCreditNoteDraft(context.db, organization.id, invoice.id, values);
       if (!result.ok && result.kind === 'not_found') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -224,7 +229,7 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async edit(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -232,6 +237,7 @@ export default createController(routes.app.invoices.creditNotes, {
         return new Response('Credit note Drafts require an issued invoice', { status: 409 });
       }
       let creditNote = await findCreditNote(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
@@ -242,10 +248,11 @@ export default createController(routes.app.invoices.creditNotes, {
       }
 
       let [sourceLines, savedLines] = await Promise.all([
-        findInvoiceLines(organization.id, invoice.id),
-        findCreditNoteLines(organization.id, invoice.id, creditNote.id),
+        findInvoiceLines(context.db, organization.id, invoice.id),
+        findCreditNoteLines(context.db, organization.id, invoice.id, creditNote.id),
       ]);
       let creditableQuantities = await remainingCreditNoteLineCapacity(
+        context.db,
         organization.id,
         invoice,
         sourceLines,
@@ -276,7 +283,7 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async update(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
@@ -285,6 +292,7 @@ export default createController(routes.app.invoices.creditNotes, {
       }
       let values = parseCreditNoteFormValues(context.formData);
       let result = await updateCreditNoteDraft(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
@@ -321,11 +329,12 @@ export default createController(routes.app.invoices.creditNotes, {
     },
     async pdf(context) {
       let organization = context.get(CurrentOrganization);
-      let invoice = await findInvoice(organization.id, context.params.invoiceId);
+      let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
       }
       let creditNote = await findCreditNote(
+        context.db,
         organization.id,
         invoice.id,
         context.params.creditNoteId,
@@ -341,6 +350,7 @@ export default createController(routes.app.invoices.creditNotes, {
 
       if (creditNote.status === 'issued') {
         let bytes = await findIssuedCreditNotePdfBytes(
+          context.db,
           organization.id,
           invoice.id,
           creditNote.id,
@@ -353,7 +363,7 @@ export default createController(routes.app.invoices.creditNotes, {
         return new Response('Credit note PDF not found', { status: 404 });
       }
       let { internal_note: _internalNote, ...invoiceDocument } = invoice;
-      let lines = await findCreditNoteLines(organization.id, invoice.id, creditNote.id);
+      let lines = await findCreditNoteLines(context.db, organization.id, invoice.id, creditNote.id);
       let pdf = renderCreditNotePdf({
         invoice: invoiceDocument,
         creditNote,

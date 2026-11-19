@@ -125,6 +125,7 @@ export const taxSection: ClientFormSection = {
     let warning: string | undefined;
     if (parsed.value.tax_value) {
       let duplicate = await findClientWithTaxValue(
+        context.db,
         context.organizationId,
         parsed.value.tax_value,
         context.clientId,

@@ -8,6 +8,9 @@ import { formData } from 'remix/middleware/form-data';
 import { methodOverride } from 'remix/middleware/method-override';
 import { csrf } from 'remix/middleware/csrf';
 import { Auth, auth } from 'remix/middleware/auth';
+import type { Cookie } from 'remix/cookie';
+import type { SessionStorage } from 'remix/session';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import controller from './actions/controller.tsx';
 import appController from './actions/app/controller.tsx';
@@ -27,9 +30,11 @@ import settingsProfileController from './actions/app/settings/profile/controller
 import settingsInvoicingController from './actions/app/settings/invoicing/controller.tsx';
 import settingsSessionsController from './actions/app/settings/sessions/controller.tsx';
 import { assets, documentScriptEntryMiddleware } from './assets.ts';
+import { createHybridSessionStorage } from './data/session/storage.ts';
+import { sessionCookie, sessionScheme } from './data/session/setup.ts';
+import { loadDatabase } from './middleware/database.ts';
 import { requestContextMiddleware } from './middleware/request-context.ts';
 import { routes } from './routes.ts';
-import { sessionCookie, sessionStorage, sessionScheme } from './data/session/setup.ts';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -76,63 +81,87 @@ const homeMethodGuard: Middleware = async (context, next) => {
   return next();
 };
 
-export const router = createRouter({
-  middleware: [
-    requestContextMiddleware,
-    asyncContext(),
-    staticFiles('./public', { index: false }),
-    sourceAssets,
-    homeMethodGuard,
-    session(sessionCookie, sessionStorage),
-    formData(),
-    methodOverride(),
-    csrf(),
-    auth({ schemes: [sessionScheme] }),
-    privateAppHtml,
-    documentScriptEntryMiddleware,
-    csp({
-      policy({ nonce }) {
-        return {
-          defaultSrc: ["'self'"],
-          scriptSrc: [`'nonce-${nonce}'`],
-          styleSrc: [`'nonce-${nonce}'`],
-          imgSrc: ["'self'", 'data:'],
-          objectSrc: ["'none'"],
-          baseUri: ["'self'"],
-          formAction: ["'self'"],
-          frameAncestors: ["'none'"],
-          ...(isDevelopment
-            ? { connectSrc: ["'self'", 'http://localhost:*', 'http://127.0.0.1:*'] }
-            : {}),
-        };
-      },
-    }),
-    render({ assets }),
-  ],
-});
+/** Options for constructing an app router around a caller-chosen database. */
+export interface AppRouterOptions {
+  /** The database request handling reads and writes. Server startup and tests choose it. */
+  db: SqliteDatabase;
+  /** The cookie holding the session id. Defaults to the application session cookie. */
+  sessionCookie?: Cookie;
+  /** Session storage built from the chosen database when omitted. */
+  sessionStorage?: SessionStorage;
+}
 
-export type AppContext = RouterContext<typeof router>;
+/**
+ * Builds a router around a caller-chosen database, session cookie, and session storage. The
+ * database is installed into the request context by `loadDatabase` middleware, so controllers
+ * and domain modules receive it explicitly instead of importing a singleton. Server startup
+ * passes the application database; tests pass their own in-memory database.
+ */
+export function createAppRouter(options: AppRouterOptions) {
+  let db = options.db;
+  let cookie = options.sessionCookie ?? sessionCookie;
+  let storage = options.sessionStorage ?? createHybridSessionStorage(db);
+  let router = createRouter({
+    middleware: [
+      requestContextMiddleware,
+      asyncContext(),
+      loadDatabase(db),
+      staticFiles('./public', { index: false }),
+      sourceAssets,
+      homeMethodGuard,
+      session(cookie, storage),
+      formData(),
+      methodOverride(),
+      csrf(),
+      auth({ schemes: [sessionScheme] }),
+      privateAppHtml,
+      documentScriptEntryMiddleware,
+      csp({
+        policy({ nonce }) {
+          return {
+            defaultSrc: ["'self'"],
+            scriptSrc: [`'nonce-${nonce}'`],
+            styleSrc: [`'nonce-${nonce}'`],
+            imgSrc: ["'self'", 'data:'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'none'"],
+            ...(isDevelopment
+              ? { connectSrc: ["'self'", 'http://localhost:*', 'http://127.0.0.1:*'] }
+              : {}),
+          };
+        },
+      }),
+      render({ assets }),
+    ],
+  });
+
+  router.map(routes, controller);
+  router.map(routes.auth.login, loginController);
+  router.map(routes.auth.register, registerController);
+  router.map(routes.auth.verify, verifyController);
+  router.map(routes.auth, authController);
+  router.map(routes.app, appController);
+  router.map(routes.app.clients, clientsController);
+  router.map(routes.app.clients.lifecycle, clientLifecycleController);
+  router.map(routes.app.invoices, invoicesController);
+  router.map(routes.app.invoices.lifecycle, invoiceLifecycleController);
+  router.map(routes.app.invoices.payments, invoicePaymentsController);
+  router.map(routes.app.invoices.refunds, invoiceRefundsController);
+  router.map(routes.app.invoices.creditNotes, creditNotesController);
+  router.map(routes.app.invoices.creditNotes.lifecycle, creditNoteLifecycleController);
+  router.map(routes.app.settings.profile, settingsProfileController);
+  router.map(routes.app.settings.invoicing, settingsInvoicingController);
+  router.map(routes.app.settings.sessions, settingsSessionsController);
+
+  return router;
+}
+
+export type AppContext = RouterContext<ReturnType<typeof createAppRouter>>;
 
 declare module 'remix' {
   interface RouterTypes {
     context: AppContext;
   }
 }
-
-router.map(routes, controller);
-router.map(routes.auth.login, loginController);
-router.map(routes.auth.register, registerController);
-router.map(routes.auth.verify, verifyController);
-router.map(routes.auth, authController);
-router.map(routes.app, appController);
-router.map(routes.app.clients, clientsController);
-router.map(routes.app.clients.lifecycle, clientLifecycleController);
-router.map(routes.app.invoices, invoicesController);
-router.map(routes.app.invoices.lifecycle, invoiceLifecycleController);
-router.map(routes.app.invoices.payments, invoicePaymentsController);
-router.map(routes.app.invoices.refunds, invoiceRefundsController);
-router.map(routes.app.invoices.creditNotes, creditNotesController);
-router.map(routes.app.invoices.creditNotes.lifecycle, creditNoteLifecycleController);
-router.map(routes.app.settings.profile, settingsProfileController);
-router.map(routes.app.settings.invoicing, settingsInvoicingController);
-router.map(routes.app.settings.sessions, settingsSessionsController);

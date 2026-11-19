@@ -46,7 +46,12 @@ export default createController(routes.app.clients, {
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
       let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
-      let directory = await listClients(organization.id, { q: query, type, status, page });
+      let directory = await listClients(context.db, organization.id, {
+        q: query,
+        type,
+        status,
+        page,
+      });
       return context.render(
         <ClientsIndexPage
           csrfToken={csrfToken}
@@ -79,9 +84,9 @@ export default createController(routes.app.clients, {
     },
     async show(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
-      let invoiceCount = await countClientInvoices(organization.id, client.id);
+      let invoiceCount = await countClientInvoices(context.db, organization.id, client.id);
 
       let auth = context.get(Auth) as GoodAuth<User>;
       let identity = auth.identity;
@@ -102,7 +107,7 @@ export default createController(routes.app.clients, {
     },
     async edit(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -121,6 +126,7 @@ export default createController(routes.app.clients, {
     async create(context) {
       let organization = context.get(CurrentOrganization);
       let { values, issues, changes, warning } = await parseClientForm(context.formData, {
+        db: context.db,
         organizationId: organization.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -140,7 +146,7 @@ export default createController(routes.app.clients, {
         );
       }
 
-      let client = await createClient(organization.id, changes);
+      let client = await createClient(context.db, organization.id, changes);
       context.session.flash(
         'message',
         warning ? `Client created. ${warning}` : 'Client created',
@@ -149,10 +155,11 @@ export default createController(routes.app.clients, {
     },
     async update(context) {
       let organization = context.get(CurrentOrganization);
-      let client = await findClient(organization.id, context.params.clientId);
+      let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
       let { values, issues, changes, warning } = await parseClientForm(context.formData, {
+        db: context.db,
         organizationId: organization.id,
         clientId: client.id,
       });
@@ -174,7 +181,7 @@ export default createController(routes.app.clients, {
         );
       }
 
-      let updated = await updateClient(organization.id, client.id, changes);
+      let updated = await updateClient(context.db, organization.id, client.id, changes);
       if (!updated) return new Response('Client not found', { status: 404 });
       context.session.flash(
         'message',

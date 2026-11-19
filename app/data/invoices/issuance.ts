@@ -1,7 +1,8 @@
 import type { Database } from 'remix/data-table';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import { findIndiaStateByCode } from '../india-states.ts';
-import { db, invoiceLines, invoices, organizationInvoicingProfiles, organizations } from '../db.ts';
+import { invoiceLines, invoices, organizationInvoicingProfiles, organizations } from '../db.ts';
 import type { Invoice, InvoiceLine } from '../db.ts';
 import { GSTIN_PATTERN, isIndiaCountry, UIN_PATTERN } from '../client-tax.ts';
 import type { InvoicePdfDocument } from './documents.ts';
@@ -142,6 +143,7 @@ function invoiceLinesInvalid(lines: readonly InvoiceLine[]): boolean {
  * stores seller snapshots, then invokes the optional artifact finalizer before the transaction commits.
  */
 export async function issueDraftInvoice(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   finalizeIssuedInvoice?: IssuedInvoiceFinalizer,

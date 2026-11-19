@@ -2,14 +2,13 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import {
-  db,
   organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
 } from '../../../../data/db.ts';
-import '../../../../../test/db-setup.ts';
+import { testDb as db } from '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { router } from '../../../../router.ts';
+import { createAppRouter } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -18,6 +17,8 @@ import {
   origin,
   postForm,
 } from '../../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 function invoicingFields(overrides: Record<string, string> = {}) {
   return {
@@ -86,7 +87,7 @@ describe('organization invoicing settings', () => {
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('Location'), routes.app.settings.invoicing.index.href());
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.organization_id, organizationId);
     assert.equal(row.legal_name, 'Acme Studios LLP');
@@ -147,7 +148,7 @@ describe('organization invoicing settings', () => {
     );
     assert.equal(updated.status, 302);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.legal_name, 'Second Legal Name');
     assert.equal(row.address_line1, '2 Second Street');
@@ -168,7 +169,7 @@ describe('organization invoicing settings', () => {
     );
     assert.equal(cleared.status, 302);
 
-    let clearedRow = await findInvoicingProfile(organizationId);
+    let clearedRow = await findInvoicingProfile(db, organizationId);
     assert.ok(clearedRow);
     assert.equal(clearedRow.legal_name, null);
     assert.equal(clearedRow.address_line1, null);
@@ -211,7 +212,7 @@ describe('organization invoicing settings', () => {
     assert.match(html, /name="address_postal_code"[^>]*value="560001"/);
     assert.match(html, /name="billing_email"[^>]*value="partial@example.com"/);
 
-    assert.equal(await findInvoicingProfile(organizationId), null, 'invalid input is not stored');
+    assert.equal(await findInvoicingProfile(db, organizationId), null, 'invalid input is not stored');
     let page = await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
     assert.match(page, /<p role="status"[^>]*>Not ready to issue invoices<\/p>/);
     assert.match(page, /name="address_locality"[^>]*value=""/);
@@ -250,7 +251,7 @@ describe('organization invoicing settings', () => {
     assert.match(html, /name="billing_email"[^>]*value="not-an-email"/);
     assert.match(html, /name="billing_phone"[^>]*value="call me maybe"/);
     assert.match(html, /name="billing_email"[^>]*aria-invalid="true"/);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('keeps stored values when a later edit fails validation', async () => {
@@ -287,7 +288,7 @@ describe('organization invoicing settings', () => {
     assert.match(html, /name="legal_name"[^>]*value="Changed Studio"/);
     assert.match(html, /name="address_line1"[^>]*value="2 Invalid Street"/);
 
-    let row = await findInvoicingProfile(organizationId);
+    let row = await findInvoicingProfile(db, organizationId);
     assert.ok(row);
     assert.equal(row.legal_name, 'Stable Studio');
     assert.equal(row.address_line1, '1 Original Street');
@@ -341,8 +342,8 @@ describe('organization invoicing settings', () => {
     );
     assert.equal(forged.status, 302);
 
-    let ownerRow = await findInvoicingProfile(owner.organizationId);
-    let otherRow = await findInvoicingProfile(other.organizationId);
+    let ownerRow = await findInvoicingProfile(db, owner.organizationId);
+    let otherRow = await findInvoicingProfile(db, other.organizationId);
     assert.ok(ownerRow);
     assert.ok(otherRow);
     assert.equal(ownerRow.legal_name, secretName);
@@ -389,7 +390,7 @@ describe('organization invoicing settings', () => {
       ).toString(),
     });
     assert.equal(noCsrf.status, 403);
-    assert.equal(await findInvoicingProfile(organizationId), null);
+    assert.equal(await findInvoicingProfile(db, organizationId), null);
   });
 
   it('fails closed for a User without an OrganizationMembership', async () => {
@@ -429,6 +430,6 @@ describe('organization invoicing settings', () => {
       },
     );
     assert.equal(postResponse.status, 403);
-    assert.equal(await findInvoicingProfile(tenant.organizationId), null);
+    assert.equal(await findInvoicingProfile(db, tenant.organizationId), null);
   });
 });

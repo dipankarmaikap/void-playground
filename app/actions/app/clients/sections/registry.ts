@@ -1,5 +1,6 @@
 import type { RemixNode } from 'remix/component';
 import type { Issue } from 'remix/data-schema';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import type { Client } from '../../../../data/db.ts';
 import type { ClientFormValues } from '../form-values.ts';
@@ -21,6 +22,8 @@ export interface ClientFormSectionResult {
 }
 
 export interface ClientFormSectionContext {
+  /** The database the section's data functions read. */
+  db: SqliteDatabase;
   /** Server-verified Organization that will own the Client. */
   organizationId: string;
   /** The Client being edited; absent when creating a Client. */

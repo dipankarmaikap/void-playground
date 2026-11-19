@@ -2,8 +2,10 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
+
 import { addDays } from '../../../data/invoices/dates.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import type { InvoiceFixture as SeedInvoiceFixture } from '../../../../test/invoice-fixtures.ts';
@@ -12,6 +14,8 @@ import {
   getHtml,
   origin,
 } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 interface InvoiceFixture extends SeedInvoiceFixture {
   invoiceDate: string;
@@ -41,7 +45,7 @@ describe('invoice directory pagination', () => {
       router,
       'invoice-directory-pages',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Directory Client ${crypto.randomUUID()}`,
     });
@@ -133,7 +137,7 @@ describe('invoice directory pagination', () => {
       router,
       'invoice-directory-invalid-page',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Page Client ${crypto.randomUUID()}`,
     });
@@ -159,7 +163,7 @@ describe('invoice directory search', () => {
       router,
       'invoice-directory-search',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Search Client ${crypto.randomUUID()}`,
     });
@@ -191,7 +195,7 @@ describe('invoice directory search', () => {
       router,
       'invoice-directory-literal-search',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Literal Search Client ${crypto.randomUUID()}`,
     });
@@ -269,7 +273,7 @@ describe('invoice directory filters', () => {
       router,
       'invoice-directory-filters',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Filter Client ${crypto.randomUUID()}`,
     });
@@ -347,7 +351,7 @@ describe('invoice directory filters', () => {
       router,
       'invoice-directory-filter-form',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Filter Form Client ${crypto.randomUUID()}`,
     });
@@ -402,11 +406,11 @@ describe('invoice directory Organization scope', () => {
   it('does not list or search another Organization’s invoices', async () => {
     let owner = await createUserAndLoginWithOrganization(router, 'invoice-directory-scope-owner');
     let other = await createUserAndLoginWithOrganization(router, 'invoice-directory-scope-other');
-    let ownClient = await createClient(owner.organizationId, {
+    let ownClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Client ${crypto.randomUUID()}`,
     });
-    let foreignClient = await createClient(other.organizationId, {
+    let foreignClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Foreign Client ${crypto.randomUUID()}`,
     });

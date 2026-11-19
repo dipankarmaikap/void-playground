@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { lt } from 'remix/data-table';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { createSession } from 'remix/session';
 import type { Session, SessionStorage } from 'remix/session';
 import { createCookieSessionStorage } from 'remix/session-storage/cookie';
 
-import { db, sessions } from '../db.ts';
+import { sessions } from '../db.ts';
 import { readAuthPayload } from './auth-payload.ts';
 
 export interface SessionRequestContext {
@@ -17,13 +18,16 @@ export const sessionRequestContext = new AsyncLocalStorage<SessionRequestContext
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 const DB_PREFIX = 'db:';
-const cookieStorage = createCookieSessionStorage();
 
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
 // Authenticated sessions live in the DB; pre-login cookies (mostly CSRF tokens) stay in the cookie.
-export function createHybridSessionStorage(): SessionStorage {
+export function createHybridSessionStorage(
+  db: SqliteDatabase,
+  preLoginStorage: SessionStorage = createCookieSessionStorage(),
+): SessionStorage {
+  let cookieStorage = preLoginStorage;
   return {
     async read(cookie) {
       if (cookie && cookie.startsWith(DB_PREFIX)) {

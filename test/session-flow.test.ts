@@ -1,12 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createAppRouter } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
-import { db, sessions } from '../app/data/db.ts';
-import './db-setup.ts';
+import { sessions } from '../app/data/db.ts';
+import { testDb as db } from './db-setup.ts';
 
 import { cookieFromResponse, createUser, extractCsrf, login, origin } from './http.ts';
+
+const router = createAppRouter({ db });
 
 async function seedSession(userId: string, ip: string, createdAt = Date.now()): Promise<string> {
   let id = crypto.randomUUID();

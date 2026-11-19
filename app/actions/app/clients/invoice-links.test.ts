@@ -2,30 +2,34 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { router } from '../../../router.ts';
+
+import { createAppRouter } from '../../../router.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 describe('Client invoice links', () => {
   it('links Active and Archived Clients to only their Organization-scoped invoices', async () => {
     let owner = await createUserAndLoginWithOrganization(router, 'client-invoice-owner');
     let other = await createUserAndLoginWithOrganization(router, 'client-invoice-other');
-    let activeClient = await createClient(owner.organizationId, {
+    let activeClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Active Invoice Client ${crypto.randomUUID()}`,
     });
-    let archivedClient = await createClient(owner.organizationId, {
+    let archivedClient = await createClient(db, owner.organizationId, {
       type: 'business',
       legal_name: `Archived Invoice Client ${crypto.randomUUID()}`,
       status: 'archived',
       archived_at: Date.now(),
     });
-    let anotherClient = await createClient(owner.organizationId, {
+    let anotherClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Another Invoice Client ${crypto.randomUUID()}`,
     });
-    let foreignClient = await createClient(other.organizationId, {
+    let foreignClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Foreign Invoice Client ${crypto.randomUUID()}`,
     });

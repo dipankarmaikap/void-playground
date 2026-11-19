@@ -3,17 +3,16 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import {
-  db,
   creditNotePdfArtifacts,
   documentSequences,
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import { issueCreditNoteDraft } from '../../../data/invoices/credit-notes.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -21,6 +20,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
+
+const router = createAppRouter({ db });
 
 async function createIssuedInvoice(
   organizationId: string,
@@ -173,7 +174,7 @@ describe('credit notes', () => {
       router,
       'credit-note-prefill',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -203,7 +204,7 @@ describe('credit notes', () => {
       router,
       'credit-note-create',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -245,7 +246,7 @@ describe('credit notes', () => {
       router,
       'credit-note-validation',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -288,7 +289,7 @@ describe('credit notes', () => {
       router,
       'credit-note-edit',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -345,7 +346,7 @@ describe('credit notes', () => {
       router,
       'credit-note-discard',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -399,7 +400,7 @@ describe('credit notes', () => {
       router,
       'credit-note-preview',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -468,7 +469,7 @@ describe('credit notes', () => {
       created_at: Date.now(),
       updated_at: Date.now(),
     });
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -560,7 +561,7 @@ describe('credit notes', () => {
       router,
       'credit-note-finalizer-rollback',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -576,7 +577,7 @@ describe('credit notes', () => {
     let finalizerCalled = false;
     let failed = false;
     try {
-      await issueCreditNoteDraft(organizationId, invoiceId, creditNoteId, async ({ creditNote }) => {
+      await issueCreditNoteDraft(db, organizationId, invoiceId, creditNoteId, async ({ creditNote }) => {
         finalizerCalled = true;
         assert.equal(creditNote.credit_note_number, 'CN/26-27/0001');
         throw new Error('PDF storage failed');
@@ -624,7 +625,7 @@ describe('credit notes', () => {
       router,
       'credit-note-parent-balance',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -721,7 +722,7 @@ describe('credit notes', () => {
       router,
       'credit-note-cancelled',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -772,7 +773,7 @@ describe('credit notes', () => {
       router,
       'credit-note-credit-cap',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -854,7 +855,7 @@ describe('credit notes', () => {
       router,
       'credit-note-concurrent-issue',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -903,7 +904,7 @@ describe('credit notes', () => {
       router,
       'credit-note-financial-years',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -965,7 +966,7 @@ describe('credit notes', () => {
       router,
       'credit-note-tax-breakdown',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -1017,7 +1018,7 @@ describe('credit notes', () => {
       router,
       'credit-note-full-rounding',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -1075,7 +1076,7 @@ describe('credit notes', () => {
       router,
       'credit-note-percent-discount-label',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Percent Discount Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -1125,7 +1126,7 @@ describe('credit notes', () => {
       router,
       'credit-note-directory-links',
     );
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Directory Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -1151,12 +1152,12 @@ describe('credit notes', () => {
   it('scopes Credit Note Drafts, issue actions, and PDFs to the authenticated Organization', async () => {
     let owner = await createUserAndLoginWithOrganization(router, 'credit-note-scope-owner');
     let other = await createUserAndLoginWithOrganization(router, 'credit-note-scope-other');
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Credit Note Client ${crypto.randomUUID()}`,
       status: 'active',

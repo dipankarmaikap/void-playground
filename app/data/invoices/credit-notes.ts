@@ -1,10 +1,10 @@
 import { sql } from 'remix/data-table';
 import type { Database } from 'remix/data-table';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
 import {
   creditNoteLines,
   creditNotes,
-  db,
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
@@ -546,6 +546,7 @@ async function createCreditNoteDraftIn(
 
 /** Creates a linked Draft Credit Note without allocating a number or changing the invoice. */
 export async function createCreditNoteDraft(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   input: CreditNoteDraftInput,
@@ -562,6 +563,7 @@ export async function createCreditNoteDraft(
 
 /** Reads a Credit Note only when both its invoice and Organization match the request. */
 export function findCreditNote(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,
@@ -577,6 +579,7 @@ export function findCreditNote(
 
 /** Reads the lines for one Credit Note within its Organization and parent invoice. */
 export function findCreditNoteLines(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,
@@ -593,6 +596,7 @@ export function findCreditNoteLines(
 
 /** Updates only a Draft; current issued notes are reloaded before credit limits are recalculated. */
 export async function updateCreditNoteDraft(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,
@@ -676,6 +680,7 @@ export async function updateCreditNoteDraft(
 
 /** Discards only an Organization-scoped Draft; issued Credit Notes are immutable. */
 export async function discardCreditNoteDraft(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,
@@ -726,6 +731,7 @@ function creditNoteLineMatches(
 
 /** Issues a Draft atomically with its FY number and exact stored PDF bytes. */
 export async function issueCreditNoteDraft(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,
@@ -861,6 +867,7 @@ export async function issueCreditNoteDraft(
 
 /** All Credit Notes linked to one parent invoice, ordered by creation time. */
 export function findInvoiceCreditNotes(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
 ): Promise<CreditNote[]> {
@@ -875,6 +882,7 @@ export function findInvoiceCreditNotes(
 
 /** Remaining face value available to new Credit Note Drafts, excluding unissued Drafts. */
 export async function remainingCreditableValue(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   originalTotalMinor: number,
@@ -889,6 +897,7 @@ export async function remainingCreditableValue(
 
 /** Remaining quantity and credited face value per original line after issued Credit Notes. */
 export async function remainingCreditNoteLineCapacity(
+  db: SqliteDatabase,
   organizationId: string,
   invoice: Invoice,
   sourceLines: readonly InvoiceLine[],
@@ -926,6 +935,7 @@ export async function remainingCreditNoteLineCapacity(
 
 /** Sums issued credits per invoice for read-time derived balances and statuses. */
 export async function activeInvoiceCreditNoteTotals(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<Map<string, number>> {
   let notes = await db.findMany(creditNotes, {
@@ -943,6 +953,7 @@ export async function activeInvoiceCreditNoteTotals(
 
 /** Credit-note numbers (or `Draft`) per invoice, for the Organization-scoped invoice directory. */
 export async function invoiceCreditNoteLabels(
+  db: SqliteDatabase,
   organizationId: string,
 ): Promise<Map<string, string[]>> {
   let notes = await db.findMany(creditNotes, {
@@ -963,6 +974,7 @@ export async function invoiceCreditNoteLabels(
 
 /** Reads stored issued Credit Note PDF bytes without regenerating an artifact. */
 export async function findIssuedCreditNotePdfBytes(
+  db: SqliteDatabase,
   organizationId: string,
   invoiceId: string,
   creditNoteId: string,

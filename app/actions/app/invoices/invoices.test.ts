@@ -2,14 +2,14 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, organizationGstRatePresets } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { organizationGstRatePresets } from '../../../data/db.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -19,6 +19,8 @@ import {
   origin,
   submitForm,
 } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 type DraftFields = Record<string, string | string[] | undefined>;
 
@@ -119,11 +121,11 @@ async function setInvoicingDefaults(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test defaults should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 async function makeClient(organizationId: string, overrides: Record<string, unknown> = {}) {
-  return createClient(organizationId, {
+  return createClient(db, organizationId, {
     type: 'individual',
     legal_name: unique('Draft Client'),
     billing_line1: '12 Residency Road',

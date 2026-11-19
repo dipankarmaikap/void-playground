@@ -6,7 +6,7 @@ import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
-import { db, users } from '../../../../data/db.ts';
+import { users } from '../../../../data/db.ts';
 import type { User } from '../../../../data/db.ts';
 import { parseDisplayName } from '../../../../data/display-name.ts';
 import { parseOrganizationName } from '../../../../data/organization/name.ts';
@@ -76,7 +76,7 @@ export default createController(routes.app.settings.profile, {
           return redirect(routes.app.settings.profile.index.href());
         }
 
-        let organization = await renameOwnedOrganizationForUser(auth.identity, result.value);
+        let organization = await renameOwnedOrganizationForUser(context.db, auth.identity, result.value);
         if (!organization) {
           return new Response('Organization owner access unavailable', { status: 403 });
         }
@@ -96,7 +96,7 @@ export default createController(routes.app.settings.profile, {
           return redirect(routes.app.settings.profile.index.href());
         }
 
-        await db.update(users, auth.identity.id, { display_name: result.value });
+        await context.db.update(users, auth.identity.id, { display_name: result.value });
         context.session.flash('message', 'Profile updated');
         return redirect(routes.app.settings.profile.index.href());
       }

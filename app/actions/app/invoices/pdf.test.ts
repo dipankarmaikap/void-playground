@@ -3,18 +3,17 @@ import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
 import {
-  db,
   documentSequences,
   invoicePdfArtifacts,
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';
 import { invoicingFormFields } from '../settings/invoicing/test-fields.ts';
@@ -25,6 +24,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { markAsSent } from '../../../../test/invoice-fixtures.ts';
+
+const router = createAppRouter({ db });
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {
@@ -118,7 +119,7 @@ async function setSellerProfile(
     ...overrides,
   });
   assert.equal(parsed.ok, true, 'the test seller profile should be valid');
-  if (parsed.ok) await saveInvoicingProfile(organizationId, parsed.value);
+  if (parsed.ok) await saveInvoicingProfile(db, organizationId, parsed.value);
 }
 
 describe('invoice PDF downloads', () => {
@@ -128,7 +129,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-draft-preview',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Draft Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -181,7 +182,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-internal-note',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Internal Note Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -212,7 +213,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-issued-immutability',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Immutability Client ${crypto.randomUUID()}`,
       billing_line1: 'Client Address Before Issue',
@@ -308,7 +309,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-detail-link',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Link Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -338,12 +339,12 @@ describe('invoice PDF downloads', () => {
     let other = await createUserAndLoginWithOrganization(router, 'invoice-pdf-scope-other');
     await setSellerProfile(owner.organizationId);
     await setSellerProfile(other.organizationId);
-    let ownerClient = await createClient(owner.organizationId, {
+    let ownerClient = await createClient(db, owner.organizationId, {
       type: 'individual',
       legal_name: `Owner Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
     });
-    let otherClient = await createClient(other.organizationId, {
+    let otherClient = await createClient(db, other.organizationId, {
       type: 'individual',
       legal_name: `Other Pdf Client ${crypto.randomUUID()}`,
       status: 'active',
@@ -395,7 +396,7 @@ describe('invoice PDF downloads', () => {
       'invoice-pdf-usd-words',
     );
     await setSellerProfile(organizationId);
-    let client = await createClient(organizationId, {
+    let client = await createClient(db, organizationId, {
       type: 'individual',
       legal_name: `Usd Client ${crypto.randomUUID()}`,
       status: 'active',
