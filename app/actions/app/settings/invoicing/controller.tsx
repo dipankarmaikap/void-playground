@@ -1,7 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
@@ -18,7 +17,7 @@ import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../../data/organization/invoicing.ts';
-import { requireAuth } from '../../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -39,7 +38,7 @@ export default createController(routes.app.settings.invoicing, {
   ],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let [view, presets] = await Promise.all([
         getInvoicingProfileView(context.db, organization),
@@ -60,7 +59,7 @@ export default createController(routes.app.settings.invoicing, {
       );
     },
     async action(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let form = context.formData.get('_form');
       let view = await getInvoicingProfileView(context.db, organization);

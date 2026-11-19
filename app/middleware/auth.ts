@@ -1,5 +1,6 @@
 import type { Route } from 'remix/routes';
-import { requireAuth as requireAuthenticated } from 'remix/middleware/auth';
+import { Auth, requireAuth as requireAuthenticated } from 'remix/middleware/auth';
+import type { GoodAuth } from 'remix/middleware/auth';
 import { redirect } from 'remix/response/redirect';
 
 import type { User } from '../data/db.ts';
@@ -23,6 +24,13 @@ export function requireAuth() {
       );
     },
   });
+}
+
+/**
+ * Reads the authenticated User's auth state from a request context guarded by `requireAuth`.
+ */
+export function authedUser(context: { get(key: typeof Auth): unknown }): GoodAuth<User> {
+  return context.get(Auth) as GoodAuth<User>;
 }
 
 /** The sanitized post-login destination, or the dashboard when none is safe. */

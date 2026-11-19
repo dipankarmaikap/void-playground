@@ -1,11 +1,8 @@
 import { createController } from 'remix/router';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
-import type { User } from '../../data/db.ts';
-import { requireAuth } from '../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -20,7 +17,7 @@ export default createController(routes.app, {
   ],
   actions: {
     async dashboard(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);

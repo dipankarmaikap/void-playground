@@ -1,8 +1,6 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
@@ -15,9 +13,8 @@ import {
 } from '../../../data/clients.ts';
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
-import type { User } from '../../../data/db.ts';
 import { countClientInvoices } from '../../../data/invoices/records.ts';
-import { requireAuth } from '../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -34,7 +31,7 @@ export default createController(routes.app.clients, {
   middleware: [requireAuth(), requireOrganizationContext],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
@@ -70,7 +67,7 @@ export default createController(routes.app.clients, {
       );
     },
     async new(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
@@ -88,7 +85,7 @@ export default createController(routes.app.clients, {
       if (!client) return new Response('Client not found', { status: 404 });
       let invoiceCount = await countClientInvoices(context.db, organization.id, client.id);
 
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       let error = context.session.get('error');
@@ -110,7 +107,7 @@ export default createController(routes.app.clients, {
       let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
 
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
       return context.render(
@@ -129,7 +126,7 @@ export default createController(routes.app.clients, {
         db: context.db,
         organizationId: organization.id,
       });
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let identity = auth.identity;
 
       if (issues.length > 0) {
@@ -163,7 +160,7 @@ export default createController(routes.app.clients, {
         organizationId: organization.id,
         clientId: client.id,
       });
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let identity = auth.identity;
 
       if (issues.length > 0) {

@@ -1,16 +1,13 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { and, ne } from 'remix/data-table';
 import { sessions } from '../../../../data/db.ts';
-import type { User } from '../../../../data/db.ts';
 import { findOrganizationForUser } from '../../../../data/organization/access.ts';
 import { browserLabel } from '../../../../data/user-agent.ts';
-import { requireAuth } from '../../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import { routes } from '../../../../routes.ts';
 import { SessionsPage } from './page.tsx';
 import type { SessionView } from './page.tsx';
@@ -19,7 +16,7 @@ export default createController(routes.app.settings.sessions, {
   middleware: [requireAuth()],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = await findOrganizationForUser(context.db, auth.identity);
       let identity = auth.identity;
       let csrfToken = getCsrfToken(context);
@@ -52,7 +49,7 @@ export default createController(routes.app.settings.sessions, {
       );
     },
     async action(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let action = String(context.formData.get('action') ?? '');
       let currentId = context.session.id;
 

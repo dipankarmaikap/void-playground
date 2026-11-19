@@ -3,8 +3,6 @@ import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
@@ -17,10 +15,10 @@ import {
   remainingCreditNoteLineCapacity,
 } from '../../../../../data/invoices/credit-notes.ts';
 import { creditNoteFormValuesOf } from '../../../../../data/invoices/credit-note-form-values.ts';
-import type { Invoice, Organization, User } from '../../../../../data/db.ts';
+import type { Invoice, Organization } from '../../../../../data/db.ts';
 import { storeIssuedCreditNotePdf } from '../../../../../data/invoices/credit-note-pdf-artifacts.ts';
 import { findInvoice, findInvoiceLines } from '../../../../../data/invoices/records.ts';
-import { requireAuth } from '../../../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -54,7 +52,7 @@ async function renderIssueError(
     invoice,
     sourceLines,
   );
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let issue: CreditNoteDraftIssue = { field: 'lines', message };
   return context.render(
     <CreditNoteDraftPage

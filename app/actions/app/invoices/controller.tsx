@@ -1,12 +1,9 @@
 import { createController } from 'remix/router';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { findClient, listClients } from '../../../data/clients.ts';
-import type { User } from '../../../data/db.ts';
 import { parseInvoiceDraft } from '../../../data/invoices/draft.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
 import {
@@ -30,7 +27,7 @@ import {
 } from '../../../data/invoices/pdf.ts';
 import { ensureGstPresets, findGstPresets } from '../../../data/organization/gst-presets.ts';
 import { getInvoicingProfileView } from '../../../data/organization/invoicing.ts';
-import { requireAuth } from '../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -51,7 +48,7 @@ export default createController(routes.app.invoices, {
   ],
   actions: {
     async index(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let query = (context.url.searchParams.get('q') ?? '').trim();
       let clientId = (context.url.searchParams.get('clientId') ?? '').trim();
@@ -89,7 +86,7 @@ export default createController(routes.app.invoices, {
       );
     },
     async show(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
@@ -155,7 +152,7 @@ export default createController(routes.app.invoices, {
       });
     },
     async new(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let directory = await listClients(context.db, organization.id, { status: 'active' });
       let clientId = context.url.searchParams.get('clientId') ?? '';
@@ -188,7 +185,7 @@ export default createController(routes.app.invoices, {
       );
     },
     async edit(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });
@@ -218,7 +215,7 @@ export default createController(routes.app.invoices, {
       );
     },
     async create(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let { values, issues: formIssues } = parseInvoiceFormValues(context.formData);
       let profile = await getInvoicingProfileView(context.db, organization);
@@ -311,7 +308,7 @@ export default createController(routes.app.invoices, {
       return redirect(routes.app.invoices.show.href({ invoiceId: invoice.id }));
     },
     async update(context) {
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let organization = context.get(CurrentOrganization);
       let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice) return new Response('Invoice not found', { status: 404 });

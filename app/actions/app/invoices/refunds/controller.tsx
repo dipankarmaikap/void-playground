@@ -4,13 +4,11 @@ import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 import * as s from 'remix/data-schema';
 
-import { Auth } from 'remix/middleware/auth';
-import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
 
 import { findClient } from '../../../../data/clients.ts';
-import type { Invoice, Organization, User } from '../../../../data/db.ts';
+import type { Invoice, Organization } from '../../../../data/db.ts';
 import { currencyMinorDigits } from '../../../../data/invoices/calculation.ts';
 import { isValidIsoDate } from '../../../../data/invoices/dates.ts';
 import { invoiceActivityData } from '../../../../data/invoices/payments.ts';
@@ -22,7 +20,7 @@ import {
 } from '../../../../data/invoices/refunds.ts';
 import type { InvoiceRefundMethod } from '../../../../data/invoices/refunds.ts';
 import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
-import { requireAuth } from '../../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -53,7 +51,7 @@ async function renderRefundError(
   invoice: Invoice,
   pageErrors: RefundPageErrors,
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let [lines, client, paymentData] = await Promise.all([
     findInvoiceLines(context.db, organization.id, invoice.id),
     findClient(context.db, organization.id, invoice.client_id),

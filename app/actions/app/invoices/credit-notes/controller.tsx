@@ -3,7 +3,6 @@ import type { AnyParams, ContextEntries, RequestContext } from 'remix/router';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { redirect } from 'remix/response/redirect';
 
-import { Auth } from 'remix/middleware/auth';
 import type { GoodAuth } from 'remix/middleware/auth';
 import { getCsrfToken } from 'remix/middleware/csrf';
 import type { RenderFunction } from 'remix/middleware/render';
@@ -31,7 +30,7 @@ import {
 import { creditNotePdfFilename } from '../../../../data/invoices/credit-note-pdf-artifacts.ts';
 import { findInvoice, findInvoiceLines } from '../../../../data/invoices/records.ts';
 import { todayInKolkata } from '../../../../data/invoices/dates.ts';
-import { requireAuth } from '../../../../middleware/auth.ts';
+import { authedUser, requireAuth } from '../../../../middleware/auth.ts';
 import {
   CurrentOrganization,
   requireOrganizationContext,
@@ -57,7 +56,7 @@ async function renderNewForm(
   values: CreditNoteFormValues,
   issues: readonly CreditNoteDraftIssue[] = [],
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let lines = await findInvoiceLines(context.db, organization.id, invoice.id);
   let creditableQuantities = await remainingCreditNoteLineCapacity(
     context.db,
@@ -92,7 +91,7 @@ async function renderEditForm(
   values: CreditNoteFormValues,
   issues: readonly CreditNoteDraftIssue[] = [],
 ) {
-  let auth = context.get(Auth) as GoodAuth<User>;
+  let auth = authedUser(context);
   let [lines, creditNote] = await Promise.all([
     findInvoiceLines(context.db, organization.id, invoice.id),
     findCreditNote(context.db, organization.id, invoice.id, creditNoteId),
@@ -135,7 +134,7 @@ export default createController(routes.app.invoices.creditNotes, {
   actions: {
     async new(context) {
       let organization = context.get(CurrentOrganization);
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let invoice = await findInvoice(context.db, organization.id, context.params.invoiceId);
       if (!invoice || invoice.document_type !== 'invoice') {
         return new Response('Invoice not found', { status: 404 });
@@ -257,7 +256,7 @@ export default createController(routes.app.invoices.creditNotes, {
         invoice,
         sourceLines,
       );
-      let auth = context.get(Auth) as GoodAuth<User>;
+      let auth = authedUser(context);
       let message = context.session.get('message');
       return context.render(
         <CreditNoteDraftPage
