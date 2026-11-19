@@ -2,7 +2,7 @@ import * as assert from 'remix/assert';
 import { DataTableValidationError } from 'remix/data-table';
 import { describe, it } from 'remix/test';
 
-import { db, clients, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
+import { db, clients, invoiceLines, invoices, organizationGstRatePresets, organizationInvoicingProfiles, organizations, users } from '../db.ts';
 import '../../../test/db-setup.ts';
 
 async function createOrganization(name: string): Promise<string> {
@@ -312,5 +312,312 @@ describe('clients table hooks', () => {
     assert.ok(saved);
     assert.equal(saved.legal_name, 'Whitmore Consultancy');
     assert.equal(saved.phone, '+91 98200 00000');
+  });
+});
+
+describe('invoices table hooks', () => {
+  async function seedDraftInvoice(organizationId: string) {
+    let clientId = crypto.randomUUID();
+    await db.create(clients, {
+      id: clientId,
+      organization_id: organizationId,
+      type: 'business',
+      legal_name: 'Draft Client',
+      status: 'active',
+      archived_at: null,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+    let invoiceId = crypto.randomUUID();
+    let now = Date.now();
+    await db.create(invoices, {
+      id: invoiceId,
+      organization_id: organizationId,
+      client_id: clientId,
+      document_type: 'invoice',
+      status: 'draft',
+      invoice_number: null,
+      currency: 'INR',
+      invoice_date: '2026-11-01',
+      due_date: '2026-11-01',
+      payment_term: 'due_on_receipt',
+      custom_payment_terms: null,
+      recipient_legal_name: 'Draft Client',
+      recipient_gstin_applicable: false,
+      reverse_charge: false,
+      gst_mode: 'none',
+      subtotal_minor: 1000,
+      line_discount_total_minor: 0,
+      invoice_discount_mode: null,
+      invoice_discount_value: null,
+      invoice_discount_minor: 0,
+      net_subtotal_minor: 1000,
+      round_off_minor: 0,
+      total_minor: 1000,
+      created_at: now,
+      updated_at: now,
+    });
+    return { invoiceId, clientId, now };
+  }
+
+  it('trims the recipient legal name and uppercases the currency before writing', async () => {
+    let organizationId = await createOrganization('Invoice Trim Studio');
+    let { invoiceId } = await seedDraftInvoice(organizationId);
+
+    await db.update(invoices, invoiceId, {
+      currency: ' inr ',
+      recipient_legal_name: '  Whitmore Consultancy ',
+      updated_at: Date.now(),
+    });
+    let invoice = await db.find(invoices, invoiceId);
+    assert.ok(invoice);
+    assert.equal(invoice.currency, 'INR');
+    assert.equal(invoice.recipient_legal_name, 'Whitmore Consultancy');
+  });
+
+  it('rejects a draft create that claims an invoice number', async () => {
+    let organizationId = await createOrganization('Invoice Draft Number Studio');
+    let clientId = crypto.randomUUID();
+    let now = Date.now();
+    let invoiceId = crypto.randomUUID();
+    await assert.rejects(
+      () =>
+        db.create(invoices, {
+          id: invoiceId,
+          organization_id: organizationId,
+          client_id: clientId,
+          document_type: 'invoice',
+          status: 'draft',
+          invoice_number: 'INV-1',
+          currency: 'INR',
+          invoice_date: '2026-11-01',
+          due_date: '2026-11-01',
+          payment_term: 'due_on_receipt',
+          recipient_legal_name: 'Numbered Draft Client',
+          recipient_gstin_applicable: false,
+          reverse_charge: false,
+          subtotal_minor: 1000,
+          line_discount_total_minor: 0,
+          invoice_discount_minor: 0,
+          net_subtotal_minor: 1000,
+          round_off_minor: 0,
+          total_minor: 1000,
+          created_at: now,
+          updated_at: now,
+        }),
+      DataTableValidationError,
+    );
+  });
+
+  it('rejects an issued create without a number and issue timestamp', async () => {
+    let organizationId = await createOrganization('Invoice Issued Studio');
+    let clientId = crypto.randomUUID();
+    let now = Date.now();
+    let invoiceId = crypto.randomUUID();
+    await assert.rejects(
+      () =>
+        db.create(invoices, {
+          id: invoiceId,
+          organization_id: organizationId,
+          client_id: clientId,
+          document_type: 'invoice',
+          status: 'issued',
+          invoice_number: null,
+          issued_at: null,
+          currency: 'INR',
+          invoice_date: '2026-11-01',
+          due_date: '2026-11-01',
+          payment_term: 'due_on_receipt',
+          recipient_legal_name: 'Issued Client',
+          recipient_gstin_applicable: false,
+          reverse_charge: false,
+          subtotal_minor: 1000,
+          line_discount_total_minor: 0,
+          invoice_discount_minor: 0,
+          net_subtotal_minor: 1000,
+          round_off_minor: 0,
+          total_minor: 1000,
+          created_at: now,
+          updated_at: now,
+        }),
+      DataTableValidationError,
+    );
+  });
+
+  it('rejects an update that pairs a draft status with an invoice number', async () => {
+    let organizationId = await createOrganization('Invoice Pair Studio');
+    let { invoiceId } = await seedDraftInvoice(organizationId);
+
+    await assert.rejects(
+      () =>
+        db.update(invoices, invoiceId, {
+          status: 'draft',
+          invoice_number: 'INV-1',
+          updated_at: Date.now(),
+        }),
+      DataTableValidationError,
+    );
+    let invoice = await db.find(invoices, invoiceId);
+    assert.ok(invoice);
+    assert.equal(invoice.status, 'draft');
+    assert.equal(invoice.invoice_number, null);
+  });
+
+  it('accepts an issuance-shaped update that allocates number, timestamp, and seller together', async () => {
+    let organizationId = await createOrganization('Invoice Issue Studio');
+    let { invoiceId } = await seedDraftInvoice(organizationId);
+    let now = Date.now();
+
+    await db.update(invoices, invoiceId, {
+      status: 'issued',
+      invoice_number: 'INV/26-27/0001',
+      issued_at: now,
+      seller_legal_name: 'Invoice Issue Studio',
+      seller_address_line1: '12 Linking Road',
+      seller_country: 'India',
+      updated_at: now,
+    });
+    let invoice = await db.find(invoices, invoiceId);
+    assert.ok(invoice);
+    assert.equal(invoice.status, 'issued');
+    assert.equal(invoice.invoice_number, 'INV/26-27/0001');
+    assert.equal(invoice.issued_at, now);
+  });
+
+  it('rejects a negative total', async () => {
+    let organizationId = await createOrganization('Invoice Negative Studio');
+    let { invoiceId } = await seedDraftInvoice(organizationId);
+
+    await assert.rejects(
+      () => db.update(invoices, invoiceId, { total_minor: -1, updated_at: Date.now() }),
+      DataTableValidationError,
+    );
+    let invoice = await db.find(invoices, invoiceId);
+    assert.ok(invoice);
+    assert.equal(invoice.total_minor, 1000);
+  });
+
+  it('rejects totals that stop adding up when the parts are updated together', async () => {
+    let organizationId = await createOrganization('Invoice Identity Studio');
+    let { invoiceId } = await seedDraftInvoice(organizationId);
+
+    await assert.rejects(
+      () =>
+        db.update(invoices, invoiceId, {
+          net_subtotal_minor: 1000,
+          tax_total_minor: 180,
+          round_off_minor: 0,
+          total_minor: 999,
+          reverse_charge: false,
+          updated_at: Date.now(),
+        }),
+      DataTableValidationError,
+    );
+    let invoice = await db.find(invoices, invoiceId);
+    assert.ok(invoice);
+    assert.equal(invoice.total_minor, 1000);
+  });
+});
+
+describe('invoice lines table hooks', () => {
+  async function seedLine(organizationId: string) {
+    let clientId = crypto.randomUUID();
+    await db.create(clients, {
+      id: clientId,
+      organization_id: organizationId,
+      type: 'business',
+      legal_name: 'Line Client',
+      status: 'active',
+      archived_at: null,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+    let invoiceId = crypto.randomUUID();
+    let now = Date.now();
+    await db.create(invoices, {
+      id: invoiceId,
+      organization_id: organizationId,
+      client_id: clientId,
+      document_type: 'invoice',
+      status: 'draft',
+      invoice_number: null,
+      currency: 'INR',
+      invoice_date: '2026-11-01',
+      due_date: '2026-11-01',
+      payment_term: 'due_on_receipt',
+      recipient_legal_name: 'Line Client',
+      recipient_gstin_applicable: false,
+      reverse_charge: false,
+      subtotal_minor: 1000,
+      line_discount_total_minor: 0,
+      invoice_discount_minor: 0,
+      net_subtotal_minor: 1000,
+      round_off_minor: 0,
+      total_minor: 1000,
+      created_at: now,
+      updated_at: now,
+    });
+    return { invoiceId, now };
+  }
+
+  function lineValues(organizationId: string, invoiceId: string, now: number) {
+    return {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      invoice_id: invoiceId,
+      position: 0,
+      description: 'Design review',
+      quantity: '1',
+      unit_price: '1000',
+      amount_minor: 1000,
+      discount_mode: null,
+      discount_value: null,
+      line_discount_minor: 0,
+      allocated_invoice_discount_minor: 0,
+      net_minor: 1000,
+      cgst_amount_minor: 0,
+      sgst_amount_minor: 0,
+      igst_amount_minor: 0,
+      foreign_tax_amount_minor: 0,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  it('trims the description before writing', async () => {
+    let organizationId = await createOrganization('Line Trim Studio');
+    let { invoiceId, now } = await seedLine(organizationId);
+    let line = lineValues(organizationId, invoiceId, now);
+    await db.create(invoiceLines, { ...line, description: '  Design review ' });
+
+    let saved = await db.find(invoiceLines, line.id);
+    assert.ok(saved);
+    assert.equal(saved.description, 'Design review');
+  });
+
+  it('rejects a blank description', async () => {
+    let organizationId = await createOrganization('Line Blank Studio');
+    let { invoiceId, now } = await seedLine(organizationId);
+    let line = lineValues(organizationId, invoiceId, now);
+    await assert.rejects(
+      () => db.create(invoiceLines, { ...line, description: '   ' }),
+      DataTableValidationError,
+    );
+    assert.equal(await db.find(invoiceLines, line.id), null);
+  });
+
+  it('rejects a negative position or line amount', async () => {
+    let organizationId = await createOrganization('Line Bounds Studio');
+    let { invoiceId, now } = await seedLine(organizationId);
+    let negativePosition = lineValues(organizationId, invoiceId, now);
+    await assert.rejects(
+      () => db.create(invoiceLines, { ...negativePosition, position: -1 }),
+      DataTableValidationError,
+    );
+    let negativeAmount = lineValues(organizationId, invoiceId, now);
+    await assert.rejects(
+      () => db.create(invoiceLines, { ...negativeAmount, amount_minor: -1 }),
+      DataTableValidationError,
+    );
   });
 });
