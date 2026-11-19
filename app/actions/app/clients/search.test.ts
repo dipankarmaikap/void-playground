@@ -2,7 +2,7 @@ import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
 import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
@@ -55,7 +55,7 @@ function includes(html: string, value: string) {
 }
 
 beforeEach(async () => {
-  await db.exec('DELETE FROM clients');
+  await clearTestTables(clients);
 });
 
 describe('client directory search and filters', () => {

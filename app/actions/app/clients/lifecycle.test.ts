@@ -2,7 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { clearTestTables } from '../../../../test/db-setup.ts';
 import { router } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {
@@ -336,7 +336,7 @@ describe('client lifecycle', () => {
 
   it('shows a useful empty state in both directory views', async () => {
     let sessionCookie = await createUserAndLogin(router, 'lifecycle');
-    await db.exec('DELETE FROM clients');
+    await clearTestTables(clients);
 
     let archivedDirectory = await getHtml(
       router,

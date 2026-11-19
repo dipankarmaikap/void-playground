@@ -2,7 +2,7 @@ import { beforeEach, describe, it } from 'remix/test';
 import * as assert from 'remix/assert';
 
 import { clients, db } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { ClientType } from '../../../data/client-names.ts';
 import { listClients } from '../../../data/clients.ts';
 import { router } from '../../../router.ts';
@@ -57,7 +57,7 @@ function nextHref(html: string): string {
 }
 
 beforeEach(async () => {
-  await db.exec('DELETE FROM clients');
+  await clearTestTables(clients);
 });
 
 describe('Client directory pagination', () => {
