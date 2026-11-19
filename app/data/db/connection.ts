@@ -15,7 +15,13 @@ if (!isTest) {
   mkdirSync(dirname(dbPath), { recursive: true });
 }
 
-/** Creates the application's single SQLite database connection. */
+/**
+ * Creates the application's single SQLite database connection.
+ *
+ * `remix.json` mirrors these adapter settings for the `remix db` CLI — the same database
+ * filename (`data/app.db` outside test mode) and `foreignKeys: true`. JSON can't hold
+ * comments, so this pointer lives here: both must change together.
+ */
 export function createAppDatabase(): SqliteDatabase {
   return createSqliteDatabase({ filename: dbPath, foreignKeys: true });
 }
