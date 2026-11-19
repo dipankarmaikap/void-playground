@@ -2,8 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { clients } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -13,7 +12,7 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 const blankBilling = {
   billing_line1: '',
@@ -56,7 +55,7 @@ function locationOf(response: Response) {
 
 describe('client billing details', () => {
   it('creates a client with no billing address or currency', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('No Billing Client');
 
     let created = await createClient(sessionCookie, { legal_name: legalName });
@@ -78,7 +77,7 @@ describe('client billing details', () => {
   });
 
   it('requires address line 1 and country when any address field is entered', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Partial Address');
 
     let response = await postForm(
@@ -119,7 +118,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an address without locality, region, or postal code', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Minimal Address');
 
     let created = await createClient(sessionCookie, {
@@ -144,7 +143,7 @@ describe('client billing details', () => {
   });
 
   it('stores and edits the full billing address on an Individual profile', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Individual Billing');
 
     let created = await createClient(sessionCookie, {
@@ -212,7 +211,7 @@ describe('client billing details', () => {
   });
 
   it('stores billing details on a Business profile', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Business Billing Legal');
     let tradingName = uniqueName('Business Billing Trading');
 
@@ -251,7 +250,7 @@ describe('client billing details', () => {
   });
 
   it('stores a blank currency as null while keeping the address and shows the suggestion before save', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Blank Currency');
 
     let created = await createClient(sessionCookie, {
@@ -286,7 +285,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an unlisted country as entered and canonicalizes known country names', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Unlisted Country');
 
     let created = await createClient(sessionCookie, {
@@ -325,7 +324,7 @@ describe('client billing details', () => {
   });
 
   it('accepts an unlisted 3-letter currency code', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Unlisted Currency');
 
     let created = await createClient(sessionCookie, {
@@ -346,7 +345,7 @@ describe('client billing details', () => {
   });
 
   it('keeps an explicit currency instead of the country suggestion', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Explicit Currency');
 
     await createClient(sessionCookie, {
@@ -363,7 +362,7 @@ describe('client billing details', () => {
   });
 
   it('accepts a manual currency with no billing address', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Manual Currency');
 
     let created = await createClient(sessionCookie, {
@@ -386,7 +385,7 @@ describe('client billing details', () => {
   });
 
   it('rejects an invalid currency and preserves the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Invalid Currency');
 
     let response = await postForm(
@@ -415,7 +414,7 @@ describe('client billing details', () => {
   });
 
   it('keeps the stored billing details when an edit fails validation', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Stable Billing');
 
     let created = await createClient(sessionCookie, {
@@ -458,8 +457,8 @@ describe('client billing details', () => {
   });
 
   it('does not disclose or edit another Organization’s billing details', async () => {
-    let firstCookie = await createUserAndLogin(router, 'billing');
-    let secondCookie = await createUserAndLogin(router, 'billing');
+    let firstCookie = await createUserAndLogin(router, db, 'billing');
+    let secondCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('Shared Billing');
 
     let created = await createClient(firstCookie, {
@@ -502,7 +501,7 @@ describe('client billing details', () => {
   });
 
   it('rejects billing mutations without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'billing');
+    let sessionCookie = await createUserAndLogin(router, db, 'billing');
     let legalName = uniqueName('No Token Billing');
 
     let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {

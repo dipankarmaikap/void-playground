@@ -2,20 +2,19 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { createAppRouter } from '../../../../router.ts';
-import { testDb as db } from '../../../../../test/db-setup.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
 import { invoicingFormFields } from './test-fields.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 let index = routes.app.settings.invoicing.index.href();
 let action = routes.app.settings.invoicing.action.href();
 
 describe('organization invoicing defaults', () => {
   it('renders INR, Due on receipt, and blank client-visible defaults for a new Organization', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'inv-default-new');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'inv-default-new');
     let html = await getHtml(router, index, sessionCookie);
 
     assert.match(html, /name="default_currency"[^>]*value="INR"/);
@@ -31,6 +30,7 @@ describe('organization invoicing defaults', () => {
   it('saves and renders default currency, payment terms, instructions, and notes', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-save',
     );
 
@@ -65,6 +65,7 @@ describe('organization invoicing defaults', () => {
   it('accepts and renders the valid ISO 4217 currency XAF', async () => {
     let { sessionCookie } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-xaf',
     );
 
@@ -83,6 +84,7 @@ describe('organization invoicing defaults', () => {
   it('updates and clears the client-visible defaults', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-update',
     );
     let saved = await postForm(
@@ -129,6 +131,7 @@ describe('organization invoicing defaults', () => {
   it('rejects an invalid currency and an unknown payment term with 400s that preserve values', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-invalid',
     );
 
@@ -170,6 +173,7 @@ describe('organization invoicing defaults', () => {
   it('rejects overlong client-visible text without truncating the submitted draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'inv-default-long',
     );
     let longInstructions = 'I'.repeat(1001);

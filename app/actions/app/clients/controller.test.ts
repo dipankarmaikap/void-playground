@@ -1,10 +1,9 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { clients } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
 import {
   createUserAndLogin,
   createUserAndLoginWithOrganization,
@@ -15,7 +14,7 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -45,7 +44,7 @@ describe('clients controller', () => {
   });
 
   it('adds the Clients destination to the app shell without a Settings subnav', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let html = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
 
     assert.match(
@@ -61,7 +60,7 @@ describe('clients controller', () => {
   });
 
   it('renders the directory and create page with route metadata and noindex', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
 
     let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
     assert.match(directory, /<title>Clients \| My Remix App<\/title>/);
@@ -83,7 +82,7 @@ describe('clients controller', () => {
   });
 
   it('creates, views, and edits an Individual client', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let legalName = uniqueName('Ada Lovelace');
 
     let created = await postForm(
@@ -150,7 +149,7 @@ describe('clients controller', () => {
   });
 
   it('requires a type and legal name and preserves submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let preferredName = uniqueName('Preferred');
 
     let response = await postForm(
@@ -175,7 +174,7 @@ describe('clients controller', () => {
   });
 
   it('keeps the stored profile when an edit fails validation', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let legalName = uniqueName('Grace Hopper');
     let created = await postForm(
       router,
@@ -208,7 +207,7 @@ describe('clients controller', () => {
   });
 
   it('aggregates section errors consistently on create and edit', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let invalidValues = {
       type: 'individual',
       legal_name: '',
@@ -282,7 +281,7 @@ describe('clients controller', () => {
   });
 
   it('rejects Client mutations without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let legalName = uniqueName('No Token');
 
     let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
@@ -300,7 +299,7 @@ describe('clients controller', () => {
   });
 
   it('uses the preferred name as the display label and falls back to the legal name', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let legalName = uniqueName('Katherine Johnson');
     let preferredName = uniqueName('Kathy');
 
@@ -336,7 +335,7 @@ describe('clients controller', () => {
   });
 
   it('shows only active clients in the directory', async () => {
-    let tenant = await createUserAndLoginWithOrganization(router, 'clients');
+    let tenant = await createUserAndLoginWithOrganization(router, db, 'clients');
     let sessionCookie = tenant.sessionCookie;
     let activeName = uniqueName('Active Client');
     let archivedName = uniqueName('Archived Client');
@@ -364,7 +363,7 @@ describe('clients controller', () => {
   });
 
   it('returns 404 for unknown clients on read and write routes', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'clients');
+    let sessionCookie = await createUserAndLogin(router, db, 'clients');
     let clientId = crypto.randomUUID();
 
     for (let path of [

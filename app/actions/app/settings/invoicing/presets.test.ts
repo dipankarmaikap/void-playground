@@ -2,8 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { organizationGstRatePresets } from '../../../../data/db.ts';
-import { testDb as db } from '../../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../../router.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -12,7 +11,7 @@ import {
   postForm,
 } from '../../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 async function presetsFor(organizationId: string) {
   let rows = await db.findMany(organizationGstRatePresets, {
@@ -35,6 +34,7 @@ describe('organization GST rate presets', () => {
   it('seeds the standard editable presets for a new Organization', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-seed',
     );
 
@@ -49,6 +49,7 @@ describe('organization GST rate presets', () => {
   it('adds a custom non-negative decimal preset', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-add',
     );
 
@@ -69,6 +70,7 @@ describe('organization GST rate presets', () => {
   it('edits a preset rate and removes another', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-edit',
     );
     await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
@@ -103,6 +105,7 @@ describe('organization GST rate presets', () => {
   it('restores the standard presets when the last custom preset is removed', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-remove-last',
     );
     let rows = await db.findMany(organizationGstRatePresets, {
@@ -127,6 +130,7 @@ describe('organization GST rate presets', () => {
   it('rejects invalid or duplicate rates with accessible 400s that preserve the draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-invalid',
     );
 
@@ -152,8 +156,8 @@ describe('organization GST rate presets', () => {
   });
 
   it('keeps each Organization’s presets private and ignores a forged Organization id', async () => {
-    let owner = await createUserAndLoginWithOrganization(router, 'preset-owner');
-    let other = await createUserAndLoginWithOrganization(router, 'preset-other');
+    let owner = await createUserAndLoginWithOrganization(router, db, 'preset-owner');
+    let other = await createUserAndLoginWithOrganization(router, db, 'preset-other');
 
     let added = await postForm(
       router,
@@ -199,6 +203,7 @@ describe('organization GST rate presets', () => {
   it('keeps the attempted value on the inline row when a duplicate preset update is rejected', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-update-duplicate',
     );
     await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
@@ -232,6 +237,7 @@ describe('organization GST rate presets', () => {
   it('keeps an out-of-range rate on the inline row when a preset update is rejected', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-update-invalid',
     );
     await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
@@ -261,6 +267,7 @@ describe('organization GST rate presets', () => {
   it('rejects preset mutations without a CSRF token', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'preset-csrf',
     );
     await getHtml(router, routes.app.settings.invoicing.index.href(), sessionCookie);
@@ -277,7 +284,7 @@ describe('organization GST rate presets', () => {
   });
 
   it('does not contact an external registry to verify PAN or GSTIN', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-no-lookup');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-no-lookup');
     let originalFetch = globalThis.fetch;
     let externalCalls: string[] = [];
     globalThis.fetch = ((input: string | URL | Request) => {

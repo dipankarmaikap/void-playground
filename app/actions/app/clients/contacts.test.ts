@@ -2,8 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { clients } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -13,7 +12,7 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -25,7 +24,7 @@ function uniqueEmail(prefix: string) {
 
 describe('client contacts', () => {
   it('creates, views, and edits an Individual email and phone', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Individual');
     let email = uniqueEmail('person');
     let phone = '+91 98765 43210';
@@ -73,7 +72,7 @@ describe('client contacts', () => {
   });
 
   it('trims contact values and stores blank optional values as null', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Optional Contacts');
     let email = uniqueEmail('trimmed');
 
@@ -105,7 +104,7 @@ describe('client contacts', () => {
   });
 
   it('accepts an Individual with no contact details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('No Contacts');
 
     let created = await postForm(
@@ -128,7 +127,7 @@ describe('client contacts', () => {
   });
 
   it('rejects an invalid Individual email and keeps the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Email');
     let badEmail = 'not-an-email';
     let phone = '+91 98765 43210';
@@ -153,7 +152,7 @@ describe('client contacts', () => {
   });
 
   it('rejects an invalid Individual phone number and keeps the submitted values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Phone');
     let email = uniqueEmail('valid');
     let badPhone = 'call me maybe';
@@ -177,7 +176,7 @@ describe('client contacts', () => {
   });
 
   it('creates, views, and edits Business shared and primary-contact details', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Business');
     let sharedEmail = uniqueEmail('shared');
     let sharedPhone = '+44 20 7946 0958';
@@ -256,7 +255,7 @@ describe('client contacts', () => {
   });
 
   it('requires a primary contact name when any other primary-contact field is present', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Named Contact Required');
     let role = 'Operations';
     let contactEmail = uniqueEmail('ops');
@@ -287,7 +286,7 @@ describe('client contacts', () => {
   });
 
   it('accepts a Business primary contact with only a name', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Name Only Contact');
     let contactName = uniqueName('Sam Rivera');
 
@@ -315,7 +314,7 @@ describe('client contacts', () => {
   });
 
   it('rejects invalid primary-contact email and phone values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Invalid Contact Details');
     let contactName = uniqueName('Jordan Lee');
 
@@ -346,7 +345,7 @@ describe('client contacts', () => {
   });
 
   it('allows the same email, phone, and primary contact across Clients', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let sharedEmail = uniqueEmail('duplicate');
     let sharedPhone = '+91 90000 00000';
     let contactName = uniqueName('Shared Contact');
@@ -383,8 +382,8 @@ describe('client contacts', () => {
   });
 
   it('does not disclose or edit another Organization’s contact details', async () => {
-    let firstCookie = await createUserAndLogin(router, 'contacts');
-    let secondCookie = await createUserAndLogin(router, 'contacts');
+    let firstCookie = await createUserAndLogin(router, db, 'contacts');
+    let secondCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Shared Contacts');
     let email = uniqueEmail('owner');
     let phone = '+61 2 9374 4000';
@@ -425,7 +424,7 @@ describe('client contacts', () => {
   });
 
   it('keeps Business primary-contact values through a type change', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact Type Change');
     let contactName = uniqueName('Casey Morgan');
     let contactRole = 'Procurement';
@@ -510,7 +509,7 @@ describe('client contacts', () => {
   });
 
   it('rejects contact edits without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'contacts');
+    let sessionCookie = await createUserAndLogin(router, db, 'contacts');
     let legalName = uniqueName('Contact CSRF');
     let originalEmail = uniqueEmail('original');
 

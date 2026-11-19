@@ -1,10 +1,8 @@
-import { invoices } from '../app/data/db.ts';
-import { testDb as db } from './db-setup.ts';
-import { createAppRouter } from '../app/router.ts';
-import { routes } from '../app/routes.ts';
-import { submitForm } from './http.ts';
+import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-const router = createAppRouter({ db });
+import { invoices } from '../app/data/db.ts';
+import { routes } from '../app/routes.ts';
+import { submitForm, type TestApp } from './http.ts';
 
 export interface InvoiceFixture {
   id: string;
@@ -13,8 +11,12 @@ export interface InvoiceFixture {
   createdAt?: number;
 }
 
-/** Seeds a Draft invoice for route tests; reads should still go through the public GET routes. */
+/**
+ * Seeds a Draft invoice for route tests; reads should still go through the public GET routes.
+ * Pass the database the router under test was built around (from `createTestRouter()`).
+ */
 export async function seedInvoice(
+  db: SqliteDatabase,
   organizationId: string,
   clientId: string,
   fixture: InvoiceFixture,
@@ -61,10 +63,14 @@ export async function seedInvoice(
   });
 }
 
-/** Marks a Draft as sent by submitting the show page's issue action. */
-export async function markAsSent(cookie: string, invoiceId: string): Promise<Response> {
+/** Marks a Draft as sent by submitting the show page's issue action through the given router. */
+export async function markAsSent(
+  app: TestApp,
+  cookie: string,
+  invoiceId: string,
+): Promise<Response> {
   return submitForm(
-    router,
+    app,
     routes.app.invoices.show.href({ invoiceId }),
     routes.app.invoices.lifecycle.issue.href({ invoiceId }),
     {},

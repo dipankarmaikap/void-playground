@@ -1,9 +1,9 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
-import { clients, organizationMemberships } from '../../../data/db.ts';
-import { testDb as db, clearTestTables } from '../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../router.ts';
+import { clients, invoices, organizationMemberships } from '../../../data/db.ts';
+import { clearTestTables } from '../../../../test/db-setup.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -14,7 +14,7 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -25,7 +25,7 @@ function clientItemCount(html: string) {
 }
 
 async function createTenant(prefix: string) {
-  return createUserAndLoginWithOrganization(router, prefix);
+  return createUserAndLoginWithOrganization(router, db, prefix);
 }
 
 async function createClient(
@@ -65,7 +65,7 @@ async function seedClient(
 }
 
 beforeEach(async () => {
-  await clearTestTables(clients);
+  await clearTestTables(db, invoices, clients);
 });
 
 describe('Client Organization isolation', () => {

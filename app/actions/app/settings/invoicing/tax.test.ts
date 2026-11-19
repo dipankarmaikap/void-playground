@@ -2,13 +2,12 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { organizationInvoicingProfiles } from '../../../../data/db.ts';
-import { testDb as db } from '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { createAppRouter } from '../../../../router.ts';
+import { createTestRouter } from '../../../../../test/router.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 const VALID_GSTIN = '27AAPCS2319F1Z5';
 const VALID_PAN = 'AAPCS2319F';
@@ -30,6 +29,7 @@ describe('organization tax registration settings', () => {
   it('saves a normalized PAN and a consistent enabled GST registration', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-save',
     );
 
@@ -65,6 +65,7 @@ describe('organization tax registration settings', () => {
   it('requires a valid PAN and reports it accessibly while preserving the draft', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-pan-invalid',
     );
 
@@ -87,6 +88,7 @@ describe('organization tax registration settings', () => {
   it('rejects an invalid GSTIN and preserves the submitted tax values', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-gstin-invalid',
     );
 
@@ -114,7 +116,7 @@ describe('organization tax registration settings', () => {
   });
 
   it('rejects a GSTIN whose state code differs from the selected State/UT', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-state-mismatch');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-state-mismatch');
 
     let response = await postForm(
       router,
@@ -134,7 +136,7 @@ describe('organization tax registration settings', () => {
   });
 
   it('rejects a GSTIN whose PAN segment differs from the saved PAN', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-pan-mismatch');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-pan-mismatch');
 
     let response = await postForm(
       router,
@@ -155,7 +157,7 @@ describe('organization tax registration settings', () => {
   });
 
   it('requires a GSTIN and State/UT when GST registration is enabled', async () => {
-    let { sessionCookie } = await createUserAndLoginWithOrganization(router, 'tax-required');
+    let { sessionCookie } = await createUserAndLoginWithOrganization(router, db, 'tax-required');
 
     let response = await postForm(
       router,
@@ -173,6 +175,7 @@ describe('organization tax registration settings', () => {
   it('clears GSTIN and State/UT and drops the readiness requirement when GST is disabled', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-disable',
     );
     await postForm(
@@ -211,6 +214,7 @@ describe('organization tax registration settings', () => {
   it('makes GSTIN and State/UT an issue-readiness requirement while GST is enabled', async () => {
     let { sessionCookie, organizationId } = await createUserAndLoginWithOrganization(
       router,
+      db,
       'tax-readiness',
     );
     await postForm(

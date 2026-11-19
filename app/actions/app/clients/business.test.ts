@@ -2,8 +2,7 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { clients } from '../../../data/db.ts';
-import { testDb as db } from '../../../../test/db-setup.ts';
-import { createAppRouter } from '../../../router.ts';
+import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLogin,
@@ -13,7 +12,7 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 
-const router = createAppRouter({ db });
+const { router, db } = await createTestRouter();
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;
@@ -42,7 +41,7 @@ async function createBusiness(sessionCookie: string, fields: Record<string, stri
 
 describe('business clients', () => {
   it('creates, views, and edits a Business profile with a trading name and industry', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Northwind Trading Private Limited');
     let tradingName = uniqueName('Northwind');
     let industry = uniqueName('Freight and logistics');
@@ -115,7 +114,7 @@ describe('business clients', () => {
   });
 
   it('requires a Business legal name and preserves submitted business values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let tradingName = uniqueName('Nameless Trading');
     let industry = uniqueName('Hospitality');
 
@@ -144,7 +143,7 @@ describe('business clients', () => {
   });
 
   it('accepts a Business with only a legal name and falls back to it as the display label', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Sole Trader Proprietorship');
 
     let created = await createBusiness(sessionCookie, { legal_name: legalName });
@@ -173,7 +172,7 @@ describe('business clients', () => {
   });
 
   it('uses the trading name as the display label when one is set', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Acme Manufacturing Limited');
     let tradingName = uniqueName('Acme Works');
 
@@ -194,7 +193,7 @@ describe('business clients', () => {
   });
 
   it('shows shared email and phone in the directory and industry only for Businesses', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let businessName = uniqueName('Directory Contact Business');
     let businessEmail = `directory-${crypto.randomUUID()}@example.com`;
     let businessPhone = '+44 20 7946 0958';
@@ -238,7 +237,7 @@ describe('business clients', () => {
   });
 
   it('changes type in both directions and keeps hidden type-specific values', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Ada Lovelace');
     let preferredName = uniqueName('Ada');
     let tradingName = uniqueName('Analytical Engines');
@@ -372,8 +371,8 @@ describe('business clients', () => {
   });
 
   it('keeps Business profiles unavailable to a different Organization', async () => {
-    let firstCookie = await createUserAndLogin(router, 'business');
-    let secondCookie = await createUserAndLogin(router, 'business');
+    let firstCookie = await createUserAndLogin(router, db, 'business');
+    let secondCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Shared Business Legal');
     let tradingName = uniqueName('Shared Business Trading');
     let industry = uniqueName('Consulting');
@@ -422,7 +421,7 @@ describe('business clients', () => {
   });
 
   it('rejects Business mutations without a CSRF token', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('No Token Business');
 
     let response = await router.fetch(new URL(routes.app.clients.create.href(), origin), {
@@ -442,7 +441,7 @@ describe('business clients', () => {
   });
 
   it('trims Industry and stores a blank Industry as not recorded', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Trimmed Industry Limited');
 
     let created = await createBusiness(sessionCookie, {
@@ -468,7 +467,7 @@ describe('business clients', () => {
   });
 
   it('keeps the stored Business profile when an edit fails validation', async () => {
-    let sessionCookie = await createUserAndLogin(router, 'business');
+    let sessionCookie = await createUserAndLogin(router, db, 'business');
     let legalName = uniqueName('Stable Business');
     let tradingName = uniqueName('Stable Trading');
 

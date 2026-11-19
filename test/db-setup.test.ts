@@ -37,7 +37,7 @@ describe('shared test database cleanup', () => {
     await createCleanupClient(organizationId);
     await createCleanupClient(organizationId);
 
-    await clearTestTables(clients);
+    await clearTestTables(db, clients);
 
     assert.equal((await db.findMany(clients)).length, 0);
     assert.ok(await db.find(users, userId), 'an unnamed table must keep its rows');
@@ -48,7 +48,7 @@ describe('shared test database cleanup', () => {
   });
 
   it('is a safe no-op on an already-empty table', async () => {
-    await clearTestTables(clients);
+    await clearTestTables(db, clients);
 
     assert.equal((await db.findMany(clients)).length, 0);
   });
