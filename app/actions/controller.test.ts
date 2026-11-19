@@ -2,8 +2,11 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createUser, login, origin } from '../../test/http.ts';
-import { router } from '../router.ts';
+import { createAppRouter } from '../router.ts';
+import { testDb } from '../../test/db-setup.ts';
 import { routes } from '../routes.ts';
+
+const router = createAppRouter({ db: testDb });
 
 describe('root controller', () => {
   it('GET / returns the home page', async () => {

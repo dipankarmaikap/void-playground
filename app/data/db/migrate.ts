@@ -4,7 +4,6 @@ import type { DatabaseMigrateOptions, MigrateResult } from 'remix/data-table/mig
 import { loadMigrations } from 'remix/data-table/migrations/node';
 import type { SqliteDatabase } from 'remix/data-table/sqlite';
 
-import { db } from '../db.ts';
 import * as compatibility from './compatibility.ts';
 
 /** Where the numbered SQL migrations live, resolved from this module like the app's other paths. */
@@ -16,10 +15,10 @@ export const migrationsDirectory = fileURLToPath(new URL('./migrations/', import
  * checksum drift detection, per-migration transaction wrapping), then verifies Organization
  * ownership. Server startup awaits this before the HTTP server starts listening, and the
  * shared test bootstrap applies it to the in-memory test database, so production and test
- * schemas come from the exact same code path.
+ * schemas come from the exact same code path. Callers pass their database explicitly.
  */
 export async function migrateDatabase(
-  database: SqliteDatabase = db,
+  database: SqliteDatabase,
   options?: DatabaseMigrateOptions,
 ): Promise<MigrateResult> {
   await compatibility.assertClientSchemaCompatible(database);

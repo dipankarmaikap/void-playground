@@ -1,13 +1,15 @@
 import { beforeEach, describe, it } from 'remix/test';
 import * as assert from 'remix/assert';
 
-import { clients, db } from '../../../data/db.ts';
-import { clearTestTables } from '../../../../test/db-setup.ts';
+import { clients } from '../../../data/db.ts';
+import { testDb as db, clearTestTables } from '../../../../test/db-setup.ts';
 import type { ClientType } from '../../../data/client-names.ts';
 import { listClients } from '../../../data/clients.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 let organizationId: string;
 

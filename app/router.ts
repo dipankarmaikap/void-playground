@@ -35,7 +35,6 @@ import settingsProfileController from './actions/app/settings/profile/controller
 import settingsInvoicingController from './actions/app/settings/invoicing/controller.tsx';
 import settingsSessionsController from './actions/app/settings/sessions/controller.tsx';
 import { assets, documentScriptEntryMiddleware } from './assets.ts';
-import { db as appDb } from './data/db.ts';
 import { createHybridSessionStorage } from './data/session/storage.ts';
 import { sessionCookie, sessionScheme } from './data/session/setup.ts';
 import { loadDatabase } from './middleware/database.ts';
@@ -87,10 +86,10 @@ const homeMethodGuard: Middleware = async (context, next) => {
   return next();
 };
 
-/** Options for constructing an app router; omitted options fall back to the application defaults. */
+/** Options for constructing an app router around a caller-chosen database. */
 export interface AppRouterOptions {
-  /** The database request handling reads and writes. Defaults to the application database. */
-  db?: SqliteDatabase;
+  /** The database request handling reads and writes. Server startup and tests choose it. */
+  db: SqliteDatabase;
   /** The cookie holding the session id. Defaults to the application session cookie. */
   sessionCookie?: Cookie;
   /** Session storage built from the chosen database when omitted. */
@@ -100,11 +99,11 @@ export interface AppRouterOptions {
 /**
  * Builds a router around a caller-chosen database, session cookie, and session storage. The
  * database is installed into the request context by `loadDatabase` middleware, so controllers
- * and domain modules receive it explicitly instead of importing a singleton; tests construct
- * their own router against an in-memory database through this factory.
+ * and domain modules receive it explicitly instead of importing a singleton. Server startup
+ * passes the application database; tests pass their own in-memory database.
  */
-export function createAppRouter(options: AppRouterOptions = {}) {
-  let db = options.db ?? appDb;
+export function createAppRouter(options: AppRouterOptions) {
+  let db = options.db;
   let cookie = options.sessionCookie ?? sessionCookie;
   let storage = options.sessionStorage ?? createHybridSessionStorage(db);
   let router = createRouter({
@@ -169,10 +168,7 @@ export function createAppRouter(options: AppRouterOptions = {}) {
   return router;
 }
 
-/** The application router, wired to the application database and session defaults. */
-export const router = createAppRouter();
-
-export type AppContext = RouterContext<typeof router>;
+export type AppContext = RouterContext<ReturnType<typeof createAppRouter>>;
 
 declare module 'remix' {
   interface RouterTypes {

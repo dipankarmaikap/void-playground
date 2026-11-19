@@ -2,11 +2,14 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db } from '../../../data/db.ts';
-import { router } from '../../../router.ts';
+
+import { createAppRouter } from '../../../router.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 describe('Client invoice links', () => {
   it('links Active and Archived Clients to only their Organization-scoped invoices', async () => {

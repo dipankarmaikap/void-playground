@@ -1,12 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { db } from '../../../../data/db.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { router } from '../../../../router.ts';
+import { createAppRouter } from '../../../../router.ts';
+import { testDb as db } from '../../../../../test/db-setup.ts';
 import { routes } from '../../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, postForm } from '../../../../../test/http.ts';
 import { invoicingFormFields } from './test-fields.ts';
+
+const router = createAppRouter({ db });
 
 let index = routes.app.settings.invoicing.index.href();
 let action = routes.app.settings.invoicing.action.href();

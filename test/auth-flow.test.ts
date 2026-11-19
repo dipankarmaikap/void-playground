@@ -1,15 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createAppRouter } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
 import {
-  db,
   organizationMemberships,
   organizations,
   users,
 } from '../app/data/db.ts';
-import './db-setup.ts';
+import { testDb as db } from './db-setup.ts';
 import { findOrganizationForUser } from '../app/data/organization/access.ts';
 
 import {
@@ -20,6 +19,8 @@ import {
   origin,
   postForm,
 } from './http.ts';
+
+const router = createAppRouter({ db });
 
 async function register(body: Record<string, string>) {
   let response = await postForm(router, routes.auth.register.action.href(), body);

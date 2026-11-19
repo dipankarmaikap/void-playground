@@ -1,12 +1,12 @@
 import { createCookie } from 'remix/cookie';
 import { createSessionAuthScheme } from 'remix/middleware/auth';
 
-import { db, users } from '../db.ts';
+import { users } from '../db.ts';
 import type { User } from '../db.ts';
 import { databaseContext } from '../../middleware/database.ts';
 import { AUTH_SESSION_KEY, readAuthPayload } from './auth-payload.ts';
 import type { AuthPayload } from './auth-payload.ts';
-import { createHybridSessionStorage, SESSION_TTL_SECONDS } from './storage.ts';
+import { SESSION_TTL_SECONDS } from './storage.ts';
 
 let sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret && process.env.NODE_ENV === 'production') {
@@ -20,8 +20,6 @@ export const sessionCookie = createCookie('__session', {
   path: '/',
   maxAge: SESSION_TTL_SECONDS,
 });
-
-export const sessionStorage = createHybridSessionStorage(db);
 
 export const sessionScheme = createSessionAuthScheme<User, AuthPayload>({
   read: readAuthPayload,

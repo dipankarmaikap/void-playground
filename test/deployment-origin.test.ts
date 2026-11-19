@@ -5,10 +5,13 @@ import { createRequestListener } from 'remix/node-fetch-server';
 import type { RequestListenerOptions } from 'remix/node-fetch-server';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createAppRouter } from '../app/router.ts';
+import { testDb } from './db-setup.ts';
 import { routes } from '../app/routes.ts';
 import { getNodeRequestListenerOptions } from '../app/server-config.ts';
 import { cookieFromResponse, extractCsrf } from './http.ts';
+
+const router = createAppRouter({ db: testDb });
 
 interface RunningServer {
   url: string;

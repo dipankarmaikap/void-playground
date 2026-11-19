@@ -1,10 +1,10 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
-import { db, clients } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { clients } from '../../../data/db.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import {
   createUserAndLogin,
   createUserAndLoginWithOrganization,
@@ -13,6 +13,8 @@ import {
   origin,
   postForm,
 } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 function uniqueName(prefix: string) {
   return `${prefix} ${crypto.randomUUID()}`;

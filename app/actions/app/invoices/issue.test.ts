@@ -5,13 +5,12 @@ import { createClient } from '../../../data/clients.ts';
 import { addDays, todayInKolkata } from '../../../data/invoices/dates.ts';
 import { issueDraftInvoice } from '../../../data/invoices/issuance.ts';
 import {
-  db,
   documentSequences,
   invoiceLines,
   invoices,
   organizationInvoicingProfiles,
 } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { parseInvoiceDraft } from '../../../data/invoices/draft.ts';
 import {
   findInvoiceLines,
@@ -21,7 +20,7 @@ import {
   parseInvoicingProfile,
   saveInvoicingProfile,
 } from '../../../data/organization/invoicing.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import { clientFormValuesOf } from '../clients/form-values.ts';
 import { invoicingFormFields } from '../settings/invoicing/test-fields.ts';
@@ -34,6 +33,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { markAsSent } from '../../../../test/invoice-fixtures.ts';
+
+const router = createAppRouter({ db });
 
 function draftFields(clientId: string, overrides: Record<string, string> = {}) {
   return {

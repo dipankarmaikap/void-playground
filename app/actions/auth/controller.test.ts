@@ -1,15 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../../router.ts';
+import { createAppRouter } from '../../router.ts';
 import { routes } from '../../routes.ts';
 import {
-  db,
   organizationMemberships,
   organizations,
   users,
 } from '../../data/db.ts';
-import '../../../test/db-setup.ts';
+import { testDb as db } from '../../../test/db-setup.ts';
 import {
   cookieFromResponse,
   createUser,
@@ -18,6 +17,8 @@ import {
   origin,
   submitForm,
 } from '../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 const base = origin;
 

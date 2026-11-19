@@ -2,9 +2,10 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db } from '../../../data/db.ts';
+
 import { addDays } from '../../../data/invoices/dates.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { routes } from '../../../routes.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
 import type { InvoiceFixture as SeedInvoiceFixture } from '../../../../test/invoice-fixtures.ts';
@@ -13,6 +14,8 @@ import {
   getHtml,
   origin,
 } from '../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 interface InvoiceFixture extends SeedInvoiceFixture {
   invoiceDate: string;

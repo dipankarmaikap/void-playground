@@ -2,14 +2,13 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import {
-  db,
   organizationInvoicingProfiles,
   organizationMemberships,
   organizations,
 } from '../../../../data/db.ts';
-import '../../../../../test/db-setup.ts';
+import { testDb as db } from '../../../../../test/db-setup.ts';
 import { findInvoicingProfile } from '../../../../data/organization/invoicing.ts';
-import { router } from '../../../../router.ts';
+import { createAppRouter } from '../../../../router.ts';
 import { routes } from '../../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -18,6 +17,8 @@ import {
   origin,
   postForm,
 } from '../../../../../test/http.ts';
+
+const router = createAppRouter({ db });
 
 function invoicingFields(overrides: Record<string, string> = {}) {
   return {

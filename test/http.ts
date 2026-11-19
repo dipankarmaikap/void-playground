@@ -1,14 +1,13 @@
 import * as assert from 'remix/assert';
 
 import {
-  db,
   organizationMemberships,
   organizationGstRatePresets,
   organizations,
   users,
   userPasswords,
 } from '../app/data/db.ts';
-import './db-setup.ts';
+import { testDb as db } from './db-setup.ts';
 import { hashPassword } from '../app/data/password.ts';
 import { defaultGstPresetRows } from '../app/data/organization/gst-presets.ts';
 import { routes } from '../app/routes.ts';

@@ -2,10 +2,10 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
-import { db, invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
-import '../../../../test/db-setup.ts';
+import { invoiceLines, invoicePayments, invoices } from '../../../data/db.ts';
+import { testDb as db } from '../../../../test/db-setup.ts';
 import { todayInKolkata } from '../../../data/invoices/dates.ts';
-import { router } from '../../../router.ts';
+import { createAppRouter } from '../../../router.ts';
 import { routes } from '../../../routes.ts';
 import {
   createUserAndLoginWithOrganization,
@@ -14,6 +14,8 @@ import {
   submitForm,
 } from '../../../../test/http.ts';
 import { seedInvoice } from '../../../../test/invoice-fixtures.ts';
+
+const router = createAppRouter({ db });
 
 async function createIssuedInvoice(
   organizationId: string,

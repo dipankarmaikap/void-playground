@@ -1,8 +1,8 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { clients, db, organizations, users } from '../app/data/db.ts';
-import { clearTestTables } from './db-setup.ts';
+import { clients, organizations, users } from '../app/data/db.ts';
+import { testDb as db, clearTestTables } from './db-setup.ts';
 
 function createCleanupClient(organizationId: string) {
   let now = Date.now();

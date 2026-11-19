@@ -1,12 +1,14 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { router } from '../app/router.ts';
+import { createAppRouter } from '../app/router.ts';
 import { routes } from '../app/routes.ts';
-import { db, sessions } from '../app/data/db.ts';
-import './db-setup.ts';
+import { sessions } from '../app/data/db.ts';
+import { testDb as db } from './db-setup.ts';
 
 import { createUser, login, origin } from './http.ts';
+
+const router = createAppRouter({ db });
 
 describe('hybrid storage', () => {
   it('anonymous visits create no DB session rows', async () => {

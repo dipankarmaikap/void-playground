@@ -7,7 +7,6 @@ import {
   creditNoteLines,
   creditNotePdfArtifacts,
   creditNotes,
-  db,
   documentSequences,
   invoiceLines,
   invoicePayments,
@@ -23,7 +22,7 @@ import {
 } from './db.ts';
 import * as compatibility from './db/compatibility.ts';
 import { migrateDatabase } from './db/migrate.ts';
-import '../../test/db-setup.ts';
+import { testDb as db } from '../../test/db-setup.ts';
 
 async function createUser(): Promise<string> {
   let id = crypto.randomUUID();
