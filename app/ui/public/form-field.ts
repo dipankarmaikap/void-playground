@@ -1,5 +1,8 @@
 import type { Issue } from 'remix/data-schema';
 
+/** The input types a form field descriptor can render. */
+export type InputFieldType = 'text' | 'email' | 'password' | 'tel' | 'date' | 'number';
+
 /**
  * The browser-facing presentation constants for one field of a shared form schema. Each form
  * authors its descriptor table next to its schema so the same constants drive server-side parsing
@@ -9,7 +12,7 @@ export interface FormFieldDescriptor {
   /** The control the field renders as; plain inputs default to their `type`. */
   control?: 'input' | 'select' | 'textarea' | 'checkbox' | 'hidden';
   /** The HTML input type; ignored for controls other than `input`. */
-  type?: 'text' | 'email' | 'password' | 'tel' | 'date' | 'number';
+  type?: InputFieldType;
   required?: boolean;
   minLength?: number;
   maxLength?: number;
@@ -17,33 +20,43 @@ export interface FormFieldDescriptor {
   max?: number | string;
   step?: number | string;
   autoComplete?: string;
-  list?: string;
 }
 
-/** The input attributes one schema field contributes, shared by server render and browser use. */
-export interface FormFieldAttributes {
-  type?: FormFieldDescriptor['type'];
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  min?: number | string;
-  max?: number | string;
-  step?: number | string;
-  autoComplete?: string;
-  list?: string;
-  'aria-invalid'?: true;
-}
+/** Controls that are not plain `<input>` elements and so carry no input type. */
+type NonInputControl = 'select' | 'textarea' | 'checkbox' | 'hidden';
+
+type DescriptorAttributeKey =
+  | 'required'
+  | 'minLength'
+  | 'maxLength'
+  | 'min'
+  | 'max'
+  | 'step'
+  | 'autoComplete';
+
+/**
+ * The input attributes one field descriptor contributes. The `type` mirrors exactly what
+ * {@link formFieldAttributes} emits, so the result can be spread straight into an `<input>`.
+ */
+export type FormFieldAttributes<D extends FormFieldDescriptor = FormFieldDescriptor> = (
+  D extends { control: NonInputControl }
+    ? { type?: undefined }
+    : { type: D extends { type: infer T } ? (T extends InputFieldType ? T : 'text') : 'text' }
+) &
+  Pick<D, Extract<keyof D, DescriptorAttributeKey>> & {
+    'aria-invalid'?: true;
+  };
 
 /**
  * Derives the browser input attributes for one field from its descriptor, marking the field
  * `aria-invalid` when parsing produced an issue for it.
  */
-export function formFieldAttributes(
-  descriptor: FormFieldDescriptor,
+export function formFieldAttributes<D extends FormFieldDescriptor>(
+  descriptor: D,
   issue?: Issue,
-): FormFieldAttributes {
+): FormFieldAttributes<D> {
   let isInput = descriptor.control === undefined || descriptor.control === 'input';
-  let attributes: FormFieldAttributes = {};
+  let attributes: Record<string, unknown> = {};
   if (isInput) attributes.type = descriptor.type ?? 'text';
   if (descriptor.required) attributes.required = true;
   if (descriptor.minLength != null) attributes.minLength = descriptor.minLength;
@@ -52,7 +65,6 @@ export function formFieldAttributes(
   if (descriptor.max != null) attributes.max = descriptor.max;
   if (descriptor.step != null) attributes.step = descriptor.step;
   if (descriptor.autoComplete) attributes.autoComplete = descriptor.autoComplete;
-  if (descriptor.list) attributes.list = descriptor.list;
   if (issue) attributes['aria-invalid'] = true;
-  return attributes;
+  return attributes as FormFieldAttributes<D>;
 }
