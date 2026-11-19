@@ -2,10 +2,11 @@ import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
 import { parseClientContacts } from '../../../../data/client-contacts.ts';
-import { CLIENT_TEXT_LIMITS } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
-import { issueFor, readText } from '../form-values.ts';
+import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
+import { issueFor } from '../form-values.ts';
+import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
 
 const contactGroupStyle = css({
@@ -49,11 +50,9 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="email"
-            type="email"
-            maxLength={CLIENT_TEXT_LIMITS.email}
             defaultValue={values.email}
-            aria-invalid={emailIssue ? true : undefined}
             variant={errorVariant(emailIssue)}
+            {...formFieldAttributes(clientFormFields.email, emailIssue)}
           />
         </Field>
         <Field
@@ -63,11 +62,9 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
         >
           <Input
             name="phone"
-            type="tel"
-            maxLength={CLIENT_TEXT_LIMITS.phone}
             defaultValue={values.phone}
-            aria-invalid={phoneIssue ? true : undefined}
             variant={errorVariant(phoneIssue)}
+            {...formFieldAttributes(clientFormFields.phone, phoneIssue)}
           />
         </Field>
         {/* The primary-contact group is business-only, but stays in the form while hidden
@@ -81,39 +78,33 @@ export function ContactFields(handle: Handle<ClientFormSectionProps>) {
           >
             <Input
               name="contact_name"
-              maxLength={CLIENT_TEXT_LIMITS.contact_name}
               defaultValue={values.contact_name}
-              aria-invalid={contactNameIssue ? true : undefined}
               variant={errorVariant(contactNameIssue)}
+              {...formFieldAttributes(clientFormFields.contact_name, contactNameIssue)}
             />
           </Field>
           <Field label="Role" hint="Optional." error={contactRoleIssue?.message}>
             <Input
               name="contact_role"
-              maxLength={CLIENT_TEXT_LIMITS.contact_role}
               defaultValue={values.contact_role}
-              aria-invalid={contactRoleIssue ? true : undefined}
               variant={errorVariant(contactRoleIssue)}
+              {...formFieldAttributes(clientFormFields.contact_role, contactRoleIssue)}
             />
           </Field>
           <Field label="Contact email" hint="Optional." error={contactEmailIssue?.message}>
             <Input
               name="contact_email"
-              type="email"
-              maxLength={CLIENT_TEXT_LIMITS.contact_email}
               defaultValue={values.contact_email}
-              aria-invalid={contactEmailIssue ? true : undefined}
               variant={errorVariant(contactEmailIssue)}
+              {...formFieldAttributes(clientFormFields.contact_email, contactEmailIssue)}
             />
           </Field>
           <Field label="Contact phone" hint="Optional." error={contactPhoneIssue?.message}>
             <Input
               name="contact_phone"
-              type="tel"
-              maxLength={CLIENT_TEXT_LIMITS.contact_phone}
               defaultValue={values.contact_phone}
-              aria-invalid={contactPhoneIssue ? true : undefined}
               variant={errorVariant(contactPhoneIssue)}
+              {...formFieldAttributes(clientFormFields.contact_phone, contactPhoneIssue)}
             />
           </Field>
         </fieldset>
@@ -130,14 +121,14 @@ export const contactSection: ClientFormSection = {
       issues={props.issues}
     />
   ),
-  parse(formData) {
+  parse(values) {
     let parsed = parseClientContacts({
-      email: readText(formData, 'email'),
-      phone: readText(formData, 'phone'),
-      contact_name: readText(formData, 'contact_name'),
-      contact_role: readText(formData, 'contact_role'),
-      contact_email: readText(formData, 'contact_email'),
-      contact_phone: readText(formData, 'contact_phone'),
+      email: values.email,
+      phone: values.phone,
+      contact_name: values.contact_name,
+      contact_role: values.contact_role,
+      contact_email: values.contact_email,
+      contact_phone: values.contact_phone,
     });
 
     if (!parsed.ok) {

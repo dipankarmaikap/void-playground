@@ -12,7 +12,6 @@ import {
   requireOrganizationContext,
 } from '../../../../middleware/organization-context.ts';
 import { routes } from '../../../../routes.ts';
-import { readClientFormValues } from '../form-values.ts';
 import { parseClientForm } from '../parse-client-form.ts';
 import { NewClientPage } from './page.tsx';
 
@@ -37,7 +36,7 @@ export default createController(routes.app.clients.new, {
     },
     async action(context) {
       let organization = context.get(CurrentOrganization);
-      let { issues, changes, warning } = await parseClientForm(context.formData, {
+      let { values, issues, changes, warning } = await parseClientForm(context.formData, {
         organizationId: organization.id,
       });
       let auth = context.get(Auth) as GoodAuth<User>;
@@ -50,7 +49,7 @@ export default createController(routes.app.clients.new, {
             csrfToken={csrfToken}
             identity={{ email: identity.email, displayName: identity.display_name }}
             organizationName={organization.name}
-            values={readClientFormValues(context.formData)}
+            values={values}
             issues={issues}
           />,
           { status: 400 },
