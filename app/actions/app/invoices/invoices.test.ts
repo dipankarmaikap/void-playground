@@ -2,8 +2,9 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { createClient } from '../../../data/clients.ts';
+import { formatIsoDate } from '../../../data/dates.ts';
 import { organizationGstRatePresets } from '../../../data/db.ts';
-import { todayInKolkata } from '../../../data/invoices/dates.ts';
+import { addDays, todayInKolkata } from '../../../data/invoices/dates.ts';
 import {
   parseInvoicingProfile,
   saveInvoicingProfile,
@@ -53,7 +54,7 @@ async function submitDraft(
 }
 
 function draftFields(clientId: string, overrides: DraftFields = {}): DraftFields {
-  let today = expectedToday();
+  let today = todayInKolkata();
   return {
     client_id: clientId,
     currency: 'INR',
@@ -137,22 +138,6 @@ async function makeClient(organizationId: string, overrides: Record<string, unkn
     status: 'active',
     ...overrides,
   });
-}
-
-function expectedToday(): string {
-  let parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  let part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
-
-function expectedDueDate(invoiceDate: string, days: number): string {
-  let [year, month, day] = invoiceDate.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 function newDraftPath(clientId: string): string {
@@ -260,9 +245,9 @@ describe('draft invoices', () => {
     assert.match(html, /name="recipient_tax_value"[^>]*value="27AAPCS2319F1Z5"/);
     assert.match(html, /name="recipient_tax_type"[^>]*value="gstin"/);
 
-    let today = expectedToday();
+    let today = todayInKolkata();
     assert.match(html, new RegExp(`name="invoice_date"[^>]*value="${today}"`));
-    assert.match(html, new RegExp(`name="due_date"[^>]*value="${expectedDueDate(today, 15)}"`));
+    assert.match(html, new RegExp(`name="due_date"[^>]*value="${addDays(today, 15)}"`));
     assert.match(html, /name="currency"[^>]*value="USD"/, 'the Client currency wins');
     assert.match(html, /<textarea[^>]*name="payment_instructions"[^>]*>Pay by bank transfer<\/textarea>/);
     assert.match(html, /<textarea[^>]*name="customer_notes"[^>]*>Thank you for your business<\/textarea>/);
@@ -314,10 +299,10 @@ describe('draft invoices', () => {
     let client = await makeClient(organizationId, { billing_currency: null });
 
     let html = await getHtml(router, newDraftPath(client.id), sessionCookie);
-    let today = expectedToday();
+    let today = todayInKolkata();
 
     assert.match(html, /name="currency"[^>]*value="JPY"/);
-    assert.match(html, new RegExp(`name="due_date"[^>]*value="${expectedDueDate(today, 30)}"`));
+    assert.match(html, new RegExp(`name="due_date"[^>]*value="${addDays(today, 30)}"`));
   });
 
   it('defaults Place of Supply from the Client and calculates intra-state GST after discounts', async () => {
@@ -618,7 +603,7 @@ describe('draft invoices', () => {
     assert.match(directory, /Draft Recipient/);
     assert.match(
       directory,
-      new RegExp(`Draft · ${todayInKolkata()} · 174\\.69 INR`),
+      new RegExp(`Draft · ${formatIsoDate(todayInKolkata())} · 174\\.69 INR`),
     );
     assert.ok(directory.includes(id), 'the Draft is visible in the invoice directory');
   });
@@ -1510,11 +1495,11 @@ describe('draft invoices', () => {
       'invoice-dates',
     );
     let client = await makeClient(organizationId);
-    let today = expectedToday();
+    let today = todayInKolkata();
 
     let tooEarly = await createDraft(sessionCookie, client.id, {
       invoice_date: today,
-      due_date: expectedDueDate(today, -1),
+      due_date: addDays(today, -1),
     });
     assert.equal(tooEarly.status, 400);
     assert.match(await tooEarly.text(), /due date cannot be earlier/i);
@@ -1536,7 +1521,7 @@ describe('draft invoices', () => {
     let custom = await createDraft(sessionCookie, client.id, {
       payment_term: 'custom',
       custom_payment_terms: 'Payable within 45 days',
-      due_date: expectedDueDate(today, 45),
+      due_date: addDays(today, 45),
     });
     assert.equal(custom.status, 302);
     let customId = draftIdFrom(custom);

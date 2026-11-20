@@ -9,6 +9,7 @@ import {
   type ClientTypeFilter,
 } from '../../../data/clients.ts';
 import type { ClientDirectoryFacts, ClientFollowUpFilter } from '../../../data/client-directory-facts.ts';
+import { formatIsoDate } from '../../../data/dates.ts';
 import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -240,16 +241,6 @@ const currentPageStyle = css({
   fontWeight: 700,
 });
 
-function formatInvoiceDate(date: string | null): string {
-  if (!date) return 'No invoices';
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 function clientContext(client: ClientDirectoryItem): string {
   let label = clientDisplayLabel(client);
   let details: string[] = [];
@@ -392,7 +383,9 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
           <Table.AmountCell>
             {formatMoney(BigInt(clientFacts?.outstandingBalanceMinor ?? 0), currency)}
           </Table.AmountCell>
-          <Table.Cell>{formatInvoiceDate(clientFacts?.lastInvoiceDate ?? null)}</Table.Cell>
+          <Table.Cell>
+            {clientFacts?.lastInvoiceDate ? formatIsoDate(clientFacts.lastInvoiceDate) : 'No invoices'}
+          </Table.Cell>
           <Table.Cell>
             {status ? (
               <Badge tone={invoiceStatusTone[status]}>

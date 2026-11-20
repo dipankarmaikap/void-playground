@@ -2,8 +2,9 @@ import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
-import type { Client } from '../../../data/db.ts';
 import type { ClientProfileFacts } from '../../../data/client-directory-facts.ts';
+import { formatIsoDate } from '../../../data/dates.ts';
+import type { Client } from '../../../data/db.ts';
 import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
@@ -133,15 +134,6 @@ const backLinkStyle = css({
   '&:hover': { color: primary.base, textDecoration: 'underline' },
 });
 
-function formatIssuedDate(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 function clientSince(createdAt: number): string {
   return new Date(createdAt).toLocaleDateString('en-US', {
     month: 'long',
@@ -185,7 +177,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
             {invoice.invoiceNumber ?? 'Invoice'}
           </a>
         </Table.Cell>
-        <Table.Cell>{formatIssuedDate(invoice.invoiceDate)}</Table.Cell>
+        <Table.Cell>{formatIsoDate(invoice.invoiceDate)}</Table.Cell>
         <Table.AmountCell>
           {formatMoney(BigInt(invoice.totalMinor), invoice.currency)}
         </Table.AmountCell>

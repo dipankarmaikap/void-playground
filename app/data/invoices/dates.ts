@@ -43,6 +43,16 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+const MS_PER_DAY = 86_400_000;
+
+/** Whole UTC calendar days between two ISO dates; anomalous negative intervals are ignored. */
+export function daysBetween(invoiceDate: string, paymentDate: string): number | null {
+  let start = Date.parse(`${invoiceDate}T00:00:00Z`);
+  let end = Date.parse(`${paymentDate}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.round((end - start) / MS_PER_DAY);
+}
+
 /** The due date a payment term suggests from the invoice date. Custom terms default to the same day. */
 export function suggestDueDate(invoiceDate: string, term: string): string {
   if (term === 'custom') return invoiceDate;

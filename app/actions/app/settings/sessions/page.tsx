@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
+import { formatKolkataTimestamp } from '../../../../data/dates.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
@@ -20,8 +21,8 @@ export interface SessionView {
   current: boolean;
   browser: string;
   ip: string;
-  createdAt: string;
-  lastActiveAt: string;
+  createdAt: number;
+  lastActiveAt: number;
 }
 
 export interface SessionsPageProps {
@@ -196,11 +197,19 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
                   </div>
                   <div>
                     <dt mix={metaTermStyle}>Created</dt>
-                    <dd mix={metaDetailStyle}>{session.createdAt}</dd>
+                    <dd mix={metaDetailStyle}>
+                      <time dateTime={new Date(session.createdAt).toISOString()}>
+                        {formatKolkataTimestamp(session.createdAt)} IST
+                      </time>
+                    </dd>
                   </div>
                   <div>
                     <dt mix={metaTermStyle}>Last active</dt>
-                    <dd mix={metaDetailStyle}>{session.lastActiveAt}</dd>
+                    <dd mix={metaDetailStyle}>
+                      <time dateTime={new Date(session.lastActiveAt).toISOString()}>
+                        {formatKolkataTimestamp(session.lastActiveAt)} IST
+                      </time>
+                    </dd>
                   </div>
                 </dl>
               </div>

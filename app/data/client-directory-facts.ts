@@ -3,7 +3,7 @@ import type { SqliteDatabase } from 'remix/data-table/sqlite';
 import { clients, invoicePayments, invoices } from './db.ts';
 import type { Invoice, InvoicePayment } from './db.ts';
 import type { ClientStatus } from './client-status.ts';
-import { todayInKolkata } from './invoices/dates.ts';
+import { daysBetween, todayInKolkata } from './invoices/dates.ts';
 import type { InvoiceDisplayStatus } from './invoices/issuance.ts';
 import { invoiceDisplayStatus } from './invoices/issuance.ts';
 import { activeInvoiceCreditNoteTotals } from './invoices/credit-notes.ts';
@@ -50,8 +50,6 @@ export type ClientFollowUpView = 'current' | 'overdue';
  * facts that define it.
  */
 export type ClientFollowUpFilter = 'all' | ClientFollowUpView;
-
-const MS_PER_DAY = 86_400_000;
 
 /**
  * The Organization-scoped Invoice rows and payment totals shared by both fact derivations.
@@ -317,12 +315,4 @@ export async function getClientProfileFacts(
     averageCollectionDays: collectionAverage(data),
     invoices: rows,
   };
-}
-
-/** Whole UTC calendar days between two ISO dates; anomalous negative intervals are ignored. */
-function daysBetween(invoiceDate: string, paymentDate: string): number | null {
-  let start = Date.parse(`${invoiceDate}T00:00:00Z`);
-  let end = Date.parse(`${paymentDate}T00:00:00Z`);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
-  return Math.round((end - start) / MS_PER_DAY);
 }

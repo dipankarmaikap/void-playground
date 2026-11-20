@@ -9,6 +9,7 @@ import type {
 import { joinAddressParts } from '../../../data/address.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
+import { formatIsoDate, formatKolkataTimestamp } from '../../../data/dates.ts';
 import {
   currencyMinorDigits,
   formatMinorInput,
@@ -288,8 +289,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             </p>
           ) : null}
           <p mix={detailStyle}>Currency: {invoice.currency}</p>
-          <p mix={detailStyle}>Invoice date: {invoice.invoice_date}</p>
-          <p mix={detailStyle}>Due date: {invoice.due_date}</p>
+          <p mix={detailStyle}>Invoice date: {formatIsoDate(invoice.invoice_date)}</p>
+          <p mix={detailStyle}>Due date: {formatIsoDate(invoice.due_date)}</p>
           <p mix={detailStyle}>
             Payment term: {PAYMENT_TERM_LABELS[invoice.payment_term as keyof typeof PAYMENT_TERM_LABELS] ?? invoice.payment_term}
           </p>
@@ -509,7 +510,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   return (
                     <li key={payment.id} mix={historyEntryStyle}>
                       <h3 id={`invoice-payment-${payment.id}-heading`} mix={headingStyle}>
-                        {invoicePaymentMethodLabel(payment.payment_method)} · {payment.payment_date}
+                        {invoicePaymentMethodLabel(payment.payment_method)} ·{' '}
+                        {formatIsoDate(payment.payment_date)}
                       </h3>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(payment.amount_minor), invoice.currency)}
@@ -522,12 +524,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>
                             Voided on:{' '}
                             <time dateTime={new Date(payment.voided_at).toISOString()}>
-                              {new Date(payment.voided_at).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })}{' '}
-                              IST
+                              {formatKolkataTimestamp(payment.voided_at)} IST
                             </time>
                           </p>
                           <p mix={detailStyle}>Void reason: {payment.void_reason}</p>
@@ -689,7 +686,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   return (
                     <li key={refund.id} mix={historyEntryStyle}>
                       <h3 id={`invoice-refund-${refund.id}-heading`} mix={headingStyle}>
-                        {refundMethodLabel(refund.refund_method)} · {refund.refund_date}
+                        {refundMethodLabel(refund.refund_method)} · {formatIsoDate(refund.refund_date)}
                       </h3>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(refund.amount_minor), invoice.currency)}
@@ -702,12 +699,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>
                             Voided on:{' '}
                             <time dateTime={new Date(refund.voided_at).toISOString()}>
-                              {new Date(refund.voided_at).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })}{' '}
-                              IST
+                              {formatKolkataTimestamp(refund.voided_at)} IST
                             </time>
                           </p>
                           <p mix={detailStyle}>Void reason: {refund.void_reason}</p>
@@ -869,7 +861,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                       <h3 mix={headingStyle}>
                         {draft ? 'Credit note Draft' : `Credit note ${creditNote.credit_note_number}`}
                       </h3>
-                      <p mix={detailStyle}>Credit note date: {creditNote.credit_date}</p>
+                      <p mix={detailStyle}>Credit note date: {formatIsoDate(creditNote.credit_date)}</p>
                       <p mix={detailStyle}>Reason: {creditNote.reason}</p>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(creditNote.total_minor), invoice.currency)}

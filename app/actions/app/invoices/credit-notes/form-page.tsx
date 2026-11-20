@@ -4,6 +4,7 @@ import { css } from 'remix/component';
 import type { CreditNote, Invoice, InvoiceLine } from '../../../../data/db.ts';
 import { joinAddressParts } from '../../../../data/address.ts';
 import { countryName } from '../../../../data/client-billing.ts';
+import { formatIsoDate } from '../../../../data/dates.ts';
 import {
   formatMoney,
   formatScaledDecimal,
@@ -166,7 +167,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                 : '—'}
             </p>
             <p mix={detailStyle}>Original invoice: {invoice.invoice_number}</p>
-            <p mix={detailStyle}>Original invoice date: {invoice.invoice_date}</p>
+            <p mix={detailStyle}>Original invoice date: {formatIsoDate(invoice.invoice_date)}</p>
             <p mix={detailStyle}>Currency: {invoice.currency}</p>
             <p mix={detailStyle}>Tax regime: {taxRegimeLabel}</p>
             {invoice.gst_mode === 'india_gst' ? (
