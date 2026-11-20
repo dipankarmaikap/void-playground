@@ -13,7 +13,7 @@ export const statGridStyle = css({
   marginBottom: '18px',
 });
 
-export const statCardStyle = css({
+const statCardStyle = css({
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
@@ -85,7 +85,6 @@ const iconBaseStyle = css({
 });
 
 export const trendUpStyle = css({ color: softFills.trendUp, fontWeight: 700 });
-export const trendDownStyle = css({ color: softFills.trendDown, fontWeight: 700 });
 
 export interface StatCardProps {
   label: string;

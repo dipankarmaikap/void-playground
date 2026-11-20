@@ -1,31 +1,12 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import { Panel, PanelBody, PanelHeader } from './ui/panel.tsx';
 import { neutrals } from '../../../ui/theme.ts';
 
 /**
- * Route-local composition of the shared Panel primitives for the Client profile's read-only
- * detail cards. Keeping it here avoids repeating card/list/term styles in each summary.
+ * Route-local `<dl>` primitives for the Client profile's read-only detail cards. Each summary
+ * composes these directly inside the shared Panel primitives from `ui/panel.tsx`.
  */
-export interface SummaryPanelProps {
-  title: string;
-  headingId: string;
-  subtitle?: string;
-  children: RemixNode;
-}
-
-export function SummaryPanel(handle: Handle<SummaryPanelProps>) {
-  return () => {
-    let { title, headingId, subtitle, children } = handle.props;
-    return (
-      <Panel labelledBy={headingId}>
-        <PanelHeader title={title} headingId={headingId} subtitle={subtitle} />
-        <PanelBody>{children}</PanelBody>
-      </Panel>
-    );
-  };
-}
 
 const listStyle = css({
   display: 'grid',

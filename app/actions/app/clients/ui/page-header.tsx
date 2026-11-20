@@ -11,7 +11,7 @@ export interface PageHeaderProps {
   action?: RemixNode;
 }
 
-export const pageHeaderStyle = css({
+const pageHeaderStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-end',
@@ -20,7 +20,7 @@ export const pageHeaderStyle = css({
   marginBottom: '1.5rem',
 });
 
-export const eyebrowStyle = css({
+const eyebrowStyle = css({
   display: 'block',
   marginBottom: '4px',
   color: primary.base,
@@ -30,7 +30,7 @@ export const eyebrowStyle = css({
   textTransform: 'uppercase',
 });
 
-export const headingStyle = css({
+const headingStyle = css({
   margin: 0,
   color: neutrals.ink,
   fontFamily: fontStack,
@@ -43,7 +43,7 @@ export const headingStyle = css({
   },
 });
 
-export const introStyle = css({
+const introStyle = css({
   margin: '6px 0 0',
   color: neutrals.muted,
   fontSize: '0.9375rem',

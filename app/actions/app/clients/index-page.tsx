@@ -14,10 +14,11 @@ import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
-import { DataTable, amountCellStyle } from './ui/data-table.tsx';
+import { EmptyState } from './ui/empty-state.tsx';
+import { Table } from './ui/table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
 import { PageHeader } from './ui/page-header.tsx';
-import { Panel, PanelBody, PanelFooter, PanelHeader } from './ui/panel.tsx';
+import { Panel } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
   noticeSpacingStyle,
@@ -216,28 +217,6 @@ const quietStyle = css({
   fontStyle: 'normal',
 });
 
-const emptyStyle = css({
-  display: 'grid',
-  gap: '6px',
-  justifyItems: 'start',
-  padding: '28px 19px',
-  color: neutrals.muted,
-  fontSize: '0.875rem',
-});
-
-const emptyHeadingStyle = css({
-  margin: 0,
-  color: neutrals.ink,
-  fontSize: '0.9375rem',
-  fontWeight: 700,
-});
-
-const emptyHintStyle = css({
-  margin: 0,
-  color: neutrals.muted,
-  fontSize: '0.75rem',
-});
-
 const paginationStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
@@ -398,36 +377,39 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
       let contact = clientContact(client);
       let clientFacts = facts.clients.get(client.id);
       let status = clientFacts?.status ?? null;
-      return {
-        key: client.id,
-        cells: [
-          <div mix={personCellStyle}>
-            <Avatar name={label} />
-            <span mix={personInfoStyle}>
-              <a
-                href={routes.app.clients.show.href({ clientId: client.id })}
-                mix={personLinkStyle}
-              >
-                <strong>{label}</strong>
-              </a>
-              <span mix={personMetaStyle}>{clientContext(client)}</span>
-              {contact ? <span mix={personMetaStyle}>{contact}</span> : null}
-            </span>
-          </div>,
-          <span>{clientFacts?.invoiceCount ?? 0}</span>,
-          <span mix={amountCellStyle}>
+      return (
+        <Table.Row key={client.id}>
+          <Table.Cell>
+            <div mix={personCellStyle}>
+              <Avatar name={label} />
+              <span mix={personInfoStyle}>
+                <a
+                  href={routes.app.clients.show.href({ clientId: client.id })}
+                  mix={personLinkStyle}
+                >
+                  <strong>{label}</strong>
+                </a>
+                <span mix={personMetaStyle}>{clientContext(client)}</span>
+                {contact ? <span mix={personMetaStyle}>{contact}</span> : null}
+              </span>
+            </div>
+          </Table.Cell>
+          <Table.Cell>{clientFacts?.invoiceCount ?? 0}</Table.Cell>
+          <Table.AmountCell>
             {formatMoney(BigInt(clientFacts?.outstandingBalanceMinor ?? 0), currency)}
-          </span>,
-          <span>{formatInvoiceDate(clientFacts?.lastInvoiceDate ?? null)}</span>,
-          status ? (
-            <StatusPill tone={invoiceStatusTone[status]}>
-              {invoiceStatusLabel[status]}
-            </StatusPill>
-          ) : (
-            <span mix={quietStyle}>No invoices</span>
-          ),
-        ],
-      };
+          </Table.AmountCell>
+          <Table.Cell>{formatInvoiceDate(clientFacts?.lastInvoiceDate ?? null)}</Table.Cell>
+          <Table.Cell>
+            {status ? (
+              <StatusPill tone={invoiceStatusTone[status]}>
+                {invoiceStatusLabel[status]}
+              </StatusPill>
+            ) : (
+              <span mix={quietStyle}>No invoices</span>
+            )}
+          </Table.Cell>
+        </Table.Row>
+      );
     });
 
     let firstShown = clients.length === 0 ? 0 : (page - 1) * CLIENT_DIRECTORY_PAGE_SIZE + 1;
@@ -477,7 +459,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
         </section>
 
         <Panel labelledBy="client-list-heading">
-          <PanelHeader
+          <Panel.Header
             title="Your clients"
             headingId="client-list-heading"
             subtitle="A quick look at your client list."
@@ -500,7 +482,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
               </nav>
             }
           />
-          <PanelBody>
+          <Panel.Body>
             <div mix={toolbarStyle}>
               <form
                 method="get"
@@ -555,42 +537,41 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
             </div>
 
             {clients.length === 0 ? (
-              <div mix={emptyStyle}>
-                <p mix={emptyHeadingStyle}>
+              <EmptyState>
+                <EmptyState.Heading>
                   {hasFilters
                     ? 'No clients match your search and filters.'
                     : archived
                       ? 'No archived clients.'
                       : 'No active clients yet.'}
-                </p>
-                <p mix={emptyHintStyle}>
+                </EmptyState.Heading>
+                <EmptyState.Hint>
                   {hasFilters
                     ? 'Try a different search, change the filters, or reset them.'
                     : archived
                       ? 'Archiving an active client keeps it here so you can restore it later.'
                       : 'Add your first client to get started.'}
-                </p>
+                </EmptyState.Hint>
                 {hasFilters ? (
                   <a href={routes.app.clients.index.href()} mix={textLinkStyle}>
                     Reset search and filters
                   </a>
                 ) : null}
-              </div>
+              </EmptyState>
             ) : (
-              <DataTable
-                label="Client directory"
-                columns={[
-                  { key: 'client', label: 'Client' },
-                  { key: 'invoices', label: 'Invoices' },
-                  { key: 'outstanding', label: 'Outstanding', align: 'right' },
-                  { key: 'last', label: 'Last invoice' },
-                  { key: 'status', label: 'Status' },
-                ]}
-                rows={rows}
-              />
+              <Table label="Client directory">
+                <Table.Header>
+                  <Table.HeadCell>Client</Table.HeadCell>
+                  <Table.HeadCell>Invoices</Table.HeadCell>
+                  <Table.HeadCell align="right">Outstanding</Table.HeadCell>
+                  <Table.HeadCell>Last invoice</Table.HeadCell>
+                  <Table.HeadCell>Status</Table.HeadCell>
+                </Table.Header>
+                <Table.Body>{rows}</Table.Body>
+              </Table>
             )}
-          </PanelBody>
-          <PanelFooter>
+          </Panel.Body>
+          <Panel.Footer>
             <span>{shownText}</span>
             {hasPrevious || hasNext ? (
               <nav aria-label="Client list pages" mix={paginationStyle}>
@@ -609,7 +590,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                 ) : null}
               </nav>
             ) : null}
-          </PanelFooter>
+          </Panel.Footer>
         </Panel>
       </AppShell>
     );

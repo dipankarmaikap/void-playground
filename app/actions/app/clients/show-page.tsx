@@ -9,9 +9,10 @@ import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
 import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
-import { DataTable, amountCellStyle } from './ui/data-table.tsx';
+import { EmptyState } from './ui/empty-state.tsx';
+import { Table } from './ui/table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
-import { Panel, PanelBody, PanelFooter, PanelHeader } from './ui/panel.tsx';
+import { Panel } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
   noticeSpacingStyle,
@@ -23,7 +24,7 @@ import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
-import { SummaryList, SummaryPanel, SummaryRow } from './summary-list.tsx';
+import { SummaryList, SummaryRow } from './summary-list.tsx';
 import { ClientTaxSummary } from './tax-summary.tsx';
 
 export interface ClientProfilePageProps {
@@ -37,7 +38,9 @@ export interface ClientProfilePageProps {
   message?: string;
 }
 
-const pageHeaderStyle = css({
+// The profile header is not the shared page header: name it for its own context so the
+// `pageHeaderStyle` name keeps exactly one meaning per module.
+const profileHeaderStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-start',
@@ -115,25 +118,6 @@ const invoiceLinkStyle = css({
   '&:hover': { color: primary.base, textDecoration: 'underline' },
 });
 
-const emptyStyle = css({
-  display: 'grid',
-  gap: '6px',
-  padding: '28px 0',
-});
-
-const emptyHeadingStyle = css({
-  margin: 0,
-  color: neutrals.ink,
-  fontSize: '0.9375rem',
-  fontWeight: 700,
-});
-
-const emptyHintStyle = css({
-  margin: 0,
-  color: neutrals.muted,
-  fontSize: '0.8125rem',
-});
-
 const footerActionsStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
@@ -195,19 +179,24 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
     }
     let contextLine = `${contextParts.join(' · ')}${contextParts.length > 0 ? ' · ' : ''}Client since ${since}`;
 
-    let rows = facts.invoices.map((invoice) => ({
-      key: invoice.id,
-      cells: [
-        <a href={routes.app.invoices.show.href({ invoiceId: invoice.id })} mix={invoiceLinkStyle}>
-          {invoice.invoiceNumber ?? 'Invoice'}
-        </a>,
-        <span>{formatIssuedDate(invoice.invoiceDate)}</span>,
-        <span mix={amountCellStyle}>{formatMoney(BigInt(invoice.totalMinor), invoice.currency)}</span>,
-        <StatusPill tone={invoiceStatusTone[invoice.status]}>
-          {invoiceStatusLabel[invoice.status]}
-        </StatusPill>,
-      ] as RemixNode[],
-    }));
+    let rows = facts.invoices.map((invoice) => (
+      <Table.Row key={invoice.id}>
+        <Table.Cell>
+          <a href={routes.app.invoices.show.href({ invoiceId: invoice.id })} mix={invoiceLinkStyle}>
+            {invoice.invoiceNumber ?? 'Invoice'}
+          </a>
+        </Table.Cell>
+        <Table.Cell>{formatIssuedDate(invoice.invoiceDate)}</Table.Cell>
+        <Table.AmountCell>
+          {formatMoney(BigInt(invoice.totalMinor), invoice.currency)}
+        </Table.AmountCell>
+        <Table.Cell>
+          <StatusPill tone={invoiceStatusTone[invoice.status]}>
+            {invoiceStatusLabel[invoice.status]}
+          </StatusPill>
+        </Table.Cell>
+      </Table.Row>
+    ));
 
     let summary: RemixNode[] = [
       <StatCard
@@ -258,7 +247,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
         title={label}
         description={`View the ${clientTypeLabel(client.type)} client profile for ${label} in your Organization's client book.`}
       >
-        <header mix={pageHeaderStyle}>
+        <header mix={profileHeaderStyle}>
           <div>
             <a href={routes.app.clients.index.href()} mix={inlineLinkStyle}>
               <span aria-hidden="true">←</span> All clients
@@ -306,7 +295,7 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
 
         <div mix={contentGridStyle}>
           <Panel labelledBy="client-invoices-heading">
-            <PanelHeader
+            <Panel.Header
               title="Invoice history"
               headingId="client-invoices-heading"
               subtitle="A record of work billed to this client."
@@ -316,26 +305,25 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
                 </a>
               }
             />
-            <PanelBody>
+            <Panel.Body>
               {facts.invoices.length === 0 ? (
-                <div mix={emptyStyle}>
-                  <p mix={emptyHeadingStyle}>No invoices</p>
-                  <p mix={emptyHintStyle}>Invoices issued to this client will appear here.</p>
-                </div>
+                <EmptyState>
+                  <EmptyState.Heading>No invoices</EmptyState.Heading>
+                  <EmptyState.Hint>Invoices issued to this client will appear here.</EmptyState.Hint>
+                </EmptyState>
               ) : (
-                <DataTable
-                  label={`${label} invoice history`}
-                  columns={[
-                    { key: 'invoice', label: 'Invoice' },
-                    { key: 'issued', label: 'Issued' },
-                    { key: 'amount', label: 'Amount', align: 'right' },
-                    { key: 'status', label: 'Status' },
-                  ]}
-                  rows={rows}
-                />
+                <Table label={`${label} invoice history`}>
+                  <Table.Header>
+                    <Table.HeadCell>Invoice</Table.HeadCell>
+                    <Table.HeadCell>Issued</Table.HeadCell>
+                    <Table.HeadCell align="right">Amount</Table.HeadCell>
+                    <Table.HeadCell>Status</Table.HeadCell>
+                  </Table.Header>
+                  <Table.Body>{rows}</Table.Body>
+                </Table>
               )}
-            </PanelBody>
-            <PanelFooter>
+            </Panel.Body>
+            <Panel.Footer>
               <span>
                 {facts.invoices.length === 0
                   ? 'No invoices yet'
@@ -344,30 +332,33 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
               <a href={invoiceDirectoryHref} mix={inlineLinkStyle}>
                 View all invoices <span aria-hidden="true">→</span>
               </a>
-            </PanelFooter>
+            </Panel.Footer>
           </Panel>
 
           <div mix={summaryColumnStyle}>
-            <SummaryPanel
-              title="Client details"
-              headingId="client-identity-heading"
-              subtitle="How this client is recorded."
-            >
-              <SummaryList>
-                <SummaryRow term="Type">{clientTypeLabel(client.type)}</SummaryRow>
-                <SummaryRow term="Legal name">{client.legal_name}</SummaryRow>
-                {!isBusiness && client.preferred_name ? (
-                  <SummaryRow term="Preferred name">{client.preferred_name}</SummaryRow>
-                ) : null}
-                {isBusiness && client.trading_name ? (
-                  <SummaryRow term="Trading name">{client.trading_name}</SummaryRow>
-                ) : null}
-                {isBusiness && client.industry ? (
-                  <SummaryRow term="Industry">{client.industry}</SummaryRow>
-                ) : null}
-                <SummaryRow term="Status">{archived ? 'Archived' : 'Active'}</SummaryRow>
-              </SummaryList>
-            </SummaryPanel>
+            <Panel labelledBy="client-identity-heading">
+              <Panel.Header
+                title="Client details"
+                headingId="client-identity-heading"
+                subtitle="How this client is recorded."
+              />
+              <Panel.Body>
+                <SummaryList>
+                  <SummaryRow term="Type">{clientTypeLabel(client.type)}</SummaryRow>
+                  <SummaryRow term="Legal name">{client.legal_name}</SummaryRow>
+                  {!isBusiness && client.preferred_name ? (
+                    <SummaryRow term="Preferred name">{client.preferred_name}</SummaryRow>
+                  ) : null}
+                  {isBusiness && client.trading_name ? (
+                    <SummaryRow term="Trading name">{client.trading_name}</SummaryRow>
+                  ) : null}
+                  {isBusiness && client.industry ? (
+                    <SummaryRow term="Industry">{client.industry}</SummaryRow>
+                  ) : null}
+                  <SummaryRow term="Status">{archived ? 'Archived' : 'Active'}</SummaryRow>
+                </SummaryList>
+              </Panel.Body>
+            </Panel>
             <ClientContactSummary client={client} />
             {client.tax_value ? <ClientTaxSummary client={client} /> : null}
             <ClientBillingSummary client={client} />

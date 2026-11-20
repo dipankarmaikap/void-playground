@@ -11,7 +11,7 @@ export const panelStyle = css({
   boxShadow: shadows.panel,
 });
 
-export const panelHeaderStyle = css({
+const panelHeaderStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-start',
@@ -34,15 +34,7 @@ export const panelSubtitleStyle = css({
   fontSize: '0.8125rem',
 });
 
-export const panelActionStyle = css({
-  color: 'inherit',
-  fontSize: '0.8125rem',
-  fontWeight: 600,
-  textDecoration: 'none',
-  '&:hover': { textDecoration: 'underline' },
-});
-
-export const panelBodyStyle = css({
+const panelBodyStyle = css({
   padding: '16px 19px 19px',
 });
 
@@ -73,38 +65,39 @@ export function Panel(handle: Handle<PanelProps>) {
   );
 }
 
-export interface PanelHeaderProps {
-  title: string;
-  headingId: string;
-  subtitle?: string;
-  action?: RemixNode;
-}
+export namespace Panel {
+  export interface HeaderProps {
+    title: string;
+    headingId: string;
+    subtitle?: string;
+    action?: RemixNode;
+  }
 
-export function PanelHeader(handle: Handle<PanelHeaderProps>) {
-  return () => {
-    let { title, headingId, subtitle, action } = handle.props;
-    return (
-      <div mix={panelHeaderStyle}>
-        <div>
-          <h2 id={headingId} mix={panelTitleStyle}>
-            {title}
-          </h2>
-          {subtitle ? <p mix={panelSubtitleStyle}>{subtitle}</p> : null}
+  /** The panel's heading block; owns the heading id that `Panel.labelledBy` references. */
+  export function Header(handle: Handle<HeaderProps>) {
+    return () => {
+      let { title, headingId, subtitle, action } = handle.props;
+      return (
+        <div mix={panelHeaderStyle}>
+          <div>
+            <h2 id={headingId} mix={panelTitleStyle}>
+              {title}
+            </h2>
+            {subtitle ? <p mix={panelSubtitleStyle}>{subtitle}</p> : null}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
-    );
-  };
-}
+      );
+    };
+  }
 
-export interface PanelSectionProps {
-  children: RemixNode;
-}
+  /** The panel's main content region. */
+  export function Body(handle: Handle<{ children: RemixNode }>) {
+    return () => <div mix={panelBodyStyle}>{handle.props.children}</div>;
+  }
 
-export function PanelBody(handle: Handle<PanelSectionProps>) {
-  return () => <div mix={panelBodyStyle}>{handle.props.children}</div>;
-}
-
-export function PanelFooter(handle: Handle<PanelSectionProps>) {
-  return () => <div mix={panelFooterStyle}>{handle.props.children}</div>;
+  /** The panel's closing region, visually separated by a top border. */
+  export function Footer(handle: Handle<{ children: RemixNode }>) {
+    return () => <div mix={panelFooterStyle}>{handle.props.children}</div>;
+  }
 }
