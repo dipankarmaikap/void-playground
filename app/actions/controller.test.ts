@@ -35,7 +35,9 @@ describe('root controller', () => {
 
     assert.equal(response.status, 200);
     assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
-    assert.match(html, new RegExp(`<title>Home \\| ${APP_NAME}<\\/title>`));
+    // The single check for Document's `${title} | ${APP_NAME}` template; per-route
+    // tests below assert page identity only, never this suffix.
+    assert.ok(html.includes(`<title>Home | ${APP_NAME}</title>`));
     assert.match(html, new RegExp(`<meta name="description" content="Welcome to ${APP_NAME}\\.`));
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
   });
@@ -73,7 +75,6 @@ describe('root controller', () => {
 
     assert.equal(response.status, 200);
     assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
-    assert.match(html, new RegExp(`<title>Home \\| ${APP_NAME}<\\/title>`));
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*>Go to dashboard<\/a>/);
     assert.match(html, /<a[^>]*href="\/register"[^>]*>Create account<\/a>/);
     assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);

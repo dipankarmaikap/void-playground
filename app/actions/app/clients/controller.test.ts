@@ -64,14 +64,14 @@ describe('clients controller', () => {
     let sessionCookie = await createUserAndLogin(router, db, 'clients');
 
     let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
-    assert.match(directory, new RegExp(`<title>Clients \\| ${APP_NAME}<\\/title>`));
+    assert.ok(directory.includes(`<title>Clients | ${APP_NAME}</title>`));
     assert.match(directory, /<meta name="description" content="[^"]*client/i);
     assert.match(directory, /<meta name="robots" content="noindex"/);
     assert.match(directory, /<h1[^>]*>Clients<\/h1>/);
     assert.match(directory, new RegExp(`href="${routes.app.clients.new.href()}"`));
 
     let newPage = await getHtml(router, routes.app.clients.new.href(), sessionCookie);
-    assert.match(newPage, new RegExp(`<title>New client \\| ${APP_NAME}<\\/title>`));
+    assert.ok(newPage.includes(`<title>New client | ${APP_NAME}</title>`));
     assert.match(newPage, /<meta name="robots" content="noindex"/);
     assert.match(
       newPage,

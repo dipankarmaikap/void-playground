@@ -42,7 +42,7 @@ describe('auth controller', () => {
     let html = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, new RegExp(`<title>Log in \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Log in | ${APP_NAME}</title>`));
     assert.match(
       html,
       new RegExp(`<meta name="description" content="Log in to ${APP_NAME} to open your dashboard\\."`),
@@ -59,7 +59,7 @@ describe('auth controller', () => {
     let html = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, new RegExp(`<title>Register \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Register | ${APP_NAME}</title>`));
     assert.match(
       html,
       new RegExp(

@@ -47,7 +47,7 @@ describe('organization invoicing settings', () => {
     let path = routes.app.settings.invoicing.index.href();
     let html = await getHtml(router, path, sessionCookie);
 
-    assert.match(html, new RegExp(`<title>Invoicing \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Invoicing | ${APP_NAME}</title>`));
     assert.match(
       html,
       /<nav aria-label="Settings"[\s\S]*?Profile[\s\S]*?Invoicing[\s\S]*?Sessions[\s\S]*?<\/nav>/,

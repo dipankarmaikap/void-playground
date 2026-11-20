@@ -74,7 +74,7 @@ describe('app controller', () => {
     let { email, sessionCookie } = await loginNewUser();
     let html = await getAuthenticatedHtml(routes.app.dashboard.href(), sessionCookie);
 
-    assert.match(html, new RegExp(`<title>Dashboard \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Dashboard | ${APP_NAME}</title>`));
     assert.match(html, /<meta name="description" content="[^"]*dashboard/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<summary[^>]*>[\s\S]*?Menu[\s\S]*?<\/summary>/);
@@ -144,7 +144,7 @@ describe('app controller', () => {
       sessionCookie,
     );
 
-    assert.match(html, new RegExp(`<title>Profile \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Profile | ${APP_NAME}</title>`));
     assert.match(html, /<meta name="description" content="[^"]*display name/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(html, /<nav aria-label="Main"/);
@@ -415,7 +415,7 @@ describe('app controller', () => {
       sessionCookie,
     );
 
-    assert.match(html, new RegExp(`<title>Sessions \\| ${APP_NAME}<\\/title>`));
+    assert.ok(html.includes(`<title>Sessions | ${APP_NAME}</title>`));
     assert.match(html, /<meta name="description" content="[^"]*browsers signed in/i);
     assert.match(html, /<meta name="robots" content="noindex"/);
     assert.match(
