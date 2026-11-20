@@ -9,14 +9,18 @@ const TERM_DAYS: Record<Exclude<PaymentTerm, 'custom'>, number> = {
   net_60: 60,
 };
 
+/** The cached Kolkata day formatter; constructing one per call is measurable in loops. */
+let kolkataDayFormatter: Intl.DateTimeFormat | null = null;
+
 /** Today's calendar date as seen in the invoice timezone, independent of the server's zone. */
 export function todayInKolkata(now: Date = new Date()): string {
-  let parts = new Intl.DateTimeFormat('en-US', {
+  let formatter = (kolkataDayFormatter ??= new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(now);
+  }));
+  let parts = formatter.formatToParts(now);
   let part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }

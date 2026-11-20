@@ -136,14 +136,13 @@ export async function invoiceActivityData(
   };
 }
 
-/** Active totals support the invoice directory's read-time derived statuses. */
-export async function activeInvoicePaymentTotals(
-  db: SqliteDatabase,
-  organizationId: string,
-): Promise<Map<string, number>> {
-  let payments = await db.findMany(invoicePayments, {
-    where: { organization_id: organizationId, voided_at: null },
-  });
+/**
+ * Sums active payment rows by Invoice id, so a loader that already holds the rows gets the
+ * totals without querying `invoice_payments` a second time.
+ */
+export function activePaymentTotalsFromRows(
+  payments: readonly InvoicePayment[],
+): Map<string, number> {
   let totals = new Map<string, number>();
   for (let payment of payments) {
     totals.set(
@@ -152,6 +151,17 @@ export async function activeInvoicePaymentTotals(
     );
   }
   return totals;
+}
+
+/** Active totals support the invoice directory's read-time derived statuses. */
+export async function activeInvoicePaymentTotals(
+  db: SqliteDatabase,
+  organizationId: string,
+): Promise<Map<string, number>> {
+  let payments = await db.findMany(invoicePayments, {
+    where: { organization_id: organizationId, voided_at: null },
+  });
+  return activePaymentTotalsFromRows(payments);
 }
 
 /** Records a confirmed payment only while the current issued invoice has enough balance due. */

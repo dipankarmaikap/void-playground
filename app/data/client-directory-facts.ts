@@ -7,7 +7,7 @@ import { todayInKolkata } from './invoices/dates.ts';
 import type { InvoiceDisplayStatus } from './invoices/issuance.ts';
 import { invoiceDisplayStatus } from './invoices/issuance.ts';
 import { activeInvoiceCreditNoteTotals } from './invoices/credit-notes.ts';
-import { activeInvoicePaymentTotals } from './invoices/payments.ts';
+import { activePaymentTotalsFromRows } from './invoices/payments.ts';
 import { activeInvoiceRefundTotals, invoiceFinancialBalances } from './invoices/refunds.ts';
 
 export interface ClientDirectorySummary {
@@ -75,20 +75,21 @@ async function loadOrganizationInvoiceData(
   let invoiceWhere = clientId
     ? { organization_id: organizationId, client_id: clientId, document_type: 'invoice' }
     : { organization_id: organizationId, document_type: 'invoice' };
-  let [rows, paymentTotals, creditTotals, refundTotals, payments] = await Promise.all([
+  // The payment rows are loaded once: `collectionAverage` reads them directly and the
+  // totals map is derived in memory, so `invoice_payments` is scanned a single time.
+  let [rows, payments, creditTotals, refundTotals] = await Promise.all([
     db.findMany(invoices, { where: invoiceWhere }),
-    activeInvoicePaymentTotals(db, organizationId),
-    activeInvoiceCreditNoteTotals(db, organizationId),
-    activeInvoiceRefundTotals(db, organizationId),
     db.findMany(invoicePayments, {
       where: { organization_id: organizationId, voided_at: null },
     }),
+    activeInvoiceCreditNoteTotals(db, organizationId),
+    activeInvoiceRefundTotals(db, organizationId),
   ]);
 
   return {
     invoices: rows,
     invoiceById: new Map(rows.map((invoice) => [invoice.id, invoice])),
-    paymentTotals,
+    paymentTotals: activePaymentTotalsFromRows(payments),
     creditTotals,
     refundTotals,
     payments,
@@ -133,8 +134,9 @@ function sortInvoicesNewestFirst(rows: readonly Invoice[]): Invoice[] {
   );
 }
 
-function currencyOf(rows: readonly Invoice[]): string {
-  return sortInvoicesNewestFirst(rows)[0]?.currency ?? 'INR';
+/** Currency of the newest Invoice; the caller passes rows already sorted newest-first. */
+function currencyOf(sortedRows: readonly Invoice[]): string {
+  return sortedRows[0]?.currency ?? 'INR';
 }
 
 /** Mean whole days from Invoice issue to active payment, or null without honest history. */
@@ -195,9 +197,9 @@ export async function getClientDirectoryFacts(
   }
 
   let outstandingBalanceMinor = 0;
-  for (let derived of sortInvoicesNewestFirst(data.invoices).map((invoice) =>
-    deriveInvoice(invoice, data, today),
-  )) {
+  let sortedInvoices = sortInvoicesNewestFirst(data.invoices);
+  for (let invoice of sortedInvoices) {
+    let derived = deriveInvoice(invoice, data, today);
     outstandingBalanceMinor += derived.balances.balanceDueMinor;
 
     let facts = clientFacts.get(derived.invoice.client_id);
@@ -225,7 +227,7 @@ export async function getClientDirectoryFacts(
       activeClientCount,
       outstandingBalanceMinor,
       newClientsThisMonth,
-      currency: currencyOf(data.invoices),
+      currency: currencyOf(sortedInvoices),
       averageCollectionDays: collectionAverage(data),
     },
     clients: clientFacts,
@@ -284,9 +286,8 @@ export async function getClientProfileFacts(
   today: string = todayInKolkata(),
 ): Promise<ClientProfileFacts> {
   let data = await loadOrganizationInvoiceData(db, organizationId, clientId);
-  let derived = sortInvoicesNewestFirst(data.invoices).map((invoice) =>
-    deriveInvoice(invoice, data, today),
-  );
+  let sortedInvoices = sortInvoicesNewestFirst(data.invoices);
+  let derived = sortedInvoices.map((invoice) => deriveInvoice(invoice, data, today));
 
   let totalInvoicedMinor = 0;
   let outstandingBalanceMinor = 0;
@@ -308,7 +309,7 @@ export async function getClientProfileFacts(
   }
 
   return {
-    currency: currencyOf(data.invoices),
+    currency: currencyOf(sortedInvoices),
     totalInvoicedMinor,
     outstandingBalanceMinor,
     paidInvoiceCount,
