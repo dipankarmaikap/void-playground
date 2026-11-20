@@ -206,7 +206,7 @@ const personMetaStyle = css({
   overflowWrap: 'anywhere',
 });
 
-const quietStyle = css({
+const noInvoiceNoteStyle = css({
   color: neutrals.softMuted,
   fontStyle: 'normal',
 });
@@ -399,7 +399,7 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
                 {invoiceStatusLabel[status]}
               </Badge>
             ) : (
-              <span mix={quietStyle}>No invoices</span>
+              <span mix={noInvoiceNoteStyle}>No invoices</span>
             )}
           </Table.Cell>
         </Table.Row>

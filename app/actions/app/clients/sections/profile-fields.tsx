@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import {
   CLIENT_TYPES,
@@ -9,17 +8,12 @@ import {
 import { validateClientTextFields } from '../../../../data/client-text.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
+import { formStackStyle } from '../../../../ui/page-styles.ts';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { Select } from '../../../../ui/select.tsx';
 import { issueFor } from '../form-values.ts';
 import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
-
-const nameGroupStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
-});
 
 export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
   return () => {
@@ -63,7 +57,7 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
           />
         </Field>
         {/* Both type-specific groups stay in the form; hidden values still submit. */}
-        <div hidden={!showIndividualNameGroup} mix={nameGroupStyle}>
+        <div hidden={!showIndividualNameGroup} mix={formStackStyle}>
           <Field
             label="Preferred name"
             hint="Optional. Shown before the legal name in lists."
@@ -77,7 +71,7 @@ export function ProfileFields(handle: Handle<ClientFormSectionProps>) {
             />
           </Field>
         </div>
-        <div hidden={!showBusinessNameGroup} mix={nameGroupStyle}>
+        <div hidden={!showBusinessNameGroup} mix={formStackStyle}>
           <Field
             label="Trading name"
             hint="Optional. Shown before the legal name in lists."

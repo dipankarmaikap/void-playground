@@ -11,7 +11,9 @@ export interface PageHeaderProps {
   action?: RemixNode;
 }
 
-const pageHeaderStyle = css({
+// The header's action row, named for its own context so the exported `pageHeaderStyle`
+// keeps exactly one meaning.
+const headerRowStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-end',
@@ -54,7 +56,7 @@ export function PageHeader(handle: Handle<PageHeaderProps>) {
   return () => {
     let { eyebrow, title, intro, action } = handle.props;
     return (
-      <header mix={pageHeaderStyle}>
+      <header mix={headerRowStyle}>
         <div>
           <span mix={eyebrowStyle}>{eyebrow}</span>
           <h1 mix={headingStyle}>{title}</h1>
