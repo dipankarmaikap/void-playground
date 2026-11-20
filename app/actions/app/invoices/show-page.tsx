@@ -47,6 +47,7 @@ import {
 } from '../../../ui/page-styles.ts';
 import { Select } from '../../../ui/select.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+import { cardStyle } from './ui/card-style.ts';
 import { internalNoteFormFields } from './public/schema.ts';
 import { paymentFormFields, paymentVoidFormFields } from './payments/public/schema.ts';
 import { refundFormFields, refundVoidFormFields } from './refunds/public/schema.ts';
@@ -94,15 +95,6 @@ export interface InvoiceShowPageProps extends InvoiceActivityData {
     message: string;
   };
 }
-
-const cardStyle = css({
-  display: 'grid',
-  gap: '0.75rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-});
 
 const headingStyle = css({ margin: 0, fontSize: '1.0625rem' });
 

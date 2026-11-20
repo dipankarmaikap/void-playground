@@ -26,7 +26,7 @@ import {
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
 import { StatCard, statGridStyle, trendUpStyle } from './ui/stat-card.tsx';
-import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
+import { Badge, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/badge.tsx';
 import { focus, fontStack, neutrals, primary, radii, shadows, softFills } from '../../../ui/theme.ts';
 
 export interface ClientsIndexPageProps {
@@ -401,9 +401,9 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
           <Table.Cell>{formatInvoiceDate(clientFacts?.lastInvoiceDate ?? null)}</Table.Cell>
           <Table.Cell>
             {status ? (
-              <StatusPill tone={invoiceStatusTone[status]}>
+              <Badge tone={invoiceStatusTone[status]}>
                 {invoiceStatusLabel[status]}
-              </StatusPill>
+              </Badge>
             ) : (
               <span mix={quietStyle}>No invoices</span>
             )}

@@ -19,7 +19,7 @@ import {
   noticeStatusStyle,
 } from '../../../ui/page-styles.ts';
 import { StatCard, statGridStyle } from './ui/stat-card.tsx';
-import { StatusPill, invoiceStatusLabel, invoiceStatusTone } from './ui/status-pill.tsx';
+import { Badge, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/badge.tsx';
 import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';
@@ -191,9 +191,9 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
           {formatMoney(BigInt(invoice.totalMinor), invoice.currency)}
         </Table.AmountCell>
         <Table.Cell>
-          <StatusPill tone={invoiceStatusTone[invoice.status]}>
+          <Badge tone={invoiceStatusTone[invoice.status]}>
             {invoiceStatusLabel[invoice.status]}
-          </StatusPill>
+          </Badge>
         </Table.Cell>
       </Table.Row>
     ));
@@ -257,9 +257,9 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
               <div mix={detailMetaStyle}>
                 <h1 mix={detailHeadingStyle}>{label}</h1>
                 <p mix={contextStyle}>{contextLine}</p>
-                <StatusPill tone={archived ? 'draft' : 'paid'}>
+                <Badge tone={archived ? 'draft' : 'paid'}>
                   {archived ? 'Archived client' : 'Active client'}
-                </StatusPill>
+                </Badge>
               </div>
             </div>
           </div>

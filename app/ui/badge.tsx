@@ -1,14 +1,14 @@
 import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
-import type { InvoiceDisplayStatus } from '../../../../data/invoices/issuance.ts';
-import { fontStack, radii, statusColors } from '../../../../ui/theme.ts';
+import type { InvoiceDisplayStatus } from '../data/invoices/issuance.ts';
+import { fontStack, radii, statusColors } from './theme.ts';
 
-/** Semantic tone of a status pill, named after the reference stylesheet's status classes. */
-export type StatusTone = keyof typeof statusColors;
+/** Semantic tone of a badge, named after the reference stylesheet's status classes. */
+export type BadgeTone = keyof typeof statusColors;
 
-/** Maps the domain's derived Invoice display statuses onto the reference's pill tones. */
-export const invoiceStatusTone: Record<InvoiceDisplayStatus, StatusTone> = {
+/** Maps the domain's derived Invoice display statuses onto the reference's badge tones. */
+export const invoiceStatusTone: Record<InvoiceDisplayStatus, BadgeTone> = {
   paid: 'paid',
   sent: 'sent',
   partially_paid: 'pending',
@@ -27,7 +27,7 @@ export const invoiceStatusLabel: Record<InvoiceDisplayStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-export const statusPillBaseStyle = css({
+const badgeBaseStyle = css({
   display: 'inline-flex',
   alignItems: 'center',
   gap: '5px',
@@ -55,15 +55,15 @@ const toneStyles = {
   pending: css({ background: statusColors.pending.background, color: statusColors.pending.color }),
 };
 
-export interface StatusPillProps {
-  tone: StatusTone;
+export interface BadgeProps {
+  tone: BadgeTone;
   children: RemixNode;
 }
 
 /** A compact, readable status indicator; all meaning is also present as text. */
-export function StatusPill(handle: Handle<StatusPillProps>) {
+export function Badge(handle: Handle<BadgeProps>) {
   return () => {
     let { tone, children } = handle.props;
-    return <span mix={[statusPillBaseStyle, toneStyles[tone]]}>{children}</span>;
+    return <span mix={[badgeBaseStyle, toneStyles[tone]]}>{children}</span>;
   };
 }
