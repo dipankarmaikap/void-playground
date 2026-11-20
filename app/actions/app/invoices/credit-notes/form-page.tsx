@@ -24,8 +24,9 @@ import {
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
-import { colors, radius } from '../../../../ui/theme.ts';
+import { colors } from '../../../../ui/theme.ts';
 import { cardStyle } from '../ui/card-style.ts';
+import { invoiceNoteAreaStyle } from '../ui/note-area-style.ts';
 import { routes } from '../../../../routes.ts';
 import { creditNoteFormFields } from './public/schema.ts';
 
@@ -63,18 +64,6 @@ const lineStyle = css({
   alignItems: 'end',
   paddingBlock: '0.75rem',
   borderBottom: `1px solid ${colors.border}`,
-});
-const noteStyle = css({
-  width: '100%',
-  boxSizing: 'border-box',
-  minHeight: '7rem',
-  padding: '0.75rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.sm,
-  background: colors.surface,
-  color: colors.text,
-  fontFamily: 'inherit',
-  fontSize: 'max(1rem, 1em)',
 });
 
 function maxQuantity(
@@ -231,7 +220,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                 name="reason"
                 defaultValue={values.reason}
                 aria-describedby={reasonError ? 'credit-note-reason-error' : undefined}
-                mix={noteStyle}
+                mix={invoiceNoteAreaStyle}
                 {...formFieldAttributes(creditNoteFormFields.reason, reasonError)}
               />
             </Field>
