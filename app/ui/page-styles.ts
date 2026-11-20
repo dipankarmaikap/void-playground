@@ -1,6 +1,20 @@
 import { css } from 'remix/component';
 
-import { colors, radius } from './theme.ts';
+import { colors, fontFamily, radius } from './theme.ts';
+
+/** The full-screen centered surface of the public pages (the home hero and the auth card). */
+export const publicScreenStyle = css({
+  margin: 0,
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '24px',
+  boxSizing: 'border-box',
+  background: colors.background,
+  color: colors.text,
+  fontFamily,
+});
 
 /** Page header used by standalone auth cards. */
 export const authHeaderStyle = css({

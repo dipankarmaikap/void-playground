@@ -4,25 +4,13 @@ import { css } from 'remix/component';
 import { APP_NAME } from '../config.ts';
 import { routes } from '../routes.ts';
 import { linkButtonStyle } from '../ui/button.tsx';
-import { colors, fontFamily } from '../ui/theme.ts';
+import { publicScreenStyle } from '../ui/page-styles.ts';
+import { colors } from '../ui/theme.ts';
 import { Document } from './document.tsx';
 
 export interface HomePageProps {
   authenticated: boolean;
 }
-
-const pageStyle = css({
-  margin: 0,
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '24px',
-  boxSizing: 'border-box',
-  background: colors.background,
-  color: colors.text,
-  fontFamily,
-});
 
 const welcomeStyle = css({
   width: '100%',
@@ -76,7 +64,7 @@ export function HomePage(handle: Handle<HomePageProps>) {
         description={`Welcome to ${APP_NAME}. Create an account or log in to get started.`}
         social
       >
-        <main mix={pageStyle}>
+        <main mix={publicScreenStyle}>
           <div mix={welcomeStyle}>
             <p mix={brandStyle}>{APP_NAME}</p>
             <h1 mix={headingStyle}>Welcome to {APP_NAME}</h1>

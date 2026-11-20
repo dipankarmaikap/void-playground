@@ -3,24 +3,12 @@ import { css } from 'remix/component';
 
 import { APP_NAME } from '../config.ts';
 import { routes } from '../routes.ts';
-import { colors, fontFamily, radius, shadow } from './theme.ts';
+import { publicScreenStyle } from './page-styles.ts';
+import { colors, radius, shadow } from './theme.ts';
 
 export interface AuthLayoutProps {
   children: RemixNode;
 }
-
-const mainStyle = css({
-  margin: 0,
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '24px',
-  boxSizing: 'border-box',
-  background: colors.background,
-  color: colors.text,
-  fontFamily,
-});
 
 const cardStyle = css({
   width: '100%',
@@ -50,7 +38,7 @@ const brandStyle = css({
 
 export function AuthLayout(handle: Handle<AuthLayoutProps>) {
   return () => (
-    <main mix={mainStyle}>
+    <main mix={publicScreenStyle}>
       <div mix={cardStyle}>
         <a href={routes.home.href()} mix={brandStyle}>
           {APP_NAME}
