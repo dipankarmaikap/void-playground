@@ -17,6 +17,15 @@ export interface DocumentProps {
   social?: boolean;
 }
 
+const documentBodyStyle = css({
+  margin: 0,
+  fontFamily: fontStack,
+  fontSize: typography.bodyFontSize,
+  lineHeight: typography.bodyLineHeight,
+  color: neutrals.ink,
+  background: neutrals.canvas,
+});
+
 export function Document(handle: Handle<DocumentProps>) {
   return () => {
     let { children, head, title, description, noindex = false, social = false } = handle.props;
@@ -26,9 +35,14 @@ export function Document(handle: Handle<DocumentProps>) {
 
     // Authored styles need the request nonce under the app's nonce-only style-src policy.
     // A global @font-face cannot live inside a generated, scoped class, so the authored <style>
-    // carries only the font face and control inheritance. Body typography is declared once,
-    // on <body> below via css(), whose rules the render middleware nonces automatically.
+    // carries only the font face and the control reset. Unlayered CSS would outrank every
+    // generated `css()` rule, so the reset lives in `base`, declared before `rmx`: it defaults
+    // controls to the body font and still loses to any component that sets its own.
+    // Body typography is declared once, on <body> below via css(), whose rules the render
+    // middleware nonces automatically.
     let fontFaceStyle = `
+      @layer base, rmx;
+
       @font-face {
         font-family: "Inter";
         font-style: normal;
@@ -36,8 +50,11 @@ export function Document(handle: Handle<DocumentProps>) {
         font-display: swap;
         src: url("${fontAssetHref}") format("woff2");
       }
-      button, input, select, textarea {
-        font-family: inherit;
+
+      @layer base {
+        button, input, select, textarea {
+          font-family: inherit;
+        }
       }
     `;
 
@@ -78,18 +95,7 @@ export function Document(handle: Handle<DocumentProps>) {
           ))}
           <script type="module" src={href} nonce={nonce}></script>
         </head>
-        <body
-          mix={css({
-            margin: 0,
-            fontFamily: fontStack,
-            fontSize: typography.bodyFontSize,
-            lineHeight: typography.bodyLineHeight,
-            color: neutrals.ink,
-            background: neutrals.canvas,
-          })}
-        >
-          {children}
-        </body>
+        <body mix={documentBodyStyle}>{children}</body>
       </html>
     );
   };
