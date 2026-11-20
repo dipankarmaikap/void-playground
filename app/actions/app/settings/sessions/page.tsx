@@ -112,7 +112,7 @@ const revokeFormStyle = css({
   display: 'inline-flex',
 });
 
-const dangerStyle = css({
+const dangerZoneStyle = css({
   marginTop: '1.75rem',
   padding: '1rem 1.25rem',
   border: `1px solid ${colors.danger}`,
@@ -216,7 +216,7 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
           ))}
         </ul>
         {hasOtherSessions ? (
-          <details mix={dangerStyle}>
+          <details mix={dangerZoneStyle}>
             <summary mix={dangerSummaryStyle}>Revoke all other sessions</summary>
             <div mix={dangerBodyStyle}>
               <p mix={dangerCopyStyle}>
