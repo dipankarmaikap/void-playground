@@ -10,7 +10,7 @@ export type SelectProps = Props<'select'> & {
   name: string;
 };
 
-const baseStyle = css({
+const selectStyle = css({
   padding: '10px 12px',
   width: '100%',
   minHeight: '48px',
@@ -26,18 +26,14 @@ const baseStyle = css({
     outlineOffset: '1px',
     borderColor: colors.accent,
   },
-});
-
-const errorStyle = css({
-  borderColor: colors.danger,
+  // One owner for `border`: the invalid state is a variant, not a second style.
+  '&[data-variant="error"]': { borderColor: colors.danger },
 });
 
 export function Select(handle: Handle<SelectProps>) {
   return () => {
     let { variant = 'default', ...selectProps } = handle.props;
 
-    return (
-      <select {...selectProps} mix={variant === 'error' ? [baseStyle, errorStyle] : baseStyle} />
-    );
+    return <select {...selectProps} data-variant={variant} mix={selectStyle} />;
   };
 }

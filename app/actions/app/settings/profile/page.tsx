@@ -9,7 +9,6 @@ import { Input } from '../../../../ui/input.tsx';
 import {
   formStackStartStyle,
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
@@ -113,12 +112,17 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </div>
           </dl>
           {organizationError ? (
-            <p id="organization-name-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p
+              id="organization-name-error"
+              role="alert"
+              data-spacing="true"
+              mix={noticeErrorStyle}
+            >
               {organizationError}
             </p>
           ) : null}
           {organizationMessage ? (
-            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+            <p role="status" data-spacing="true" mix={noticeStatusStyle}>
               {organizationMessage}
             </p>
           ) : null}
@@ -141,12 +145,12 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           </form>
         </section>
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}

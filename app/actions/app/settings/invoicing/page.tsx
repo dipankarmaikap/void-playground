@@ -257,12 +257,12 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
         >
           <input type="hidden" name="_csrf" value={csrfToken} />
           {issues.length > 0 ? (
-            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
               Please correct the fields below.
             </p>
           ) : null}
           {message ? (
-            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+            <p role="status" data-spacing="true" mix={noticeStatusStyle}>
               {message}
             </p>
           ) : null}
@@ -714,7 +714,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             Editable rate presets available on this Organization&rsquo;s invoice service lines.
           </p>
           {presetError ? (
-            <p id="preset-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p id="preset-error" role="alert" data-spacing="true" mix={noticeErrorStyle}>
               {presetError}
             </p>
           ) : null}

@@ -66,6 +66,15 @@ export const linkButtonStyle = css({
   '&:hover': {
     background: colors.accentHover,
   },
+  // One owner for the sizing properties: the reference's slimmer `.btn` metric
+  // is a variant, so a caller mixing extras cannot fight it by insertion order.
+  '&[data-size="compact"]': {
+    minHeight: '42px',
+    padding: '0 17px',
+    fontSize: '1rem',
+    fontWeight: 700,
+    lineHeight: 1,
+  },
   '&[data-variant="secondary"]': {
     background: colors.surface,
     color: colors.text,

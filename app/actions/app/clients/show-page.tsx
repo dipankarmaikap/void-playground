@@ -15,7 +15,6 @@ import type { UserIdentity } from '../../../ui/identity.ts';
 import { Panel } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
 } from '../../../ui/page-styles.ts';
 import { StatCard, statGridStyle } from './ui/stat-card.tsx';
@@ -279,12 +278,12 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
         </header>
 
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}

@@ -9,7 +9,7 @@ import {
   panelSubtitleStyle,
   panelTitleStyle,
 } from './ui/panel.tsx';
-import { noticeErrorStyle, noticeSpacingStyle } from '../../../ui/page-styles.ts';
+import { noticeErrorStyle } from '../../../ui/page-styles.ts';
 import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import { neutrals } from '../../../ui/theme.ts';
 import type { ClientFormValues } from './form-values.ts';
@@ -77,7 +77,7 @@ export function ClientForm(handle: Handle<ClientFormProps>) {
         <input type="hidden" name="_csrf" value={csrfToken} />
         {issues.length > 0 ? (
           <div mix={noticeWrapStyle}>
-            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
               Please correct the fields below.
             </p>
           </div>

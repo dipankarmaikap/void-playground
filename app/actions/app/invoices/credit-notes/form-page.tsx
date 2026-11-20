@@ -48,9 +48,6 @@ export interface CreditNoteDraftPageProps {
   message?: string;
 }
 
-/** Roomier spacing for the credit note draft's cards. */
-const cardGapStyle = css({ gap: '0.875rem' });
-
 const detailsStyle = css({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))',
@@ -154,7 +151,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         </header>
 
         {issues.length > 0 ? (
-          <div role="alert" mix={[cardStyle, cardGapStyle]}>
+          <div role="alert" data-gap="draft" mix={cardStyle}>
             <p>Please correct the following credit note details.</p>
             <ul>
               {issues.map((issue, index) => (
@@ -165,7 +162,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         ) : null}
         {message ? <p role="status">{message}</p> : null}
 
-        <section aria-labelledby="credit-note-snapshot-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="credit-note-snapshot-heading" data-gap="draft" mix={cardStyle}>
           <h2 id="credit-note-snapshot-heading">Original invoice snapshots</h2>
           <div mix={detailsStyle}>
             <p mix={detailStyle}>Seller: {invoice.seller_legal_name}</p>
@@ -195,7 +192,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         </section>
 
         {creditNote ? (
-          <section aria-label="Credit note draft total" mix={[cardStyle, cardGapStyle]}>
+          <section aria-label="Credit note draft total" data-gap="draft" mix={cardStyle}>
             <p mix={detailStyle}>
               Draft credit amount: {formatMoney(BigInt(creditNote.total_minor), invoice.currency)}
             </p>
@@ -208,7 +205,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
           aria-labelledby="credit-note-details-heading"
         >
           <input type="hidden" name="_csrf" value={csrfToken} />
-          <section aria-labelledby="credit-note-details-heading" mix={[cardStyle, cardGapStyle]}>
+          <section aria-labelledby="credit-note-details-heading" data-gap="draft" mix={cardStyle}>
             <h2 id="credit-note-details-heading">Credit note details</h2>
             <Field
               label="Credit note date"
@@ -240,7 +237,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
             </Field>
           </section>
 
-          <section aria-labelledby="credit-note-lines-heading" mix={[cardStyle, cardGapStyle]}>
+          <section aria-labelledby="credit-note-lines-heading" data-gap="draft" mix={cardStyle}>
             <h2 id="credit-note-lines-heading">Service lines to credit</h2>
             {generalErrors.map((issue, index) => (
               <p key={`credit-note-lines-error-${index}`} role="alert">

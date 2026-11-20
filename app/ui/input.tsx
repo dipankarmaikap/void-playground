@@ -10,7 +10,7 @@ export type InputProps = Props<'input'> & {
   name: string;
 };
 
-const baseStyle = css({
+const inputStyle = css({
   padding: '10px 12px',
   width: '100%',
   minHeight: '48px',
@@ -26,18 +26,14 @@ const baseStyle = css({
     outlineOffset: '1px',
     borderColor: colors.accent,
   },
-});
-
-const errorStyle = css({
-  borderColor: colors.danger,
+  // One owner for `border`: the invalid state is a variant, not a second style.
+  '&[data-variant="error"]': { borderColor: colors.danger },
 });
 
 export function Input(handle: Handle<InputProps>) {
   return () => {
     let { variant = 'default', ...inputProps } = handle.props;
 
-    return (
-      <input {...inputProps} mix={variant === 'error' ? [baseStyle, errorStyle] : baseStyle} />
-    );
+    return <input {...inputProps} data-variant={variant} mix={inputStyle} />;
   };
 }

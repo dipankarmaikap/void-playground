@@ -42,12 +42,12 @@ const cellStyle = css({
   fontSize: '0.875rem',
   verticalAlign: 'middle',
   '&[data-align="right"]': { textAlign: 'right' },
-});
-
-const amountCellStyle = css({
-  color: neutrals.ink,
-  fontWeight: 700,
-  whiteSpace: 'nowrap',
+  // One owner for `color`: the money cell is a variant, not a second style.
+  '&[data-amount="true"]': {
+    color: neutrals.ink,
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+  },
 });
 
 export interface TableProps {
@@ -131,7 +131,7 @@ export namespace Table {
   /** A right-aligned cell for a money value: ink, bold, and never wrapping. */
   export function AmountCell(handle: Handle<{ children: RemixNode }>) {
     return () => (
-      <td data-align="right" mix={[cellStyle, amountCellStyle]}>
+      <td data-align="right" data-amount="true" mix={cellStyle}>
         {handle.props.children}
       </td>
     );

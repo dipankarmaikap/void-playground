@@ -39,7 +39,6 @@ import { Input } from '../../../ui/input.tsx';
 import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import {
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
@@ -276,7 +275,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           </a>
         </div>
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}

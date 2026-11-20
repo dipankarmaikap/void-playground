@@ -33,9 +33,6 @@ const formStyle = css({
   gap: '1rem',
 });
 
-/** Roomier spacing for the form's cards. */
-const cardGapStyle = css({ gap: '1rem' });
-
 const gridStyle = css({
   display: 'grid',
   gap: '1rem',
@@ -135,7 +132,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           <p role="alert">{firstIssue(issues, 'client_id')?.message}</p>
         ) : null}
 
-        <section aria-labelledby="invoice-basics-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-basics-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-basics-heading" mix={sectionHeadingStyle}>
             Invoice details
           </h2>
@@ -198,7 +195,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-recipient-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-recipient-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-recipient-heading" mix={sectionHeadingStyle}>
             Bill to
           </h2>
@@ -308,7 +305,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-tax-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-tax-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-tax-heading" mix={sectionHeadingStyle}>
             Tax treatment
           </h2>
@@ -429,7 +426,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           ) : null}
         </section>
 
-        <section aria-labelledby="invoice-lines-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-lines-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-lines-heading" mix={sectionHeadingStyle}>
             Service lines
           </h2>
@@ -445,7 +442,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           <InvoiceFormLines values={values} issues={issues} gstRatePresets={gstRatePresets} />
         </section>
 
-        <section aria-labelledby="invoice-discount-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-discount-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-discount-heading" mix={sectionHeadingStyle}>
             Invoice discount and round-off
           </h2>
@@ -505,7 +502,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-notes-heading" mix={[cardStyle, cardGapStyle]}>
+        <section aria-labelledby="invoice-notes-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-notes-heading" mix={sectionHeadingStyle}>
             Notes and instructions
           </h2>

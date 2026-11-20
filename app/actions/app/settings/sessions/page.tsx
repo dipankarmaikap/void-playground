@@ -8,7 +8,6 @@ import { Icon } from '../../../../ui/icon.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import {
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
@@ -168,12 +167,12 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
           </p>
         </header>
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}

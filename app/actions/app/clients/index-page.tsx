@@ -21,7 +21,6 @@ import { PageHeader } from './ui/page-header.tsx';
 import { Panel } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
   textLinkStyle,
 } from '../../../ui/page-styles.ts';
@@ -72,11 +71,6 @@ function directoryHref({ q, type, status, followUp = 'all', page }: DirectoryFil
 
 /** The reference's `.btn.btn-primary` treatment for the page's Add client action. */
 const addClientStyle = css({
-  minHeight: '42px',
-  padding: '0 17px',
-  fontSize: '1rem',
-  fontWeight: 700,
-  lineHeight: 1,
   boxShadow: shadows.primary,
   whiteSpace: 'nowrap',
   transition: 'transform 160ms ease, box-shadow 160ms ease, background 160ms ease',
@@ -437,19 +431,23 @@ export function ClientsIndexPage(handle: Handle<ClientsIndexPageProps>) {
               : 'Keep every client, conversation, and payment in one lovely place.'
           }
           action={
-            <a href={routes.app.clients.new.href()} mix={[linkButtonStyle, addClientStyle]}>
+            <a
+              href={routes.app.clients.new.href()}
+              data-size="compact"
+              mix={[linkButtonStyle, addClientStyle]}
+            >
               <span aria-hidden="true">＋</span> Add client
             </a>
           }
         />
 
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}
