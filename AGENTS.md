@@ -44,8 +44,10 @@ Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`
 
 ## UI styles
 
-- Every `css()` value ends in `Style` and names what it styles, not what it looks like (`amountCellStyle`, never `boldNoWrapStyle`).
-- Keep styles module-private unless another module imports them. Exported styles exist so a caller can `mix` them onto its own element, the way `client-form.tsx` builds its form panel from `panelStyle` and the directory adds `addClientStyle` to the shared `linkButtonStyle`.
+- Every `css()` value ends in `Style` and names what it styles, not what it looks like (`panelTitleStyle`, never `boldNoWrapStyle`).
+- Keep styles module-private unless another module imports them. Exported styles exist so a caller can `mix` them onto its own element, the way `client-form.tsx` builds its form panel from `panelStyle`.
+- Mix styles that set different properties only. When two mixed `css()` styles set the same property, the winner depends on which style rendered first, not on `mix` order (`node_modules/remix/src/component/README.md`, "Combining Styles"). Express a variant as a selector inside one style instead: `'&[data-variant="danger"]'` on `Button`, `data-align` in `Table`, `data-tone` in `StatCard`.
+- Values that change per render (progress, coordinates, transforms) go on the `style` prop; `css()` declares static rules. Design tokens live in `app/ui/theme.ts` — the TypeScript-value route the rendering guide sanctions alongside CSS custom properties.
 - When callers keep importing a style to rebuild the same markup, promote the markup to a composed part instead (`Table.AmountCell`, `EmptyState.Hint`) and make the style private again.
 - Exported names are global by grep: never reuse one with a different meaning. Before taking a shared name locally, name it for its own context (`profileHeaderStyle` in the clients show page, not a third `pageHeaderStyle`).
 - Composed display primitives follow the root + `export namespace` pattern (`Panel.Header`, `Table.Row`, `EmptyState.Heading`) and own their HTML semantics; leaf components (`StatCard`, `Badge`) keep plain-prop interfaces.
@@ -60,7 +62,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 - `app/router.ts` wires routes to controllers and installs the middleware stack: request context, async context, static files, session, form data, method override, CSRF, auth, CSP, render. No-JS forms submit PUT and DELETE through the shared `app/ui/public/restful-form.tsx` wrapper's hidden `_method` field.
 - `app/config.ts` owns `APP_NAME` (the single product name used for branding and metadata) and `DISPLAY_NAME_MAX_LENGTH`.
 - `hmr.ts` supervises the development server for `npm run hmr`, proxying requests while server and browser modules reload.
-- Authored `<script>` and `<style>` tags need the request nonce from `getCspNonce(getContext())`; import maps, module preloads, and `css()` styles get it from `render()` automatically.
+- Authored `<script>` and `<style>` tags need the request nonce from `getCspNonce(getContext())`; import maps, module preloads, and `css()` styles get it from `render()` automatically. Authored CSS is unlayered, so it outranks every generated `css()` rule (`node_modules/remix/src/component/README.md`, "Cascade Layers"); resets that should defer to component styles declare `@layer base, rmx;` and live in `base`.
 - Put top-level route actions in `app/actions/controller.tsx`; give every nested route map its own directory with `controller.tsx` (and `page.tsx` for route-local UI). `app/actions/controller.test.ts` is the root controller's router smoke test.
 - `app/actions/document.tsx` renders the `<html>` shell: the `APP_NAME` title suffix, description, `noindex`, and optional social metadata. Pages pass `title`/`description` rather than writing `<head>` tags.
 - `app/actions/home-page.tsx` renders the public welcome screen; the auth pages live in `app/actions/auth/` (login, register, verify, logout), and `app/actions/app/` owns the protected dashboard and settings pages.
