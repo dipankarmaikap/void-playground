@@ -1,6 +1,20 @@
 import { css } from 'remix/component';
 
-import { colors, radius } from './theme.ts';
+import { colors, fontFamily, radius } from './theme.ts';
+
+/** The full-screen centered surface of the public pages (the home hero and the auth card). */
+export const publicScreenStyle = css({
+  margin: 0,
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '24px',
+  boxSizing: 'border-box',
+  background: colors.background,
+  color: colors.text,
+  fontFamily,
+});
 
 /** Page header used by standalone auth cards. */
 export const authHeaderStyle = css({
@@ -52,6 +66,9 @@ export const noticeErrorStyle = css({
   background: colors.dangerSoft,
   color: colors.danger,
   fontSize: '0.875rem',
+  // One owner for `margin`: callers that separate the notice from the content
+  // below pass `data-spacing="true"` instead of mixing a second margin style.
+  '&[data-spacing="true"]': { margin: '0 0 1rem' },
 });
 
 export const noticeStatusStyle = css({
@@ -62,9 +79,14 @@ export const noticeStatusStyle = css({
   background: colors.successSoft,
   color: colors.success,
   fontSize: '0.875rem',
+  '&[data-spacing="true"]': { margin: '0 0 1rem' },
 });
 
-/** Separates a notice from the content that follows it inside the app shell. */
+/**
+ * Spacing for status paragraphs that skip the boxed notice treatment (see the
+ * invoicing page's readiness banner). Boxed notices get the same separation
+ * from their own `data-spacing="true"` variant instead of a mix.
+ */
 export const noticeSpacingStyle = css({
   margin: '0 0 1rem',
 });

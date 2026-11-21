@@ -9,14 +9,18 @@ const TERM_DAYS: Record<Exclude<PaymentTerm, 'custom'>, number> = {
   net_60: 60,
 };
 
+/** The cached Kolkata day formatter; constructing one per call is measurable in loops. */
+let kolkataDayFormatter: Intl.DateTimeFormat | null = null;
+
 /** Today's calendar date as seen in the invoice timezone, independent of the server's zone. */
 export function todayInKolkata(now: Date = new Date()): string {
-  let parts = new Intl.DateTimeFormat('en-US', {
+  let formatter = (kolkataDayFormatter ??= new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(now);
+  }));
+  let parts = formatter.formatToParts(now);
   let part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
@@ -37,6 +41,16 @@ export function isValidIsoDate(value: string): boolean {
 export function addDays(date: string, days: number): string {
   let [year, month, day] = date.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** Whole UTC calendar days between two ISO dates; anomalous negative intervals are ignored. */
+export function daysBetween(invoiceDate: string, paymentDate: string): number | null {
+  let start = Date.parse(`${invoiceDate}T00:00:00Z`);
+  let end = Date.parse(`${paymentDate}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.round((end - start) / MS_PER_DAY);
 }
 
 /** The due date a payment term suggests from the invoice date. Custom terms default to the same day. */

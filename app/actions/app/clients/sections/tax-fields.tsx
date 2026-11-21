@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import {
   duplicateTaxWarning,
@@ -9,17 +8,12 @@ import {
 import { INDIA_STATES } from '../../../../data/india-states.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
+import { formStackStyle } from '../../../../ui/page-styles.ts';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { Select } from '../../../../ui/select.tsx';
 import { issueFor } from '../form-values.ts';
 import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
-
-const taxGroupStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
-});
 
 export function TaxFields(handle: Handle<ClientFormSectionProps>) {
   return () => {
@@ -30,7 +24,7 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
     let stateIssue = issueFor(issues, 'tax_state_code');
 
     return (
-      <div mix={taxGroupStyle}>
+      <div mix={formStackStyle}>
         <Field
           label="Tax identifier country"
           hint="Optional. Enter IN for India; otherwise use the country name or code."
@@ -98,6 +92,8 @@ export function TaxFields(handle: Handle<ClientFormSectionProps>) {
 
 export const taxSection: ClientFormSection = {
   key: 'tax',
+  title: 'Tax identifier',
+  hint: 'Optional. Recorded for invoice documents.',
   render: (props) => (
     <TaxFields
       values={props.values}

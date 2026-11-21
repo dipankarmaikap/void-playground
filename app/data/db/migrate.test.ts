@@ -190,12 +190,16 @@ describe('migrateDatabase', () => {
       await indexExists(freshDb, 'idx_clients_organization_status'),
       'the final schema keeps the Client directory index fast',
     );
+    assert.ok(
+      await indexExists(freshDb, 'idx_invoices_organization_client_document'),
+      'the final schema keeps the Client profile query fast',
+    );
 
     let rollback = await migrateDatabase(freshDb, { direction: 'down', step: 1 });
     assert.equal(rollback.reverted.length, 1, 'a bounded rollback reverts exactly one step');
-    assert.equal(rollback.reverted[0]?.id, '0015');
+    assert.equal(rollback.reverted[0]?.id, '0016');
     assert.equal(
-      await indexExists(freshDb, 'idx_clients_organization_status'),
+      await indexExists(freshDb, 'idx_invoices_organization_client_document'),
       false,
       'the reverted step leaves no schema behind',
     );
@@ -203,8 +207,8 @@ describe('migrateDatabase', () => {
     // The journal recorded the revert, so a forward run re-applies exactly that step.
     let rerun = await migrateDatabase(freshDb);
     assert.equal(rerun.applied.length, 1);
-    assert.equal(rerun.applied[0]?.id, '0015');
-    assert.ok(await indexExists(freshDb, 'idx_clients_organization_status'));
+    assert.equal(rerun.applied[0]?.id, '0016');
+    assert.ok(await indexExists(freshDb, 'idx_invoices_organization_client_document'));
 
     await freshDb.close();
   });

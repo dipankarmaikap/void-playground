@@ -4,7 +4,7 @@ import * as assert from 'remix/assert';
 import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { ClientType } from '../../../data/client-names.ts';
-import { listClients } from '../../../data/clients.ts';
+import { CLIENT_DIRECTORY_PAGE_SIZE, listClients } from '../../../data/clients.ts';
 import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { createUserAndLoginWithOrganization, getHtml, origin } from '../../../../test/http.ts';
@@ -48,8 +48,47 @@ async function seedClient(input: {
   );
 }
 
+async function seedOverdueInvoice(clientId: string) {
+  let now = Date.now();
+  return db.create(
+    invoices,
+    {
+      id: crypto.randomUUID(),
+      organization_id: organizationId,
+      client_id: clientId,
+      document_type: 'invoice',
+      status: 'issued',
+      invoice_number: `INV/${crypto.randomUUID()}`,
+      issued_at: now,
+      seller_legal_name: 'Pagination Seller',
+      seller_address_line1: '1 Pagination Street',
+      seller_country: 'IN',
+      seller_gst_registered: false,
+      currency: 'INR',
+      invoice_date: '2019-12-01',
+      due_date: '2020-01-01',
+      payment_term: 'net_30',
+      recipient_legal_name: 'Pagination Recipient',
+      gst_mode: 'none',
+      recipient_gstin_applicable: false,
+      reverse_charge: false,
+      subtotal_minor: 10_000,
+      line_discount_total_minor: 0,
+      invoice_discount_minor: 0,
+      net_subtotal_minor: 10_000,
+      tax_total_minor: 0,
+      round_off_minor: 0,
+      total_minor: 10_000,
+      created_at: now,
+      updated_at: now,
+    },
+    { returnRow: true },
+  );
+}
+
 function clientItemCount(html: string) {
-  return html.match(/<li\b/g)?.length ?? 0;
+  let body = html.match(/<tbody\b[^>]*>([\s\S]*?)<\/tbody>/);
+  return body ? (body[1].match(/<tr\b/g)?.length ?? 0) : 0;
 }
 
 function nextHref(html: string): string {
@@ -180,6 +219,105 @@ describe('Client directory pagination', () => {
     assert.ok(second.includes('Literal 21 100% Match'));
     assert.ok(second.includes('Literal 25 100% Match'));
     assert.ok(!second.includes('100X Match'));
+  });
+
+  it('applies the follow-up filter before pagination, including matches beyond the first page', async () => {
+    let sessionCookie = await createPageUser();
+    for (let number = 1; number <= 30; number += 1) {
+      let client = await seedClient({
+        id: `follow-${String(number).padStart(3, '0')}`,
+        legalName: `Follow Client ${String(number).padStart(3, '0')}`,
+      });
+      if (number >= 21 && number <= 25) await seedOverdueInvoice(client.id);
+    }
+
+    let overdue = await getHtml(router, indexHref({ followup: 'overdue' }), sessionCookie);
+    assert.equal(clientItemCount(overdue), 5);
+    assert.ok(overdue.includes('Follow Client 021'));
+    assert.ok(overdue.includes('Follow Client 025'));
+    assert.ok(!overdue.includes('Follow Client 001'));
+    assert.doesNotMatch(overdue, />Next<\/a>/);
+    assert.match(overdue, /Showing 1–5 of 5 clients/);
+
+    let currentFirst = await getHtml(router, indexHref({ followup: 'current' }), sessionCookie);
+    assert.equal(clientItemCount(currentFirst), 20);
+    assert.ok(currentFirst.includes('Follow Client 020'));
+    assert.ok(!currentFirst.includes('Follow Client 021'));
+    assert.match(currentFirst, /Showing 1–20 of 25 clients/);
+
+    let nextUrl = new URL(nextHref(currentFirst).replaceAll('&amp;', '&'), origin);
+    assert.equal(nextUrl.searchParams.get('followup'), 'current');
+    let currentSecond = await getHtml(
+      router,
+      `${nextUrl.pathname}${nextUrl.search}`,
+      sessionCookie,
+    );
+    assert.equal(clientItemCount(currentSecond), 5);
+    assert.ok(currentSecond.includes('Follow Client 026'));
+    assert.ok(!currentSecond.includes('Follow Client 021'));
+    assert.match(currentSecond, />Previous<\/a>/);
+    assert.doesNotMatch(currentSecond, />Next<\/a>/);
+    assert.match(currentSecond, /Showing 21–25 of 25 clients/);
+  });
+
+  it('reports a real total for search, type and status filters in the footer', async () => {
+    let sessionCookie = await createPageUser();
+    let batch = `Footer Batch ${crypto.randomUUID()}`;
+    for (let number = 1; number <= 25; number += 1) {
+      await seedClient({
+        id: `footer-${String(number).padStart(3, '0')}`,
+        legalName: `${batch} ${String(number).padStart(3, '0')}`,
+        type: 'business',
+      });
+    }
+    await seedClient({ id: 'footer-distractor', legalName: `${batch} distractor` });
+
+    let first = await getHtml(
+      router,
+      indexHref({ q: batch, type: 'business' }),
+      sessionCookie,
+    );
+    assert.match(first, /Showing 1–20 of 25 clients/);
+    let second = await getHtml(
+      router,
+      indexHref({ q: batch, type: 'business', page: '2' }),
+      sessionCookie,
+    );
+    assert.match(second, /Showing 21–25 of 25 clients/);
+
+    for (let number = 1; number <= 5; number += 1) {
+      await seedClient({
+        id: `footer-archived-${number}`,
+        legalName: `Archived Footer ${number}`,
+        status: 'archived',
+      });
+    }
+    let archived = await getHtml(router, indexHref({ status: 'archived' }), sessionCookie);
+    assert.match(archived, /Showing 1–5 of 5 clients/);
+  });
+
+  it('batches a large Client id allow-list and reports its filtered total', async () => {
+    await createPageUser();
+    let ids: string[] = [];
+    for (let number = 1; number <= 505; number += 1) {
+      let client = await seedClient({
+        id: `batch-${String(number).padStart(3, '0')}`,
+        legalName: `Batch Client ${String(number).padStart(3, '0')}`,
+      });
+      ids.push(client.id);
+    }
+
+    let first = await listClients(db, organizationId, { clientIds: ids });
+    assert.equal(first.total, 505);
+    assert.equal(first.clients.length, CLIENT_DIRECTORY_PAGE_SIZE);
+    assert.equal(first.hasNext, true);
+    assert.equal(first.hasPrevious, false);
+
+    let lastPage = Math.ceil(505 / CLIENT_DIRECTORY_PAGE_SIZE);
+    let last = await listClients(db, organizationId, { clientIds: ids, page: lastPage });
+    assert.equal(last.clients.length, 505 - (lastPage - 1) * CLIENT_DIRECTORY_PAGE_SIZE);
+    assert.equal(last.hasNext, false);
+    assert.equal(last.hasPrevious, true);
   });
 
   it('normalizes invalid page numbers to the first page', async () => {

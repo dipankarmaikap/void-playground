@@ -4,6 +4,7 @@ import { css } from 'remix/component';
 import type { CreditNote, Invoice, InvoiceLine } from '../../../../data/db.ts';
 import { joinAddressParts } from '../../../../data/address.ts';
 import { countryName } from '../../../../data/client-billing.ts';
+import { formatIsoDate } from '../../../../data/dates.ts';
 import {
   formatMoney,
   formatScaledDecimal,
@@ -24,7 +25,9 @@ import {
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
-import { colors, radius } from '../../../../ui/theme.ts';
+import { colors } from '../../../../ui/theme.ts';
+import { cardStyle } from '../ui/card-style.ts';
+import { invoiceNoteAreaStyle } from '../ui/note-area-style.ts';
 import { routes } from '../../../../routes.ts';
 import { creditNoteFormFields } from './public/schema.ts';
 
@@ -47,15 +50,6 @@ export interface CreditNoteDraftPageProps {
   message?: string;
 }
 
-const cardStyle = css({
-  display: 'grid',
-  gap: '0.875rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-});
-
 const detailsStyle = css({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))',
@@ -71,18 +65,6 @@ const lineStyle = css({
   alignItems: 'end',
   paddingBlock: '0.75rem',
   borderBottom: `1px solid ${colors.border}`,
-});
-const noteStyle = css({
-  width: '100%',
-  boxSizing: 'border-box',
-  minHeight: '7rem',
-  padding: '0.75rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.sm,
-  background: colors.surface,
-  color: colors.text,
-  fontFamily: 'inherit',
-  fontSize: 'max(1rem, 1em)',
 });
 
 function maxQuantity(
@@ -159,7 +141,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         </header>
 
         {issues.length > 0 ? (
-          <div role="alert" mix={cardStyle}>
+          <div role="alert" data-gap="draft" mix={cardStyle}>
             <p>Please correct the following credit note details.</p>
             <ul>
               {issues.map((issue, index) => (
@@ -170,7 +152,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         ) : null}
         {message ? <p role="status">{message}</p> : null}
 
-        <section aria-labelledby="credit-note-snapshot-heading" mix={cardStyle}>
+        <section aria-labelledby="credit-note-snapshot-heading" data-gap="draft" mix={cardStyle}>
           <h2 id="credit-note-snapshot-heading">Original invoice snapshots</h2>
           <div mix={detailsStyle}>
             <p mix={detailStyle}>Seller: {invoice.seller_legal_name}</p>
@@ -185,7 +167,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                 : '—'}
             </p>
             <p mix={detailStyle}>Original invoice: {invoice.invoice_number}</p>
-            <p mix={detailStyle}>Original invoice date: {invoice.invoice_date}</p>
+            <p mix={detailStyle}>Original invoice date: {formatIsoDate(invoice.invoice_date)}</p>
             <p mix={detailStyle}>Currency: {invoice.currency}</p>
             <p mix={detailStyle}>Tax regime: {taxRegimeLabel}</p>
             {invoice.gst_mode === 'india_gst' ? (
@@ -200,7 +182,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
         </section>
 
         {creditNote ? (
-          <section aria-label="Credit note draft total" mix={cardStyle}>
+          <section aria-label="Credit note draft total" data-gap="draft" mix={cardStyle}>
             <p mix={detailStyle}>
               Draft credit amount: {formatMoney(BigInt(creditNote.total_minor), invoice.currency)}
             </p>
@@ -213,7 +195,7 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
           aria-labelledby="credit-note-details-heading"
         >
           <input type="hidden" name="_csrf" value={csrfToken} />
-          <section aria-labelledby="credit-note-details-heading" mix={cardStyle}>
+          <section aria-labelledby="credit-note-details-heading" data-gap="draft" mix={cardStyle}>
             <h2 id="credit-note-details-heading">Credit note details</h2>
             <Field
               label="Credit note date"
@@ -239,13 +221,13 @@ export function CreditNoteDraftPage(handle: Handle<CreditNoteDraftPageProps>) {
                 name="reason"
                 defaultValue={values.reason}
                 aria-describedby={reasonError ? 'credit-note-reason-error' : undefined}
-                mix={noteStyle}
+                mix={invoiceNoteAreaStyle}
                 {...formFieldAttributes(creditNoteFormFields.reason, reasonError)}
               />
             </Field>
           </section>
 
-          <section aria-labelledby="credit-note-lines-heading" mix={cardStyle}>
+          <section aria-labelledby="credit-note-lines-heading" data-gap="draft" mix={cardStyle}>
             <h2 id="credit-note-lines-heading">Service lines to credit</h2>
             {generalErrors.map((issue, index) => (
               <p key={`credit-note-lines-error-${index}`} role="alert">

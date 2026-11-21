@@ -1,46 +1,12 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import type { Client } from '../../../data/db.ts';
-import { colors, radius, shadow } from '../../../ui/theme.ts';
+import { SummaryList, SummaryRow } from './summary-list.tsx';
+import { Panel } from './ui/panel.tsx';
 
 export interface ClientContactSummaryProps {
   client: Client;
 }
-
-const cardStyle = css({
-  marginTop: '1rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-  boxShadow: shadow.card,
-});
-
-const cardHeadingStyle = css({
-  margin: '0 0 1rem',
-  fontSize: '1rem',
-});
-
-const listStyle = css({
-  margin: 0,
-  display: 'grid',
-  gap: '0.75rem',
-});
-
-const termStyle = css({
-  color: colors.muted,
-  fontSize: '0.75rem',
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-});
-
-const detailStyle = css({
-  margin: '0.125rem 0 0',
-  fontSize: '0.9375rem',
-  overflowWrap: 'anywhere',
-});
 
 export function ClientContactSummary(handle: Handle<ClientContactSummaryProps>) {
   return () => {
@@ -66,46 +32,31 @@ export function ClientContactSummary(handle: Handle<ClientContactSummaryProps>) 
     if (!hasVisibleContacts) return null;
 
     return (
-      <section aria-labelledby="client-contacts-heading" mix={cardStyle}>
-        <h2 id="client-contacts-heading" mix={cardHeadingStyle}>
-          Contacts
-        </h2>
-        <dl mix={listStyle}>
-          {client.email ? (
-            <div>
-              <dt mix={termStyle}>Email</dt>
-              <dd mix={detailStyle}>{client.email}</dd>
-            </div>
-          ) : null}
-          {client.phone ? (
-            <div>
-              <dt mix={termStyle}>Phone</dt>
-              <dd mix={detailStyle}>{client.phone}</dd>
-            </div>
-          ) : null}
-          {hasPrimaryContact ? (
-            <div>
-              <dt mix={termStyle}>Primary contact</dt>
-              <dd mix={detailStyle}>
+      <Panel labelledBy="client-contacts-heading">
+        <Panel.Header
+          title="Contact details"
+          headingId="client-contacts-heading"
+          subtitle="The best ways to reach this client."
+        />
+        <Panel.Body>
+          <SummaryList>
+            {client.email ? <SummaryRow term="Email">{client.email}</SummaryRow> : null}
+            {client.phone ? <SummaryRow term="Phone">{client.phone}</SummaryRow> : null}
+            {hasPrimaryContact ? (
+              <SummaryRow term="Primary contact">
                 {client.contact_name}
                 {client.contact_role ? ` — ${client.contact_role}` : null}
-              </dd>
-            </div>
-          ) : null}
-          {isBusiness && client.contact_email ? (
-            <div>
-              <dt mix={termStyle}>Contact email</dt>
-              <dd mix={detailStyle}>{client.contact_email}</dd>
-            </div>
-          ) : null}
-          {isBusiness && client.contact_phone ? (
-            <div>
-              <dt mix={termStyle}>Contact phone</dt>
-              <dd mix={detailStyle}>{client.contact_phone}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </section>
+              </SummaryRow>
+            ) : null}
+            {isBusiness && client.contact_email ? (
+              <SummaryRow term="Contact email">{client.contact_email}</SummaryRow>
+            ) : null}
+            {isBusiness && client.contact_phone ? (
+              <SummaryRow term="Contact phone">{client.contact_phone}</SummaryRow>
+            ) : null}
+          </SummaryList>
+        </Panel.Body>
+      </Panel>
     );
   };
 }

@@ -25,12 +25,20 @@ import {
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
-import { colors, radius, shadow } from '../../../../ui/theme.ts';
+import { colors, radius } from '../../../../ui/theme.ts';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { APP_NAME } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
 import type { InvoicingFormValues } from './form-values.ts';
 import { invoicingFormFields, presetFormFields } from './public/schema.ts';
+import {
+  settingsCardDetailStyle,
+  settingsCardHeadingStyle,
+  settingsCardListStyle,
+  settingsCardStackStyle,
+  settingsCardStyle,
+  settingsCardTermStyle,
+} from '../ui/card-style.ts';
 
 export interface InvoicingPageProps {
   csrfToken: string;
@@ -50,55 +58,11 @@ export interface InvoicingPageProps {
   presetErrorId?: string;
 }
 
-const cardStyle = css({
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-  boxShadow: shadow.card,
-});
-
-const cardGapStyle = css({
-  marginTop: '1rem',
-});
-
-const cardHeadingStyle = css({
-  margin: '0 0 1rem',
-  fontSize: '1rem',
-  fontWeight: 700,
-});
-
-const listStyle = css({
-  margin: 0,
-  display: 'grid',
-  gap: '0.75rem',
-});
-
-const termStyle = css({
-  color: colors.muted,
-  fontSize: '0.75rem',
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-});
-
-const detailStyle = css({
-  margin: '0.125rem 0 0',
-  fontSize: '0.9375rem',
-  overflowWrap: 'anywhere',
-});
-
 const missingStyle = css({
   margin: '0.5rem 0 0',
   paddingLeft: '1.25rem',
   color: colors.muted,
   fontSize: '0.875rem',
-});
-
-const addressGroupStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
 });
 
 const checkboxStyle = css({
@@ -221,8 +185,8 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
           </p>
         </header>
 
-        <section aria-labelledby="issue-readiness-heading" mix={cardStyle}>
-          <h2 id="issue-readiness-heading" mix={cardHeadingStyle}>
+        <section aria-labelledby="issue-readiness-heading" mix={settingsCardStyle}>
+          <h2 id="issue-readiness-heading" mix={settingsCardHeadingStyle}>
             Issue readiness
           </h2>
           <p role="status" mix={noticeSpacingStyle}>
@@ -230,7 +194,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
           </p>
           {view.issueReady ? null : (
             <>
-              <p mix={detailStyle}>Complete these seller details before issuing an invoice:</p>
+              <p mix={settingsCardDetailStyle}>Complete these seller details before issuing an invoice:</p>
               <ul mix={missingStyle}>
                 {view.missingRequirements.map((requirement) => (
                   <li key={requirement}>{requirement}</li>
@@ -238,14 +202,14 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               </ul>
             </>
           )}
-          <dl mix={listStyle}>
+          <dl mix={settingsCardListStyle}>
             <div>
-              <dt mix={termStyle}>Seller legal name</dt>
-              <dd mix={detailStyle}>{view.legalName}</dd>
+              <dt mix={settingsCardTermStyle}>Seller legal name</dt>
+              <dd mix={settingsCardDetailStyle}>{view.legalName}</dd>
             </div>
             <div>
-              <dt mix={termStyle}>Legal seller name override</dt>
-              <dd mix={detailStyle}>{view.explicitLegalName?.trim() || 'Not set'}</dd>
+              <dt mix={settingsCardTermStyle}>Legal seller name override</dt>
+              <dd mix={settingsCardDetailStyle}>{view.explicitLegalName?.trim() || 'Not set'}</dd>
             </div>
           </dl>
         </section>
@@ -257,18 +221,18 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
         >
           <input type="hidden" name="_csrf" value={csrfToken} />
           {issues.length > 0 ? (
-            <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
               Please correct the fields below.
             </p>
           ) : null}
           {message ? (
-            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+            <p role="status" data-spacing="true" mix={noticeStatusStyle}>
               {message}
             </p>
           ) : null}
 
-          <section aria-labelledby="seller-profile-heading" mix={[cardStyle, cardGapStyle]}>
-            <h2 id="seller-profile-heading" mix={cardHeadingStyle}>
+          <section aria-labelledby="seller-profile-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+            <h2 id="seller-profile-heading" mix={settingsCardHeadingStyle}>
               Seller profile
             </h2>
             <Field
@@ -284,7 +248,7 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
               />
             </Field>
 
-            <div mix={addressGroupStyle}>
+            <div mix={formStackStyle}>
               <Field
                 label="Business address line 1"
                 hint="Optional. If you enter any address field, line 1 and country are required."
@@ -375,8 +339,8 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
 
           </section>
 
-          <section aria-labelledby="tax-registration-heading" mix={[cardStyle, cardGapStyle]}>
-            <h2 id="tax-registration-heading" mix={cardHeadingStyle}>
+          <section aria-labelledby="tax-registration-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+            <h2 id="tax-registration-heading" mix={settingsCardHeadingStyle}>
               Tax registration
             </h2>
             <Field
@@ -442,11 +406,11 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
 
           </section>
 
-          <section aria-labelledby="invoice-defaults-heading" mix={[cardStyle, cardGapStyle]}>
-            <h2 id="invoice-defaults-heading" mix={cardHeadingStyle}>
+          <section aria-labelledby="invoice-defaults-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+            <h2 id="invoice-defaults-heading" mix={settingsCardHeadingStyle}>
               Invoice defaults
             </h2>
-            <p mix={detailStyle}>
+            <p mix={settingsCardDetailStyle}>
               These values prefill new invoice drafts for this Organization&rsquo;s Clients.
             </p>
             <Field
@@ -538,11 +502,11 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             </Field>
           </section>
 
-          <section aria-labelledby="numbering-heading" mix={[cardStyle, cardGapStyle]}>
-            <h2 id="numbering-heading" mix={cardHeadingStyle}>
+          <section aria-labelledby="numbering-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+            <h2 id="numbering-heading" mix={settingsCardHeadingStyle}>
               Document numbering
             </h2>
-            <p mix={detailStyle}>
+            <p mix={settingsCardDetailStyle}>
               Prefixes and starting sequence floors for invoices and credit notes. Numbers are
               allocated later, when documents are issued.
             </p>
@@ -607,11 +571,11 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
             </Field>
           </section>
 
-          <section aria-labelledby="branding-heading" mix={[cardStyle, cardGapStyle]}>
-            <h2 id="branding-heading" mix={cardHeadingStyle}>
+          <section aria-labelledby="branding-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+            <h2 id="branding-heading" mix={settingsCardHeadingStyle}>
               Logo and authorized signature
             </h2>
-            <p mix={detailStyle}>
+            <p mix={settingsCardDetailStyle}>
               Optional PNG, JPEG, or WebP data URLs up to 128 KB each. They appear on issued
               invoices and credit notes; leave the image field blank to keep the saved image.
             </p>
@@ -706,15 +670,15 @@ export function InvoicingPage(handle: Handle<InvoicingPageProps>) {
           </div>
         </form>
 
-        <section aria-labelledby="gst-presets-heading" mix={[cardStyle, cardGapStyle]}>
-          <h2 id="gst-presets-heading" mix={cardHeadingStyle}>
+        <section aria-labelledby="gst-presets-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+          <h2 id="gst-presets-heading" mix={settingsCardHeadingStyle}>
             GST rate presets
           </h2>
-          <p mix={detailStyle}>
+          <p mix={settingsCardDetailStyle}>
             Editable rate presets available on this Organization&rsquo;s invoice service lines.
           </p>
           {presetError ? (
-            <p id="preset-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p id="preset-error" role="alert" data-spacing="true" mix={noticeErrorStyle}>
               {presetError}
             </p>
           ) : null}

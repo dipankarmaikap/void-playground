@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { beforeEach, describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../../config.ts';
 import { clients, invoices } from '../../../data/db.ts';
 import { clearTestTables } from '../../../../test/db-setup.ts';
 import type { Client } from '../../../data/db.ts';
@@ -283,7 +284,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, indexHref({ q: legalName }), secondCookie);
     assert.match(html, /No clients match your search and filters\./);
-    assert.doesNotMatch(html, /<li\b/);
+    assert.doesNotMatch(html, /<tbody\b/);
   });
 
   it('distinguishes an empty Client book from an empty search result', async () => {
@@ -306,7 +307,7 @@ describe('client directory search and filters', () => {
     assert.match(typeFiltered, /No clients match your search and filters\./);
   });
 
-  it('renders an accessible GET search/filter form and preserves submitted values', async () => {
+  it('renders an accessible GET search form and preserves submitted values', async () => {
     let sessionCookie = await createSearchUser();
 
     let html = await getHtml(
@@ -318,14 +319,15 @@ describe('client directory search and filters', () => {
     assert.match(html, /<form[^>]*method="get"/);
     assert.match(html, /<form[^>]*action="\/app\/clients"/);
     assert.match(html, /role="search"/);
-    assert.match(html, />Search clients</);
-    assert.match(html, />Client type</);
-    assert.match(html, />Status</);
+    assert.match(html, /aria-label="Search clients"/);
     assert.match(html, /name="q"[^>]*value="Needle"/);
-    assert.match(html, /<option value="business" selected/);
-    assert.match(html, /<option value="archived" selected/);
-    assert.match(html, /Apply filters/);
-    assert.match(html, />Reset</);
+    // Type and archived-status have no controls of their own, so a search
+    // carries the current view forward as hidden inputs.
+    assert.match(html, /name="type" value="business"/);
+    assert.match(html, /name="status" value="archived"/);
+    assert.doesNotMatch(html, /<select/);
+    assert.doesNotMatch(html, /Apply filters/);
+    assert.doesNotMatch(html, />Reset</);
   });
 
   it('keeps the searchable directory authenticated and noindex', async () => {
@@ -340,7 +342,7 @@ describe('client directory search and filters', () => {
 
     let html = await getHtml(router, path, sessionCookie);
     assert.match(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, /<title>Clients \| My Remix App<\/title>/);
+    assert.ok(html.includes(`<title>Clients | ${APP_NAME}</title>`));
   });
 
   it('treats percent and underscore as literal search characters', async () => {

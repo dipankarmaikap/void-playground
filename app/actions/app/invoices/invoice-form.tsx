@@ -10,6 +10,7 @@ import { Field } from '../../../ui/field.tsx';
 import { Input } from '../../../ui/input.tsx';
 import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import { colors, radius } from '../../../ui/theme.ts';
+import { cardStyle } from './ui/card-style.ts';
 import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import type { InvoiceFormValues } from './form-values.ts';
 import { InvoiceFormLines } from './invoice-form-lines.tsx';
@@ -30,15 +31,6 @@ const formStyle = css({
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
-});
-
-const cardStyle = css({
-  display: 'grid',
-  gap: '1rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
 });
 
 const gridStyle = css({
@@ -140,7 +132,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           <p role="alert">{firstIssue(issues, 'client_id')?.message}</p>
         ) : null}
 
-        <section aria-labelledby="invoice-basics-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-basics-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-basics-heading" mix={sectionHeadingStyle}>
             Invoice details
           </h2>
@@ -203,7 +195,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-recipient-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-recipient-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-recipient-heading" mix={sectionHeadingStyle}>
             Bill to
           </h2>
@@ -313,7 +305,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-tax-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-tax-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-tax-heading" mix={sectionHeadingStyle}>
             Tax treatment
           </h2>
@@ -434,7 +426,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           ) : null}
         </section>
 
-        <section aria-labelledby="invoice-lines-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-lines-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-lines-heading" mix={sectionHeadingStyle}>
             Service lines
           </h2>
@@ -450,7 +442,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           <InvoiceFormLines values={values} issues={issues} gstRatePresets={gstRatePresets} />
         </section>
 
-        <section aria-labelledby="invoice-discount-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-discount-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-discount-heading" mix={sectionHeadingStyle}>
             Invoice discount and round-off
           </h2>
@@ -510,7 +502,7 @@ export function InvoiceForm(handle: Handle<InvoiceFormProps>) {
           </div>
         </section>
 
-        <section aria-labelledby="invoice-notes-heading" mix={cardStyle}>
+        <section aria-labelledby="invoice-notes-heading" data-gap="form" mix={cardStyle}>
           <h2 id="invoice-notes-heading" mix={sectionHeadingStyle}>
             Notes and instructions
           </h2>

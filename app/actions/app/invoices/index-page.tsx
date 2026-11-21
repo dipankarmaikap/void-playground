@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
+import { formatIsoDate } from '../../../data/dates.ts';
 import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { DRAFT_STATUS_LABEL } from '../../../data/invoices/records.ts';
 import type { InvoiceDirectoryItem } from '../../../data/invoices/records.ts';
@@ -290,7 +291,7 @@ export function InvoicesIndexPage(handle: Handle<InvoicesIndexPageProps>) {
                   </span>
                   <span mix={itemMetaStyle}>
                     {invoice.status === 'draft' ? DRAFT_STATUS_LABEL : statusLabel(invoice.status)} ·{' '}
-                    {invoice.invoice_date} ·{' '}
+                    {formatIsoDate(invoice.invoice_date)} ·{' '}
                     {formatMoney(BigInt(invoice.total_minor), invoice.currency)}
                     {invoice.credited_total_minor > 0
                       ? ` · Credited: ${formatMoney(BigInt(invoice.credited_total_minor), invoice.currency)} · Revised total: ${formatMoney(BigInt(invoice.revised_total_minor), invoice.currency)}`

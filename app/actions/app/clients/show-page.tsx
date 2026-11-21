@@ -1,24 +1,30 @@
-import type { Handle } from 'remix/component';
+import type { Handle, RemixNode } from 'remix/component';
 import { css } from 'remix/component';
 
 import { clientDisplayLabel, clientTypeLabel } from '../../../data/client-names.ts';
+import type { ClientProfileFacts } from '../../../data/client-directory-facts.ts';
+import { formatIsoDate } from '../../../data/dates.ts';
 import type { Client } from '../../../data/db.ts';
+import { formatMoney } from '../../../data/invoices/calculation.ts';
 import { routes } from '../../../routes.ts';
 import { AppShell } from '../../../ui/app-shell.tsx';
+import { Avatar } from '../../../ui/avatar.tsx';
 import { linkButtonStyle } from '../../../ui/button.tsx';
+import { EmptyState } from './ui/empty-state.tsx';
+import { Table } from './ui/table.tsx';
 import type { UserIdentity } from '../../../ui/identity.ts';
+import { Panel } from './ui/panel.tsx';
 import {
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
-  pageHeaderStyle,
-  pageHeadingStyle,
-  pageIntroStyle,
 } from '../../../ui/page-styles.ts';
-import { colors, radius, shadow } from '../../../ui/theme.ts';
+import { StatCard, statGridStyle } from './ui/stat-card.tsx';
+import { Badge, invoiceStatusLabel, invoiceStatusTone } from '../../../ui/badge.tsx';
+import { fontStack, neutrals, primary } from '../../../ui/theme.ts';
 import { ClientBillingSummary } from './billing-summary.tsx';
 import { ClientContactSummary } from './contact-summary.tsx';
 import { ClientStatusControls } from './sections/status-controls.tsx';
+import { SummaryList, SummaryRow } from './summary-list.tsx';
 import { ClientTaxSummary } from './tax-summary.tsx';
 
 export interface ClientProfilePageProps {
@@ -26,75 +32,124 @@ export interface ClientProfilePageProps {
   identity: UserIdentity;
   organizationName: string;
   client: Client;
+  facts: ClientProfileFacts;
   invoiceCount: number;
   error?: string;
   message?: string;
 }
 
-const cardStyle = css({
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-  boxShadow: shadow.card,
+// The profile header is not the shared page header: name it for its own context so the
+// `pageHeaderStyle` name keeps exactly one meaning per module.
+const profileHeaderStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '1rem',
+  marginBottom: '1.5rem',
 });
 
-const cardHeadingStyle = css({
-  margin: '0 0 1rem',
-  fontSize: '1rem',
+const inlineLinkStyle = css({
+  display: 'inline-block',
+  marginBottom: '12px',
+  color: primary.base,
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  textDecoration: 'none',
+  '&:hover': { textDecoration: 'underline' },
 });
 
-const listStyle = css({
+const detailHeaderStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+});
+
+const detailMetaStyle = css({
+  minWidth: 0,
+});
+
+// The reference detail heading is one step smaller than the directory page heading.
+const detailHeadingStyle = css({
   margin: 0,
-  display: 'grid',
-  gap: '0.75rem',
+  color: neutrals.ink,
+  fontFamily: fontStack,
+  fontSize: '1.75rem',
+  fontWeight: 800,
+  letterSpacing: '-0.02em',
+  lineHeight: 1.2,
 });
 
-const termStyle = css({
-  color: colors.muted,
-  fontSize: '0.75rem',
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
+const contextStyle = css({
+  margin: '4px 0 8px',
+  color: neutrals.muted,
+  fontSize: '0.8125rem',
+  lineHeight: 1.55,
 });
 
-const detailStyle = css({
-  margin: '0.125rem 0 0',
-  fontSize: '0.9375rem',
-  overflowWrap: 'anywhere',
-});
-
-const actionsStyle = css({
+const headerActionsStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'center',
-  gap: '1rem',
-  marginTop: '1.25rem',
+  gap: '0.75rem',
 });
 
-const backLinkStyle = css({
-  color: colors.muted,
-  fontSize: '0.875rem',
-  textDecoration: 'none',
-  '&:hover': {
-    color: colors.text,
-    textDecoration: 'underline',
+const contentGridStyle = css({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: '18px',
+  '@media (min-width: 60rem)': {
+    gridTemplateColumns: 'minmax(0, 1.55fr) minmax(0, 0.85fr)',
+    alignItems: 'start',
   },
 });
 
+const summaryColumnStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '18px',
+});
+
+const invoiceLinkStyle = css({
+  color: neutrals.ink,
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  textDecoration: 'none',
+  '&:hover': { color: primary.base, textDecoration: 'underline' },
+});
+
+const footerActionsStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '1rem',
+  marginTop: '18px',
+});
+
+const backLinkStyle = css({
+  color: neutrals.muted,
+  fontSize: '0.875rem',
+  textDecoration: 'none',
+  '&:hover': { color: primary.base, textDecoration: 'underline' },
+});
+
+function clientSince(createdAt: number): string {
+  return new Date(createdAt).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
 export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
   return () => {
-    let {
-      csrfToken,
-      identity,
-      organizationName,
-      client,
-      invoiceCount,
-      error,
-      message,
-    } = handle.props;
+    let { csrfToken, identity, organizationName, client, facts, invoiceCount, error, message } =
+      handle.props;
     let label = clientDisplayLabel(client);
     let isBusiness = client.type === 'business';
+    let archived = client.status === 'archived';
+    let since = clientSince(client.created_at);
     let invoiceDirectoryHref = routes.app.invoices.index.href(
       {},
       { searchParams: { clientId: client.id } },
@@ -103,6 +158,76 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
       {},
       { searchParams: { clientId: client.id } },
     );
+
+    let contextParts: string[] = [];
+    if (isBusiness) {
+      let tradingName = client.trading_name?.trim();
+      let industry = client.industry?.trim();
+      if (tradingName) contextParts.push(tradingName);
+      if (industry) contextParts.push(industry);
+    } else if (client.preferred_name?.trim() && client.preferred_name.trim() !== label) {
+      contextParts.push(client.preferred_name.trim());
+    }
+    let contextLine = `${contextParts.join(' · ')}${contextParts.length > 0 ? ' · ' : ''}Client since ${since}`;
+
+    let rows = facts.invoices.map((invoice) => (
+      <Table.Row key={invoice.id}>
+        <Table.Cell>
+          <a href={routes.app.invoices.show.href({ invoiceId: invoice.id })} mix={invoiceLinkStyle}>
+            {invoice.invoiceNumber ?? 'Invoice'}
+          </a>
+        </Table.Cell>
+        <Table.Cell>{formatIsoDate(invoice.invoiceDate)}</Table.Cell>
+        <Table.AmountCell>
+          {formatMoney(BigInt(invoice.totalMinor), invoice.currency)}
+        </Table.AmountCell>
+        <Table.Cell>
+          <Badge tone={invoiceStatusTone[invoice.status]}>
+            {invoiceStatusLabel[invoice.status]}
+          </Badge>
+        </Table.Cell>
+      </Table.Row>
+    ));
+
+    let summary: RemixNode[] = [
+      <StatCard
+        label="Total invoiced"
+        value={formatMoney(BigInt(facts.totalInvoicedMinor), facts.currency)}
+        icon="↗"
+        foot={<span>Since {since}</span>}
+      />,
+      <StatCard
+        label="Outstanding"
+        value={formatMoney(BigInt(facts.outstandingBalanceMinor), facts.currency)}
+        icon="$"
+        tone="coral"
+        foot={<span>Across this client's invoices</span>}
+      />,
+      <StatCard
+        label="Invoices paid"
+        value={`${facts.paidInvoiceCount} / ${facts.invoiceCount}`}
+        icon="✓"
+        tone="green"
+        foot={<span>Of this client's invoices</span>}
+      />,
+      <StatCard
+        label="Average time to pay"
+        value={
+          facts.averageCollectionDays === null
+            ? '—'
+            : `${facts.averageCollectionDays} days`
+        }
+        icon="◷"
+        tone="amber"
+        foot={
+          <span>
+            {facts.averageCollectionDays === null
+              ? 'No payment history yet'
+              : 'From active payments'}
+          </span>
+        }
+      />,
+    ];
 
     return (
       <AppShell
@@ -113,85 +238,125 @@ export function ClientProfilePage(handle: Handle<ClientProfilePageProps>) {
         title={label}
         description={`View the ${clientTypeLabel(client.type)} client profile for ${label} in your Organization's client book.`}
       >
-        <header mix={pageHeaderStyle}>
-          <h1 mix={pageHeadingStyle}>{label}</h1>
-          <p mix={pageIntroStyle}>{clientTypeLabel(client.type)} client profile</p>
+        <header mix={profileHeaderStyle}>
+          <div>
+            <a href={routes.app.clients.index.href()} mix={inlineLinkStyle}>
+              <span aria-hidden="true">←</span> All clients
+            </a>
+            <div mix={detailHeaderStyle}>
+              <Avatar name={label} size="lg" />
+              <div mix={detailMetaStyle}>
+                <h1 mix={detailHeadingStyle}>{label}</h1>
+                <p mix={contextStyle}>{contextLine}</p>
+                <Badge tone={archived ? 'draft' : 'paid'}>
+                  {archived ? 'Archived client' : 'Active client'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          <div mix={headerActionsStyle}>
+            <a
+              href={routes.app.clients.edit.href({ clientId: client.id })}
+              mix={linkButtonStyle}
+            >
+              Edit client
+            </a>
+            {archived ? null : (
+              <a href={newInvoiceHref} data-variant="secondary" mix={linkButtonStyle}>
+                New invoice draft
+              </a>
+            )}
+          </div>
         </header>
+
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}
-        <section aria-labelledby="client-identity-heading" mix={cardStyle}>
-          <h2 id="client-identity-heading" mix={cardHeadingStyle}>
-            Identity
-          </h2>
-          <dl mix={listStyle}>
-            <div>
-              <dt mix={termStyle}>Type</dt>
-              <dd mix={detailStyle}>{clientTypeLabel(client.type)}</dd>
-            </div>
-            <div>
-              <dt mix={termStyle}>Legal name</dt>
-              <dd mix={detailStyle}>{client.legal_name}</dd>
-            </div>
-            {!isBusiness && client.preferred_name ? (
-              <div>
-                <dt mix={termStyle}>Preferred name</dt>
-                <dd mix={detailStyle}>{client.preferred_name}</dd>
-              </div>
-            ) : null}
-            {isBusiness && client.trading_name ? (
-              <div>
-                <dt mix={termStyle}>Trading name</dt>
-                <dd mix={detailStyle}>{client.trading_name}</dd>
-              </div>
-            ) : null}
-            {isBusiness && client.industry ? (
-              <div>
-                <dt mix={termStyle}>Industry</dt>
-                <dd mix={detailStyle}>{client.industry}</dd>
-              </div>
-            ) : null}
-            <div>
-              <dt mix={termStyle}>Status</dt>
-              <dd mix={detailStyle}>{client.status === 'active' ? 'Active' : 'Archived'}</dd>
-            </div>
-          </dl>
+
+        <section aria-label={`${label} account summary`} mix={statGridStyle}>
+          {summary}
         </section>
-        <ClientContactSummary client={client} />
-        {client.tax_value ? <ClientTaxSummary client={client} /> : null}
-        <ClientBillingSummary client={client} />
-        <section aria-labelledby="client-invoices-heading" mix={cardStyle}>
-          <h2 id="client-invoices-heading" mix={cardHeadingStyle}>
-            Invoices
-          </h2>
-          <p mix={detailStyle}>
-            {invoiceCount} {invoiceCount === 1 ? 'invoice' : 'invoices'}
-          </p>
-          <div mix={actionsStyle}>
-            <a href={invoiceDirectoryHref} mix={linkButtonStyle}>
-              View invoices
-            </a>
-            {client.status === 'active' ? (
-              <a href={newInvoiceHref} data-variant="secondary" mix={linkButtonStyle}>
-                New invoice draft
+
+        <div mix={contentGridStyle}>
+          <Panel labelledBy="client-invoices-heading">
+            <Panel.Header
+              title="Invoice history"
+              headingId="client-invoices-heading"
+              subtitle="A record of work billed to this client."
+              action={
+                <a href={invoiceDirectoryHref} mix={inlineLinkStyle}>
+                  All invoices <span aria-hidden="true">→</span>
+                </a>
+              }
+            />
+            <Panel.Body>
+              {facts.invoices.length === 0 ? (
+                <EmptyState>
+                  <EmptyState.Heading>No invoices</EmptyState.Heading>
+                  <EmptyState.Hint>Invoices issued to this client will appear here.</EmptyState.Hint>
+                </EmptyState>
+              ) : (
+                <Table label={`${label} invoice history`}>
+                  <Table.Header>
+                    <Table.HeadCell>Invoice</Table.HeadCell>
+                    <Table.HeadCell>Issued</Table.HeadCell>
+                    <Table.HeadCell align="right">Amount</Table.HeadCell>
+                    <Table.HeadCell>Status</Table.HeadCell>
+                  </Table.Header>
+                  <Table.Body>{rows}</Table.Body>
+                </Table>
+              )}
+            </Panel.Body>
+            <Panel.Footer>
+              <span>
+                {facts.invoices.length === 0
+                  ? 'No invoices yet'
+                  : `${invoiceCount} ${invoiceCount === 1 ? 'invoice' : 'invoices'}`}
+              </span>
+              <a href={invoiceDirectoryHref} mix={inlineLinkStyle}>
+                View all invoices <span aria-hidden="true">→</span>
               </a>
-            ) : null}
+            </Panel.Footer>
+          </Panel>
+
+          <div mix={summaryColumnStyle}>
+            <Panel labelledBy="client-identity-heading">
+              <Panel.Header
+                title="Client details"
+                headingId="client-identity-heading"
+                subtitle="How this client is recorded."
+              />
+              <Panel.Body>
+                <SummaryList>
+                  <SummaryRow term="Type">{clientTypeLabel(client.type)}</SummaryRow>
+                  <SummaryRow term="Legal name">{client.legal_name}</SummaryRow>
+                  {!isBusiness && client.preferred_name ? (
+                    <SummaryRow term="Preferred name">{client.preferred_name}</SummaryRow>
+                  ) : null}
+                  {isBusiness && client.trading_name ? (
+                    <SummaryRow term="Trading name">{client.trading_name}</SummaryRow>
+                  ) : null}
+                  {isBusiness && client.industry ? (
+                    <SummaryRow term="Industry">{client.industry}</SummaryRow>
+                  ) : null}
+                  <SummaryRow term="Status">{archived ? 'Archived' : 'Active'}</SummaryRow>
+                </SummaryList>
+              </Panel.Body>
+            </Panel>
+            <ClientContactSummary client={client} />
+            {client.tax_value ? <ClientTaxSummary client={client} /> : null}
+            <ClientBillingSummary client={client} />
           </div>
-        </section>
-        <div mix={actionsStyle}>
-          <a
-            href={routes.app.clients.edit.href({ clientId: client.id })}
-            mix={linkButtonStyle}
-          >
-            Edit client
-          </a>
+        </div>
+
+        <div mix={footerActionsStyle}>
           <ClientStatusControls csrfToken={csrfToken} client={client} />
           <a href={routes.app.clients.index.href()} mix={backLinkStyle}>
             Back to clients

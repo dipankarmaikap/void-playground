@@ -30,8 +30,8 @@ export default createController(routes.app.settings.sessions, {
         current: row.id === currentId,
         browser: browserLabel(row.user_agent),
         ip: row.ip ?? 'unknown',
-        createdAt: new Date(row.created_at).toLocaleString(),
-        lastActiveAt: new Date(row.last_active_at).toLocaleString(),
+        createdAt: row.created_at,
+        lastActiveAt: row.last_active_at,
       }));
       // Stable sort keeps newest-first order within each group.
       views.sort((a, b) => Number(b.current) - Number(a.current));

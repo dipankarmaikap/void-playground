@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../../config.ts';
 import { createTestRouter } from '../../../../test/router.ts';
 import { routes } from '../../../routes.ts';
 import { clients } from '../../../data/db.ts';
@@ -63,14 +64,14 @@ describe('clients controller', () => {
     let sessionCookie = await createUserAndLogin(router, db, 'clients');
 
     let directory = await getHtml(router, routes.app.clients.index.href(), sessionCookie);
-    assert.match(directory, /<title>Clients \| My Remix App<\/title>/);
+    assert.ok(directory.includes(`<title>Clients | ${APP_NAME}</title>`));
     assert.match(directory, /<meta name="description" content="[^"]*client/i);
     assert.match(directory, /<meta name="robots" content="noindex"/);
     assert.match(directory, /<h1[^>]*>Clients<\/h1>/);
     assert.match(directory, new RegExp(`href="${routes.app.clients.new.href()}"`));
 
     let newPage = await getHtml(router, routes.app.clients.new.href(), sessionCookie);
-    assert.match(newPage, /<title>New client \| My Remix App<\/title>/);
+    assert.ok(newPage.includes(`<title>New client | ${APP_NAME}</title>`));
     assert.match(newPage, /<meta name="robots" content="noindex"/);
     assert.match(
       newPage,
@@ -113,14 +114,14 @@ describe('clients controller', () => {
     assert.match(profile, /Ada/);
     assert.match(profile, /<p role="status"[^>]*>Client created<\/p>/);
     assert.match(profile, /<meta name="robots" content="noindex"/);
-    assert.match(profile, /<title>Ada \| My Remix App<\/title>/);
+    assert.match(profile, new RegExp(`<title>Ada \\| ${APP_NAME}<\\/title>`));
 
     let editPage = await getHtml(
       router,
       routes.app.clients.edit.href({ clientId: row.id }),
       sessionCookie,
     );
-    assert.match(editPage, /<title>Edit Ada \| My Remix App<\/title>/);
+    assert.match(editPage, new RegExp(`<title>Edit Ada \\| ${APP_NAME}<\\/title>`));
     assert.match(editPage, /name="_csrf" value="[^"]+"/);
     assert.ok(editPage.includes(legalName), 'the edit form should load the stored name');
 
@@ -318,7 +319,7 @@ describe('clients controller', () => {
     assert.match(directory, new RegExp(legalName));
 
     let profile = await getHtml(router, withPreferred, sessionCookie);
-    assert.match(profile, new RegExp(`<title>${preferredName} \\| My Remix App<\\/title>`));
+    assert.match(profile, new RegExp(`<title>${preferredName} \\| ${APP_NAME}<\\/title>`));
 
     let fallbackName = uniqueName('Dorothy Vaughan');
     let fallback = await postForm(
@@ -331,7 +332,7 @@ describe('clients controller', () => {
     let fallbackLocation = fallback.headers.get('Location');
     assert.ok(fallbackLocation);
     let fallbackProfile = await getHtml(router, fallbackLocation, sessionCookie);
-    assert.match(fallbackProfile, new RegExp(`<title>${fallbackName} \\| My Remix App<\\/title>`));
+    assert.match(fallbackProfile, new RegExp(`<title>${fallbackName} \\| ${APP_NAME}<\\/title>`));
   });
 
   it('shows only active clients in the directory', async () => {

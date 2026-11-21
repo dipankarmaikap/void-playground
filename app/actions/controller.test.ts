@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../config.ts';
 import { createUser, login, origin } from '../../test/http.ts';
 import { createTestRouter } from '../../test/router.ts';
 import { routes } from '../routes.ts';
@@ -34,8 +35,10 @@ describe('root controller', () => {
 
     assert.equal(response.status, 200);
     assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
-    assert.match(html, /<title>Home \| My Remix App<\/title>/);
-    assert.match(html, /<meta name="description" content="Welcome to My Remix App\./);
+    // The single check for Document's `${title} | ${APP_NAME}` template; per-route
+    // tests below assert page identity only, never this suffix.
+    assert.ok(html.includes(`<title>Home | ${APP_NAME}</title>`));
+    assert.match(html, new RegExp(`<meta name="description" content="Welcome to ${APP_NAME}\\.`));
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
   });
 
@@ -52,12 +55,12 @@ describe('root controller', () => {
     let html = await response.text();
 
     assert.match(html, /<meta property="og:type" content="website"/);
-    assert.match(html, /<meta property="og:site_name" content="My Remix App"/);
-    assert.match(html, /<meta property="og:title" content="Home \| My Remix App"/);
-    assert.match(html, /<meta property="og:description" content="[^"]*My Remix App/);
+    assert.match(html, new RegExp(`<meta property="og:site_name" content="${APP_NAME}"`));
+    assert.match(html, new RegExp(`<meta property="og:title" content="Home \\| ${APP_NAME}"`));
+    assert.match(html, new RegExp(`<meta property="og:description" content="[^"]*${APP_NAME}`));
     assert.match(html, /<meta name="twitter:card" content="summary"/);
-    assert.match(html, /<meta name="twitter:title" content="Home \| My Remix App"/);
-    assert.match(html, /<meta name="twitter:description" content="[^"]*My Remix App/);
+    assert.match(html, new RegExp(`<meta name="twitter:title" content="Home \\| ${APP_NAME}"`));
+    assert.match(html, new RegExp(`<meta name="twitter:description" content="[^"]*${APP_NAME}`));
   });
 
   it('GET / remains public for an authenticated user and links to every destination', async () => {
@@ -72,7 +75,6 @@ describe('root controller', () => {
 
     assert.equal(response.status, 200);
     assert.doesNotMatch(response.headers.get('Cache-Control') ?? '', /private|no-store/i);
-    assert.match(html, /<title>Home \| My Remix App<\/title>/);
     assert.match(html, /<a[^>]*href="\/app\/dashboard"[^>]*>Go to dashboard<\/a>/);
     assert.match(html, /<a[^>]*href="\/register"[^>]*>Create account<\/a>/);
     assert.match(html, /<a[^>]*href="\/login"[^>]*>Log in<\/a>/);

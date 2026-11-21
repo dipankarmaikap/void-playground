@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import {
   COUNTRIES,
@@ -12,16 +11,11 @@ import {
 } from '../../../../data/client-billing.ts';
 import { Field } from '../../../../ui/field.tsx';
 import { Input } from '../../../../ui/input.tsx';
+import { formStackStyle } from '../../../../ui/page-styles.ts';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { issueFor } from '../form-values.ts';
 import { clientFormFields } from '../public/schema.ts';
 import type { ClientFormSection, ClientFormSectionProps } from './registry.ts';
-
-const addressGroupStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem',
-});
 
 export function BillingFields(handle: Handle<ClientFormSectionProps>) {
   return () => {
@@ -43,7 +37,7 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
 
     return (
       <>
-        <div mix={addressGroupStyle}>
+        <div mix={formStackStyle}>
           <Field
             label="Billing address line 1"
             hint="Optional. If you enter any address field, line 1 and country are required."
@@ -145,6 +139,8 @@ export function BillingFields(handle: Handle<ClientFormSectionProps>) {
 
 export const billingSection: ClientFormSection = {
   key: 'billing',
+  title: 'Billing address',
+  hint: 'Shown on invoices sent to this client.',
   render: (props) => (
     <BillingFields
       values={props.values}

@@ -14,6 +14,7 @@ import {
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
 import { colors, radius } from '../../../../ui/theme.ts';
+import { cardStyle } from '../ui/card-style.ts';
 import type { InvoiceFormValues } from '../form-values.ts';
 import { InvoiceForm } from '../invoice-form.tsx';
 
@@ -27,15 +28,6 @@ export interface NewInvoicePageProps {
   issues?: readonly Issue[];
   gstRatePresets: readonly string[];
 }
-
-const cardStyle = css({
-  display: 'grid',
-  gap: '0.75rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-});
 
 const listStyle = css({
   listStyle: 'none',

@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/component';
 import { css } from 'remix/component';
 
+import { formatKolkataTimestamp } from '../../../../data/dates.ts';
 import { routes } from '../../../../routes.ts';
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
@@ -8,7 +9,6 @@ import { Icon } from '../../../../ui/icon.tsx';
 import type { UserIdentity } from '../../../../ui/identity.ts';
 import {
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
@@ -21,8 +21,8 @@ export interface SessionView {
   current: boolean;
   browser: string;
   ip: string;
-  createdAt: string;
-  lastActiveAt: string;
+  createdAt: number;
+  lastActiveAt: number;
 }
 
 export interface SessionsPageProps {
@@ -83,7 +83,7 @@ const currentBadgeStyle = css({
   padding: '0.125rem 0.5rem',
   borderRadius: '999px',
   background: colors.accent,
-  color: '#ffffff',
+  color: colors.onPrimary,
   fontSize: '0.75rem',
   fontWeight: 700,
   letterSpacing: '0.02em',
@@ -113,7 +113,7 @@ const revokeFormStyle = css({
   display: 'inline-flex',
 });
 
-const dangerStyle = css({
+const dangerZoneStyle = css({
   marginTop: '1.75rem',
   padding: '1rem 1.25rem',
   border: `1px solid ${colors.danger}`,
@@ -168,12 +168,12 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
           </p>
         </header>
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}
@@ -197,11 +197,19 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
                   </div>
                   <div>
                     <dt mix={metaTermStyle}>Created</dt>
-                    <dd mix={metaDetailStyle}>{session.createdAt}</dd>
+                    <dd mix={metaDetailStyle}>
+                      <time dateTime={new Date(session.createdAt).toISOString()}>
+                        {formatKolkataTimestamp(session.createdAt)} IST
+                      </time>
+                    </dd>
                   </div>
                   <div>
                     <dt mix={metaTermStyle}>Last active</dt>
-                    <dd mix={metaDetailStyle}>{session.lastActiveAt}</dd>
+                    <dd mix={metaDetailStyle}>
+                      <time dateTime={new Date(session.lastActiveAt).toISOString()}>
+                        {formatKolkataTimestamp(session.lastActiveAt)} IST
+                      </time>
+                    </dd>
                   </div>
                 </dl>
               </div>
@@ -217,7 +225,7 @@ export function SessionsPage(handle: Handle<SessionsPageProps>) {
           ))}
         </ul>
         {hasOtherSessions ? (
-          <details mix={dangerStyle}>
+          <details mix={dangerZoneStyle}>
             <summary mix={dangerSummaryStyle}>Revoke all other sessions</summary>
             <div mix={dangerBodyStyle}>
               <p mix={dangerCopyStyle}>

@@ -40,6 +40,10 @@ export interface ClientFormSectionContext {
 export interface ClientFormSection {
   /** Stable identity for rendering and diagnostics. */
   key: string;
+  /** Heading shown above this section's fields in the form panel. */
+  title: string;
+  /** Plain-language hint shown under the heading. */
+  hint: string;
   render: (props: ClientFormSectionProps) => RemixNode;
   parse: (
     values: ClientFormValues,

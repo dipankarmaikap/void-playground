@@ -5,6 +5,12 @@ import { getCsrfToken } from 'remix/middleware/csrf';
 
 import { isClientType } from '../../../data/client-names.ts';
 import {
+  clientIdsForFollowUp,
+  getClientDirectoryFacts,
+  getClientProfileFacts,
+} from '../../../data/client-directory-facts.ts';
+import type { ClientFollowUpFilter } from '../../../data/client-directory-facts.ts';
+import {
   createClient,
   findClient,
   listClients,
@@ -13,7 +19,6 @@ import {
 } from '../../../data/clients.ts';
 import type { ClientTypeFilter } from '../../../data/clients.ts';
 import { parseClientStatusFilter } from '../../../data/client-status.ts';
-import { countClientInvoices } from '../../../data/invoices/records.ts';
 import { authedUser, requireAuth } from '../../../middleware/auth.ts';
 import {
   CurrentOrganization,
@@ -43,11 +48,19 @@ export default createController(routes.app.clients, {
       if (isClientType(typeParam)) type = typeParam;
       let status = parseClientStatusFilter(context.url.searchParams.get('status'));
       let page = parseClientDirectoryPage(context.url.searchParams.get('page'));
+      let followUpParam = context.url.searchParams.get('followup');
+      let followUp: ClientFollowUpFilter =
+        followUpParam === 'overdue' || followUpParam === 'current' ? followUpParam : 'all';
+      // The follow-up set is Organization-wide and comes from the same facts that feed the
+      // summary cards. Passing it into listClients filters before pagination, so counts and
+      // Next/Previous links describe the filtered view instead of the unfiltered directory.
+      let facts = await getClientDirectoryFacts(context.db, organization.id);
       let directory = await listClients(context.db, organization.id, {
         q: query,
         type,
         status,
         page,
+        clientIds: followUp === 'all' ? undefined : clientIdsForFollowUp(facts, followUp),
       });
       return context.render(
         <ClientsIndexPage
@@ -58,7 +71,10 @@ export default createController(routes.app.clients, {
           query={query}
           type={type}
           status={status}
+          followUp={followUp}
+          facts={facts}
           page={directory.page}
+          total={directory.total}
           hasPrevious={directory.hasPrevious}
           hasNext={directory.hasNext}
           error={typeof error === 'string' ? error : undefined}
@@ -83,7 +99,7 @@ export default createController(routes.app.clients, {
       let organization = context.get(CurrentOrganization);
       let client = await findClient(context.db, organization.id, context.params.clientId);
       if (!client) return new Response('Client not found', { status: 404 });
-      let invoiceCount = await countClientInvoices(context.db, organization.id, client.id);
+      let facts = await getClientProfileFacts(context.db, organization.id, client.id);
 
       let auth = authedUser(context);
       let identity = auth.identity;
@@ -96,7 +112,8 @@ export default createController(routes.app.clients, {
           identity={{ email: identity.email, displayName: identity.display_name }}
           organizationName={organization.name}
           client={client}
-          invoiceCount={invoiceCount}
+          facts={facts}
+          invoiceCount={facts.invoiceCount}
           error={typeof error === 'string' ? error : undefined}
           message={typeof message === 'string' ? message : undefined}
         />,

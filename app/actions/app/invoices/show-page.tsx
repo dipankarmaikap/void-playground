@@ -9,6 +9,7 @@ import type {
 import { joinAddressParts } from '../../../data/address.ts';
 import { countryName } from '../../../data/client-billing.ts';
 import { clientTaxTypeLabel } from '../../../data/client-tax.ts';
+import { formatIsoDate, formatKolkataTimestamp } from '../../../data/dates.ts';
 import {
   currencyMinorDigits,
   formatMinorInput,
@@ -39,7 +40,6 @@ import { Input } from '../../../ui/input.tsx';
 import { formFieldAttributes } from '../../../ui/public/form-field.ts';
 import { RestfulForm } from '../../../ui/public/restful-form.tsx';
 import {
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
@@ -47,6 +47,8 @@ import {
 } from '../../../ui/page-styles.ts';
 import { Select } from '../../../ui/select.tsx';
 import { colors, radius } from '../../../ui/theme.ts';
+import { cardStyle } from './ui/card-style.ts';
+import { invoiceNoteAreaStyle } from './ui/note-area-style.ts';
 import { internalNoteFormFields } from './public/schema.ts';
 import { paymentFormFields, paymentVoidFormFields } from './payments/public/schema.ts';
 import { refundFormFields, refundVoidFormFields } from './refunds/public/schema.ts';
@@ -95,15 +97,6 @@ export interface InvoiceShowPageProps extends InvoiceActivityData {
   };
 }
 
-const cardStyle = css({
-  display: 'grid',
-  gap: '0.75rem',
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-});
-
 const headingStyle = css({ margin: 0, fontSize: '1.0625rem' });
 
 const detailStyle = css({ margin: 0, fontSize: '0.9375rem', lineHeight: 1.5 });
@@ -118,22 +111,9 @@ const amountCellStyle = css({ padding: '0.5rem 0.625rem', textAlign: 'right' });
 const breakdownStyle = css({ margin: 0, fontSize: '0.9375rem', lineHeight: 1.6 });
 const totalStyle = css({ margin: 0, textAlign: 'right', fontSize: '1.0625rem', fontWeight: 700 });
 const actionsStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.25rem' });
-const paymentHistoryStyle = css({ display: 'grid', gap: '0.75rem', margin: 0, padding: 0, listStyle: 'none' });
-const paymentEntryStyle = css({
-  display: 'grid',
-  gap: '0.5rem',
-  padding: '1rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.md,
-});
-const creditNoteHistoryStyle = css({
-  display: 'grid',
-  gap: '0.75rem',
-  margin: 0,
-  padding: 0,
-  listStyle: 'none',
-});
-const creditNoteEntryStyle = css({
+// The payment, refund, and credit note histories share one list and one entry box.
+const historyListStyle = css({ display: 'grid', gap: '0.75rem', margin: 0, padding: 0, listStyle: 'none' });
+const historyEntryStyle = css({
   display: 'grid',
   gap: '0.5rem',
   padding: '1rem',
@@ -154,18 +134,6 @@ const errorStyle = css({
   borderRadius: radius.md,
   background: colors.surface,
   color: colors.danger,
-});
-const textAreaStyle = css({
-  width: '100%',
-  boxSizing: 'border-box',
-  minHeight: '7rem',
-  padding: '0.75rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.sm,
-  background: colors.surface,
-  color: colors.text,
-  fontFamily: 'inherit',
-  fontSize: 'max(1rem, 1em)',
 });
 const noteFieldStyle = css({ display: 'grid', gap: '0.375rem', marginBottom: '0.75rem' });
 const snapshotImageStyle = css({ display: 'block', maxWidth: '12rem', maxHeight: '8rem' });
@@ -284,7 +252,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
           </a>
         </div>
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}
@@ -321,8 +289,8 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
             </p>
           ) : null}
           <p mix={detailStyle}>Currency: {invoice.currency}</p>
-          <p mix={detailStyle}>Invoice date: {invoice.invoice_date}</p>
-          <p mix={detailStyle}>Due date: {invoice.due_date}</p>
+          <p mix={detailStyle}>Invoice date: {formatIsoDate(invoice.invoice_date)}</p>
+          <p mix={detailStyle}>Due date: {formatIsoDate(invoice.due_date)}</p>
           <p mix={detailStyle}>
             Payment term: {PAYMENT_TERM_LABELS[invoice.payment_term as keyof typeof PAYMENT_TERM_LABELS] ?? invoice.payment_term}
           </p>
@@ -529,7 +497,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
               </p>
             ) : null}
             {payments.length > 0 ? (
-              <ol role="list" mix={paymentHistoryStyle}>
+              <ol role="list" mix={historyListStyle}>
                 {payments.map((payment) => {
                   let voidError =
                     voidPaymentError?.paymentId === payment.id ? voidPaymentError : undefined;
@@ -540,9 +508,10 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                     paymentId: payment.id,
                   });
                   return (
-                    <li key={payment.id} mix={paymentEntryStyle}>
+                    <li key={payment.id} mix={historyEntryStyle}>
                       <h3 id={`invoice-payment-${payment.id}-heading`} mix={headingStyle}>
-                        {invoicePaymentMethodLabel(payment.payment_method)} · {payment.payment_date}
+                        {invoicePaymentMethodLabel(payment.payment_method)} ·{' '}
+                        {formatIsoDate(payment.payment_date)}
                       </h3>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(payment.amount_minor), invoice.currency)}
@@ -555,12 +524,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>
                             Voided on:{' '}
                             <time dateTime={new Date(payment.voided_at).toISOString()}>
-                              {new Date(payment.voided_at).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })}{' '}
-                              IST
+                              {formatKolkataTimestamp(payment.voided_at)} IST
                             </time>
                           </p>
                           <p mix={detailStyle}>Void reason: {payment.void_reason}</p>
@@ -579,7 +543,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                             autoFocus={Boolean(voidError)}
                             defaultValue={voidError?.reason ?? ''}
                             aria-describedby={voidError ? voidErrorId : undefined}
-                            mix={textAreaStyle}
+                            mix={invoiceNoteAreaStyle}
                             {...formFieldAttributes(paymentVoidFormFields.reason, voidError)}
                           />
                           {voidError ? (
@@ -713,16 +677,16 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
               Refund due: {formatMoney(BigInt(refundDueMinor), invoice.currency)}
             </p>
             {refunds.length > 0 ? (
-              <ol role="list" mix={paymentHistoryStyle}>
+              <ol role="list" mix={historyListStyle}>
                 {refunds.map((refund) => {
                   let voidError =
                     voidRefundError?.refundId === refund.id ? voidRefundError : undefined;
                   let voidReasonId = `invoice-refund-${refund.id}-void-reason`;
                   let voidErrorId = `${voidReasonId}-error`;
                   return (
-                    <li key={refund.id} mix={paymentEntryStyle}>
+                    <li key={refund.id} mix={historyEntryStyle}>
                       <h3 id={`invoice-refund-${refund.id}-heading`} mix={headingStyle}>
-                        {refundMethodLabel(refund.refund_method)} · {refund.refund_date}
+                        {refundMethodLabel(refund.refund_method)} · {formatIsoDate(refund.refund_date)}
                       </h3>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(refund.amount_minor), invoice.currency)}
@@ -735,12 +699,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                           <p mix={detailStyle}>
                             Voided on:{' '}
                             <time dateTime={new Date(refund.voided_at).toISOString()}>
-                              {new Date(refund.voided_at).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })}{' '}
-                              IST
+                              {formatKolkataTimestamp(refund.voided_at)} IST
                             </time>
                           </p>
                           <p mix={detailStyle}>Void reason: {refund.void_reason}</p>
@@ -762,7 +721,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                             autoFocus={Boolean(voidError)}
                             defaultValue={voidError?.reason ?? ''}
                             aria-describedby={voidError ? voidErrorId : undefined}
-                            mix={textAreaStyle}
+                            mix={invoiceNoteAreaStyle}
                             {...formFieldAttributes(refundVoidFormFields.reason, voidError)}
                           />
                           {voidError ? (
@@ -894,15 +853,15 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
               Revised total: {formatMoney(BigInt(revisedTotalMinor), invoice.currency)}
             </p>
             {creditNotes.length > 0 ? (
-              <ol role="list" mix={creditNoteHistoryStyle}>
+              <ol role="list" mix={historyListStyle}>
                 {creditNotes.map((creditNote) => {
                   let draft = creditNote.status === 'draft';
                   return (
-                    <li key={creditNote.id} mix={creditNoteEntryStyle}>
+                    <li key={creditNote.id} mix={historyEntryStyle}>
                       <h3 mix={headingStyle}>
                         {draft ? 'Credit note Draft' : `Credit note ${creditNote.credit_note_number}`}
                       </h3>
-                      <p mix={detailStyle}>Credit note date: {creditNote.credit_date}</p>
+                      <p mix={detailStyle}>Credit note date: {formatIsoDate(creditNote.credit_date)}</p>
                       <p mix={detailStyle}>Reason: {creditNote.reason}</p>
                       <p mix={detailStyle}>
                         Amount: {formatMoney(BigInt(creditNote.total_minor), invoice.currency)}
@@ -998,7 +957,7 @@ export function InvoiceShowPage(handle: Handle<InvoiceShowPageProps>) {
                   <textarea
                     id="invoice-internal-note"
                     name="internal_note"
-                    mix={textAreaStyle}
+                    mix={invoiceNoteAreaStyle}
                     defaultValue={internalNoteValue ?? invoice.internal_note ?? ''}
                     aria-describedby={internalNoteError ? 'internal-note-error' : undefined}
                     {...formFieldAttributes(internalNoteFormFields.internal_note, internalNoteError)}

@@ -1,6 +1,7 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { APP_NAME } from '../../config.ts';
 import { createTestRouter } from '../../../test/router.ts';
 import { routes } from '../../routes.ts';
 import {
@@ -41,13 +42,13 @@ describe('auth controller', () => {
     let html = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, /<title>Log in \| My Remix App<\/title>/);
+    assert.ok(html.includes(`<title>Log in | ${APP_NAME}</title>`));
     assert.match(
       html,
-      /<meta name="description" content="Log in to My Remix App to open your dashboard\."/,
+      new RegExp(`<meta name="description" content="Log in to ${APP_NAME} to open your dashboard\\."`),
     );
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, /<a[^>]*href="\/"[^>]*>My Remix App<\/a>/);
+    assert.match(html, new RegExp(`<a[^>]*href="\\/"[^>]*>${APP_NAME}<\\/a>`));
     assert.match(html, /<form[^>]*method="post"[^>]*action="\/login"/);
     assert.match(html, /name="_csrf"/);
     assert.match(html, /<a[^>]*href="\/register"[^>]*>Register<\/a>/);
@@ -58,13 +59,15 @@ describe('auth controller', () => {
     let html = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, /<title>Register \| My Remix App<\/title>/);
+    assert.ok(html.includes(`<title>Register | ${APP_NAME}</title>`));
     assert.match(
       html,
-      /<meta name="description" content="Register with My Remix App and create your Organization\."/,
+      new RegExp(
+        `<meta name="description" content="Register with ${APP_NAME} and create your Organization\\."`,
+      ),
     );
     assert.doesNotMatch(html, /<meta name="robots" content="noindex"/);
-    assert.match(html, /<a[^>]*href="\/"[^>]*>My Remix App<\/a>/);
+    assert.match(html, new RegExp(`<a[^>]*href="\\/"[^>]*>${APP_NAME}<\\/a>`));
     assert.match(html, /<form[^>]*method="post"[^>]*action="\/register"/);
     assert.match(html, /name="_csrf"/);
     assert.match(html, /name="organization_name"[^>]*required/);

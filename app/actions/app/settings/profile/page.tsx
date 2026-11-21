@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/component';
-import { css } from 'remix/component';
 
 import { AppShell } from '../../../../ui/app-shell.tsx';
 import { Button } from '../../../../ui/button.tsx';
@@ -9,16 +8,22 @@ import { Input } from '../../../../ui/input.tsx';
 import {
   formStackStartStyle,
   noticeErrorStyle,
-  noticeSpacingStyle,
   noticeStatusStyle,
   pageHeaderStyle,
   pageHeadingStyle,
   pageIntroStyle,
 } from '../../../../ui/page-styles.ts';
-import { colors, radius, shadow } from '../../../../ui/theme.ts';
 import { formFieldAttributes } from '../../../../ui/public/form-field.ts';
 import { APP_NAME } from '../../../../config.ts';
 import { routes } from '../../../../routes.ts';
+import {
+  settingsCardDetailStyle,
+  settingsCardHeadingStyle,
+  settingsCardListStyle,
+  settingsCardStackStyle,
+  settingsCardStyle,
+  settingsCardTermStyle,
+} from '../ui/card-style.ts';
 import { displayNameFormFields, organizationNameFormFields } from './public/schema.ts';
 
 export interface ProfilePageProps {
@@ -32,44 +37,6 @@ export interface ProfilePageProps {
   error?: string;
   message?: string;
 }
-
-const cardStyle = css({
-  padding: '1.25rem',
-  border: `1px solid ${colors.border}`,
-  borderRadius: radius.lg,
-  background: colors.surface,
-  boxShadow: shadow.card,
-});
-
-const editCardStyle = css({
-  marginTop: '1rem',
-});
-
-const cardHeadingStyle = css({
-  margin: '0 0 1rem',
-  fontSize: '1rem',
-  fontWeight: 700,
-});
-
-const listStyle = css({
-  margin: 0,
-  display: 'grid',
-  gap: '0.75rem',
-});
-
-const termStyle = css({
-  color: colors.muted,
-  fontSize: '0.75rem',
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-});
-
-const detailStyle = css({
-  margin: '0.125rem 0 0',
-  fontSize: '0.9375rem',
-  overflowWrap: 'anywhere',
-});
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
@@ -102,23 +69,28 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             Manage your Organization identity separately from your personal display name.
           </p>
         </header>
-        <section aria-labelledby="organization-heading" mix={cardStyle}>
-          <h2 id="organization-heading" mix={cardHeadingStyle}>
+        <section aria-labelledby="organization-heading" mix={settingsCardStyle}>
+          <h2 id="organization-heading" mix={settingsCardHeadingStyle}>
             Organization
           </h2>
-          <dl mix={listStyle}>
+          <dl mix={settingsCardListStyle}>
             <div>
-              <dt mix={termStyle}>Organization name</dt>
-              <dd mix={detailStyle}>{organizationName}</dd>
+              <dt mix={settingsCardTermStyle}>Organization name</dt>
+              <dd mix={settingsCardDetailStyle}>{organizationName}</dd>
             </div>
           </dl>
           {organizationError ? (
-            <p id="organization-name-error" role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+            <p
+              id="organization-name-error"
+              role="alert"
+              data-spacing="true"
+              mix={noticeErrorStyle}
+            >
               {organizationError}
             </p>
           ) : null}
           {organizationMessage ? (
-            <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+            <p role="status" data-spacing="true" mix={noticeStatusStyle}>
               {organizationMessage}
             </p>
           ) : null}
@@ -141,32 +113,32 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           </form>
         </section>
         {error ? (
-          <p role="alert" mix={[noticeErrorStyle, noticeSpacingStyle]}>
+          <p role="alert" data-spacing="true" mix={noticeErrorStyle}>
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" mix={[noticeStatusStyle, noticeSpacingStyle]}>
+          <p role="status" data-spacing="true" mix={noticeStatusStyle}>
             {message}
           </p>
         ) : null}
-        <section aria-labelledby="identity-heading" mix={cardStyle}>
-          <h2 id="identity-heading" mix={cardHeadingStyle}>
+        <section aria-labelledby="identity-heading" mix={settingsCardStyle}>
+          <h2 id="identity-heading" mix={settingsCardHeadingStyle}>
             Identity
           </h2>
-          <dl mix={listStyle}>
+          <dl mix={settingsCardListStyle}>
             <div>
-              <dt mix={termStyle}>Display name</dt>
-              <dd mix={detailStyle}>{trimmedDisplayName ?? 'Not set'}</dd>
+              <dt mix={settingsCardTermStyle}>Display name</dt>
+              <dd mix={settingsCardDetailStyle}>{trimmedDisplayName ?? 'Not set'}</dd>
             </div>
             <div>
-              <dt mix={termStyle}>Email</dt>
-              <dd mix={detailStyle}>{identity.email}</dd>
+              <dt mix={settingsCardTermStyle}>Email</dt>
+              <dd mix={settingsCardDetailStyle}>{identity.email}</dd>
             </div>
           </dl>
         </section>
-        <section aria-labelledby="edit-display-name-heading" mix={[cardStyle, editCardStyle]}>
-          <h2 id="edit-display-name-heading" mix={cardHeadingStyle}>
+        <section aria-labelledby="edit-display-name-heading" mix={[settingsCardStyle, settingsCardStackStyle]}>
+          <h2 id="edit-display-name-heading" mix={settingsCardHeadingStyle}>
             Display name
           </h2>
           <form
